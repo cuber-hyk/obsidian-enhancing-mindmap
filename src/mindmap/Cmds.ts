@@ -110,18 +110,20 @@ export class ChangeNodeText extends Command {
     }
     execute():boolean {
         //if(!this.isFirst){
-            this.node.setText(this.text);
+            this.node.setText(this.text).then(() => {
+                this.node.refreshBox();
+                this.node.clearCacheData();
+                this.refresh(this.node.mindmap);
+            });
         //}
-        this.node.refreshBox();
-        this.node.clearCacheData();
-        this.refresh(this.node.mindmap);
         return true; //exit with no error
     }
     undo() {
-        this.node.setText(this.oldText);
-        this.node.clearCacheData();
-        this.node.refreshBox();
-        this.refresh(this.node.mindmap);
+        this.node.setText(this.oldText).then(() => {
+            this.node.clearCacheData();
+            this.node.refreshBox();
+            this.refresh(this.node.mindmap);
+        });
         this.isFirst =false;
     }
 }

@@ -48,6 +48,22 @@ export default {
   "Toggle markdown/mindmap":"切换为 markdown 或 mindmap 模式",
   "Copy node":"复制",
   "Paste node":"粘贴",
-  "Export to html":"导出为 html"
+  "Export to html":"导出为 html",
+
+  "Node insert toolbar":"节点插入工具栏",
+  "Insert external link":"插入外部链接",
+  "Insert Vault file":"插入 Vault 文件",
+  "Insert image":"插入图片",
+  "Link title":"链接标题",
+  "Link URL":"链接地址",
+  "Insert":"插入",
+  "Cancel":"取消",
+  "Invalid URL":"请输入有效的 http 或 https 地址",
+  "Choose Vault file":"选择 Vault 文件",
+  "Choose Vault image":"选择 Vault 图片",
+  "Import local image":"导入本地图片",
+  "Image insertion failed":"图片已导入，但无法插入节点",
+  "Unsupported image type":"不支持的图片类型",
+  "Image import failed":"图片导入失败"
 
 };

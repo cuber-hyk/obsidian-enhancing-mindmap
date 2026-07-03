@@ -1,5 +1,5 @@
 import MindMap from './mindmap'
-import {MarkdownRenderer,normalizePath,TFile,parseLinktext,resolveSubpath} from 'obsidian'
+import {MarkdownRenderer,TFile,parseLinktext,resolveSubpath} from 'obsidian'
 import {t} from '../lang/helpers'
 
 
@@ -38,6 +38,19 @@ interface BOX {
     bottom?:number;
 }
 
+interface NodeLinkData {
+    markdown:string;
+    href:string;
+    label:string;
+    isInternal:boolean;
+    isWholeExternal:boolean;
+}
+
+interface EditableTextData {
+    text:string;
+    links:NodeLinkData[];
+}
+
 export class INodeData implements INode{
     id:string;
     text:string;
@@ -52,6 +65,7 @@ export class INodeData implements INode{
 export default class Node {
     containEl:HTMLElement;
     contentEl:HTMLElement;
+    linkLayerEl:HTMLElement;
     box:BOX = {
         x:0,
         y:0,
@@ -62,6 +76,9 @@ export default class Node {
     isExpand:boolean=true;
     isSelect:boolean = false;
     _oldText?:string;
+    _editText?:string;
+    _editLinks:NodeLinkData[]=[];
+    _linkCount:number=0;
     parent?:Node;
     //isRoot?:boolean;
     children:Node[]=[];
@@ -93,6 +110,10 @@ export default class Node {
         this.contentEl = document.createElement('div');
         this.contentEl.classList.add('mm-node-content');
         this.containEl.appendChild(this.contentEl);
+
+        this.linkLayerEl = document.createElement('div');
+        this.linkLayerEl.classList.add('mm-node-link-layer');
+        this.containEl.appendChild(this.linkLayerEl);
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
 
@@ -112,11 +133,11 @@ export default class Node {
         this.containEl.appendChild(this._barDom);
     }
 
-    parseText(){
+    parseText(): Promise<void>{
         if (this.data.text.length === 0){
             this.data.text = "Sub title";
         }
-        MarkdownRenderer.renderMarkdown( this.data.text ,this.contentEl,this.mindmap.path||"",null).then(()=>{
+        return MarkdownRenderer.renderMarkdown( this.data.text ,this.contentEl,this.mindmap.path||"",this.mindmap.view).then(()=>{
             this.data.mdText = this.contentEl.innerHTML;
             this.refreshBox();
             this.mindmap&&this.mindmap.emit('initNode',{});
@@ -126,6 +147,23 @@ export default class Node {
     }
 
     _delay(){
+           this.linkLayerEl.innerHTML = '';
+           this.setNodeLinkCount(0);
+           var linkIndex = 0;
+           this.contentEl.querySelectorAll('a').forEach((link) => {
+             if (this.decorateNodeLink(link, linkIndex)) {
+                linkIndex++;
+             }
+           });
+           this.setNodeLinkCount(linkIndex);
+           if (linkIndex > 0 && !this.data.isEdit) {
+                requestAnimationFrame(() => {
+                    this.clearTreeCacheData();
+                    this.refreshBox();
+                    this.mindmap&&this.mindmap.emit('renderEditNode',{node:this});
+                });
+           }
+
            //parse md
            this.contentEl.findAll(".internal-embed").forEach(async (el) => {
             const src = el.getAttribute("src");
@@ -174,7 +212,7 @@ export default class Node {
                         }
 
                         if(md){
-                            MarkdownRenderer.renderMarkdown(md,markdownPreview,this.mindmap.path||"",null).then(()=>{
+                            MarkdownRenderer.renderMarkdown(md,markdownPreview,this.mindmap.path||"",this.mindmap.view).then(()=>{
                                // this.data.mdText = this.editDom.innerHTML;
                                 this.refreshBox();
                                 //this._delay();
@@ -237,6 +275,32 @@ export default class Node {
          },100)
     }
 
+    decorateNodeLink(link: HTMLAnchorElement, index: number) {
+        if (link.querySelector('img') || link.closest('.markdown-embed-link')) {
+            return false;
+        }
+
+        const href = link.getAttribute('href') || link.getAttribute('data-href') || '';
+        const label = link.textContent.trim() || href;
+        const visualLink = link.cloneNode(false) as HTMLAnchorElement;
+
+        visualLink.classList.add('mm-node-link');
+        visualLink.setAttribute('title', href);
+        visualLink.setAttribute('aria-label', label);
+        visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+        visualLink.textContent = '';
+
+        if (!visualLink.classList.contains('internal-link')) {
+            visualLink.setAttribute('target', '_blank');
+            visualLink.setAttribute('rel', 'noopener noreferrer');
+        }
+
+        this.linkLayerEl.appendChild(visualLink);
+        link.remove();
+
+        return true;
+    }
+
     select(){
         this.isSelect = true;
         this.containEl.setAttribute('draggable','true');
@@ -263,10 +327,14 @@ export default class Node {
     edit(){
         this.contentEl.innerText='';
         this._oldText = this.data.text;
+        var editData = this.getEditableTextData(this.data.text);
+        this._editText = editData.text;
+        this._editLinks = editData.links;
         //var _t =  this.data.text.replace(/\r\n/g,"<br/>")
        // _t = _t.replace(/\n/g,"<br/>");
       //  console.log(_t);
-        this.contentEl.innerText = this.data.text;
+        this.contentEl.innerText = editData.text;
+        this.renderLinkLayer(editData.links);
         this.contentEl.setAttribute('contentEditable','true');
         this.contentEl.focus();
         this.mindmap.editNode = this;
@@ -280,6 +348,7 @@ export default class Node {
         if(!this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.add('mm-edit-node')
         }
+        this.mindmap.view?.insertController.beginEdit(this);
     }
 
     selectText() {
@@ -499,18 +568,20 @@ export default class Node {
 
     cancelEdit(){
         console.log("CancelEdit");
-        var text = this.contentEl.innerText.trim()||'';
+        var text = this.getMarkdownFromEditedText(this.contentEl.innerText.trim()||'');
         if(text.length == 0){
             text = this._oldText
         }
-        this.data.text = text;
-        this.contentEl.innerText = '';
 
-        MarkdownRenderer.renderMarkdown(text,this.contentEl,this.mindmap.path||"",null).then(()=>{
-            this.data.mdText = this.contentEl.innerHTML;
-            this.refreshBox();
-            this._delay();
-        });
+        this.contentEl.setAttribute('contentEditable','false');
+        this.data.isEdit = false;
+        this._editText = '';
+        this._editLinks = [];
+
+        if(this.containEl.classList.contains('mm-edit-node')){
+            this.containEl.classList.remove('mm-edit-node')
+        }
+        this.mindmap.view?.insertController.endEdit(this);
 
         if(text != this._oldText){
             this.mindmap.execute('changeNodeText',{
@@ -518,15 +589,127 @@ export default class Node {
                 text,
                 oldText:this._oldText
             });
-         }
-
-        this.contentEl.setAttribute('contentEditable','false');
-        this.data.isEdit = false;
-
-        if(this.containEl.classList.contains('mm-edit-node')){
-            this.containEl.classList.remove('mm-edit-node')
+        }else{
+            this.setText(text);
         }
 
+    }
+
+    getEditableTextData(markdown: string): EditableTextData {
+        const links: NodeLinkData[] = [];
+        const externalLink = /(?<!!)\[([^\]]*)\]\(([^)]*)\)/g;
+        const internalLink = /(?<!!)\[\[([^\]]+)]]/g;
+        let text = markdown.replace(externalLink, (match, label, href) => {
+            links.push({
+                markdown: match,
+                href,
+                label: label || href,
+                isInternal: false,
+                isWholeExternal: match === markdown.trim(),
+            });
+            return label || '';
+        });
+
+        text = text.replace(internalLink, (match, linktext) => {
+            const [path, alias] = `${linktext}`.split('|');
+            links.push({
+                markdown: match,
+                href: path,
+                label: alias || path.split('/').pop() || path,
+                isInternal: true,
+                isWholeExternal: false,
+            });
+            return alias || '';
+        });
+
+        return {
+            text: text.trim(),
+            links,
+        };
+    }
+
+    getMarkdownFromEditedText(text: string) {
+        if (!this._editLinks.length) {
+            return text;
+        }
+
+        const oldEditData = this.getEditableTextData(this._oldText || '');
+        const isOriginalEditState =
+            text === oldEditData.text &&
+            this._editLinks.length === oldEditData.links.length &&
+            this._editLinks.every((link, index) => link.markdown === oldEditData.links[index].markdown);
+
+        if (isOriginalEditState) {
+            return this._oldText || text;
+        }
+
+        if (this._editLinks.length === 1 && this._editLinks[0].isWholeExternal) {
+            const link = this._editLinks[0];
+            return `[${text}](${link.href})`;
+        }
+
+        return `${text}${this._editLinks.map((link) => link.markdown).join('')}`;
+    }
+
+    renderLinkLayer(links: NodeLinkData[]) {
+        this.linkLayerEl.innerHTML = '';
+        this.setNodeLinkCount(links.length);
+        links.forEach((link, index) => {
+            const visualLink = this.linkLayerEl.ownerDocument.createElement('a');
+            visualLink.classList.add('mm-node-link');
+            if (link.isInternal) {
+                visualLink.classList.add('internal-link');
+                visualLink.setAttribute('href', link.href);
+                visualLink.setAttribute('data-href', link.href);
+            } else {
+                visualLink.setAttribute('href', link.href);
+                visualLink.setAttribute('target', '_blank');
+                visualLink.setAttribute('rel', 'noopener noreferrer');
+            }
+            visualLink.setAttribute('title', link.href);
+            visualLink.setAttribute('aria-label', link.label);
+            visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+            this.linkLayerEl.appendChild(visualLink);
+        });
+    }
+
+    setNodeLinkCount(count: number) {
+        this._linkCount = count;
+        if (count > 0) {
+            this.containEl.classList.add('mm-node-has-link');
+            this.containEl.style.setProperty('--mm-node-link-space', `${0.35 + count * 1.1}em`);
+            requestAnimationFrame(() => {
+                this.syncLinkLayerPosition();
+            });
+        } else {
+            this.containEl.classList.remove('mm-node-has-link');
+            this.containEl.style.removeProperty('--mm-node-link-space');
+            this.containEl.style.removeProperty('--mm-node-link-layer-left');
+        }
+    }
+
+    syncLinkLayerPosition() {
+        if (this._linkCount <= 0) {
+            this.containEl.style.removeProperty('--mm-node-link-layer-left');
+            return;
+        }
+
+        const fontSize = parseFloat(getComputedStyle(this.contentEl).fontSize) || 16;
+        const linkSpace = (0.35 + this._linkCount * 1.1) * fontSize;
+        const iconGap = 0.35 * fontSize;
+        const left = Math.max(0, this.contentEl.offsetWidth - linkSpace + iconGap);
+        this.containEl.style.setProperty('--mm-node-link-layer-left', `${left}px`);
+    }
+
+    refreshEditText() {
+        if (!this.data.isEdit) return;
+
+        const editData = this.getEditableTextData(this.contentEl.innerText.trim() || '');
+        this._editText = editData.text;
+        this._editLinks = editData.links;
+        this.contentEl.innerText = editData.text;
+        this.renderLinkLayer(editData.links);
+        keepLastIndex(this.contentEl);
     }
 
     getLevel() {
@@ -587,6 +770,7 @@ export default class Node {
 
     refreshBox(){
         this.box = this.getDomBox();
+        this.syncLinkLayerPosition();
     }
 
     getBox(){
@@ -757,6 +941,14 @@ export default class Node {
         }
     }
 
+    clearTreeCacheData() {
+        const root = this.mindmap?.root || this;
+        (function clear(node: Node) {
+            node.boundingRect = null;
+            node.children.forEach((child) => clear(child));
+        })(root);
+    }
+
     addChild(node:Node, i?:number) {
         if (this.children.indexOf(node) == -1) {
             if (i > -1) {
@@ -777,10 +969,10 @@ export default class Node {
         return index;
     }
 
-    setText(text:string) {
+    setText(text:string): Promise<void> {
         this.data.text = text;
         this.contentEl.innerHTML='';
-        this.parseText();
+        return this.parseText();
     }
 
     removeLineBreak() {

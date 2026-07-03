@@ -16,6 +16,7 @@ import { INodeData } from './mindmap/INode'
 import { Transformer } from './markmapLib/markmap-lib';
 import randomColor from "randomcolor";
 import { t } from './lang/helpers'
+import NodeInsertController from './mindmap/insert/NodeInsertController';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
@@ -34,6 +35,7 @@ export const mindmapIcon = "blocks";
 
 export class MindMapView extends TextFileView implements HoverParent {
   plugin: MindMapPlugin;
+  insertController: NodeInsertController;
   hoverPopover: HoverPopover | null;
   id: string = (this.leaf as any).id;
   mindmap: MindMap | null;
@@ -320,6 +322,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   constructor(leaf: WorkspaceLeaf, plugin: MindMapPlugin) {
     super(leaf);
     this.plugin = plugin;
+    this.insertController = new NodeInsertController(this.app);
     this.setColors();
 
     this.fileCache = {
@@ -334,6 +337,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   async onClose() {
     // Remove draggables from render, as the DOM has already detached
     //this.plugin.removeView(this);
+    this.insertController.destroy();
     if (this.mindmap) {
       this.mindmap.clear();
       this.contentEl.innerHTML = '';
@@ -353,6 +357,7 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   setViewData(data: string) {
 
+    this.insertController.endEdit();
     if (this.mindmap) {
       this.mindmap.clear();
       this.contentEl.innerHTML = '';
@@ -391,9 +396,9 @@ export class MindMapView extends TextFileView implements HoverParent {
             this.yamlString = this.getFrontMatter();
           }
         }
+        this.mindmap.view = this;
         this.mindmap.init();
         this.mindmap.refresh();
-        this.mindmap.view = this;
         this.firstInit = false;
       }, 100);
     } else {
@@ -402,15 +407,16 @@ export class MindMapView extends TextFileView implements HoverParent {
       this.yamlString = this.getFrontMatter();
 
       this.mindmap.path = view?.file.path;
+      this.mindmap.view = this;
       this.mindmap.init();
       this.mindmap.refresh();
-      this.mindmap.view = this;
     }
   }
 
   onunload() {
     this.app.workspace.offref("quick-preview");
     this.app.workspace.offref("resize");
+    this.insertController.destroy();
 
     if (this.mindmap) {
       this.mindmap.clear();

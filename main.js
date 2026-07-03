@@ -179,6 +179,8 @@ var en = {
     'Join as citation with the node below': 'Join as citation with the node below',
     'Center mindmap view on the current node': 'Center mindmap view on the current node',
     'Center mindmap view': 'Center mindmap view',
+    'Zoom in': 'Zoom in',
+    'Zoom out': 'Zoom out',
     'Display the node\'s info in console': 'Display the node\'s info in console',
     "Export to html": "Export to html",
     "Export to PNG": "Export to PNG",
@@ -187,6 +189,21 @@ var en = {
     "Export to JPEG (HQ)": "Export to JPEG (HQ)",
     "Export to PNG (LQ)": "Export to PNG (LQ)",
     "Export to JPEG (LQ)": "Export to JPEG (LQ)",
+    "Node insert toolbar": "Node insert toolbar",
+    "Insert external link": "Insert external link",
+    "Insert Vault file": "Insert Vault file",
+    "Insert image": "Insert image",
+    "Link title": "Link title",
+    "Link URL": "Link URL",
+    "Insert": "Insert",
+    "Cancel": "Cancel",
+    "Invalid URL": "Enter a valid http or https URL",
+    "Choose Vault file": "Choose a Vault file",
+    "Choose Vault image": "Choose a Vault image",
+    "Import local image": "Import a local image",
+    "Image insertion failed": "The image was imported but could not be inserted",
+    "Unsupported image type": "Unsupported image type",
+    "Image import failed": "Image import failed",
 };
 
 // British English
@@ -357,7 +374,22 @@ var zhCN = {
     "Toggle markdown/mindmap": "切换为 markdown 或 mindmap 模式",
     "Copy node": "复制",
     "Paste node": "粘贴",
-    "Export to html": "导出为 html"
+    "Export to html": "导出为 html",
+    "Node insert toolbar": "节点插入工具栏",
+    "Insert external link": "插入外部链接",
+    "Insert Vault file": "插入 Vault 文件",
+    "Insert image": "插入图片",
+    "Link title": "链接标题",
+    "Link URL": "链接地址",
+    "Insert": "插入",
+    "Cancel": "取消",
+    "Invalid URL": "请输入有效的 http 或 https 地址",
+    "Choose Vault file": "选择 Vault 文件",
+    "Choose Vault image": "选择 Vault 图片",
+    "Import local image": "导入本地图片",
+    "Image insertion failed": "图片已导入，但无法插入节点",
+    "Unsupported image type": "不支持的图片类型",
+    "Image import failed": "图片导入失败"
 };
 
 // 繁體中文
@@ -432,6 +464,8 @@ class Node$1 {
         };
         this.isExpand = true;
         this.isSelect = false;
+        this._editLinks = [];
+        this._linkCount = 0;
         //isRoot?:boolean;
         this.children = [];
         this.isHide = false;
@@ -454,6 +488,9 @@ class Node$1 {
         this.contentEl = document.createElement('div');
         this.contentEl.classList.add('mm-node-content');
         this.containEl.appendChild(this.contentEl);
+        this.linkLayerEl = document.createElement('div');
+        this.linkLayerEl.classList.add('mm-node-link-layer');
+        this.containEl.appendChild(this.linkLayerEl);
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
         if (this.data.isRoot) {
@@ -475,7 +512,7 @@ class Node$1 {
         if (this.data.text.length === 0) {
             this.data.text = "Sub title";
         }
-        obsidian.MarkdownRenderer.renderMarkdown(this.data.text, this.contentEl, this.mindmap.path || "", null).then(() => {
+        return obsidian.MarkdownRenderer.renderMarkdown(this.data.text, this.contentEl, this.mindmap.path || "", this.mindmap.view).then(() => {
             this.data.mdText = this.contentEl.innerHTML;
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', {});
@@ -483,6 +520,22 @@ class Node$1 {
         });
     }
     _delay() {
+        this.linkLayerEl.innerHTML = '';
+        this.setNodeLinkCount(0);
+        var linkIndex = 0;
+        this.contentEl.querySelectorAll('a').forEach((link) => {
+            if (this.decorateNodeLink(link, linkIndex)) {
+                linkIndex++;
+            }
+        });
+        this.setNodeLinkCount(linkIndex);
+        if (linkIndex > 0 && !this.data.isEdit) {
+            requestAnimationFrame(() => {
+                this.clearTreeCacheData();
+                this.refreshBox();
+                this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
+            });
+        }
         //parse md
         this.contentEl.findAll(".internal-embed").forEach((el) => __awaiter(this, void 0, void 0, function* () {
             const src = el.getAttribute("src");
@@ -531,7 +584,7 @@ class Node$1 {
                             var md = fileData || '';
                         }
                         if (md) {
-                            obsidian.MarkdownRenderer.renderMarkdown(md, markdownPreview, this.mindmap.path || "", null).then(() => {
+                            obsidian.MarkdownRenderer.renderMarkdown(md, markdownPreview, this.mindmap.path || "", this.mindmap.view).then(() => {
                                 // this.data.mdText = this.editDom.innerHTML;
                                 this.refreshBox();
                                 //this._delay();
@@ -585,6 +638,26 @@ class Node$1 {
             });
         }, 100);
     }
+    decorateNodeLink(link, index) {
+        if (link.querySelector('img') || link.closest('.markdown-embed-link')) {
+            return false;
+        }
+        const href = link.getAttribute('href') || link.getAttribute('data-href') || '';
+        const label = link.textContent.trim() || href;
+        const visualLink = link.cloneNode(false);
+        visualLink.classList.add('mm-node-link');
+        visualLink.setAttribute('title', href);
+        visualLink.setAttribute('aria-label', label);
+        visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+        visualLink.textContent = '';
+        if (!visualLink.classList.contains('internal-link')) {
+            visualLink.setAttribute('target', '_blank');
+            visualLink.setAttribute('rel', 'noopener noreferrer');
+        }
+        this.linkLayerEl.appendChild(visualLink);
+        link.remove();
+        return true;
+    }
     select() {
         this.isSelect = true;
         this.containEl.setAttribute('draggable', 'true');
@@ -607,12 +680,17 @@ class Node$1 {
         }
     }
     edit() {
+        var _a;
         this.contentEl.innerText = '';
         this._oldText = this.data.text;
+        var editData = this.getEditableTextData(this.data.text);
+        this._editText = editData.text;
+        this._editLinks = editData.links;
         //var _t =  this.data.text.replace(/\r\n/g,"<br/>")
         // _t = _t.replace(/\n/g,"<br/>");
         //  console.log(_t);
-        this.contentEl.innerText = this.data.text;
+        this.contentEl.innerText = editData.text;
+        this.renderLinkLayer(editData.links);
         this.contentEl.setAttribute('contentEditable', 'true');
         this.contentEl.focus();
         this.mindmap.editNode = this;
@@ -624,6 +702,7 @@ class Node$1 {
         if (!this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.add('mm-edit-node');
         }
+        (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.insertController.beginEdit(this);
     }
     selectText() {
         var text = this.contentEl;
@@ -804,18 +883,20 @@ class Node$1 {
         //selection.removeAllRanges();
     }
     cancelEdit() {
+        var _a;
         console.log("CancelEdit");
-        var text = this.contentEl.innerText.trim() || '';
+        var text = this.getMarkdownFromEditedText(this.contentEl.innerText.trim() || '');
         if (text.length == 0) {
             text = this._oldText;
         }
-        this.data.text = text;
-        this.contentEl.innerText = '';
-        obsidian.MarkdownRenderer.renderMarkdown(text, this.contentEl, this.mindmap.path || "", null).then(() => {
-            this.data.mdText = this.contentEl.innerHTML;
-            this.refreshBox();
-            this._delay();
-        });
+        this.contentEl.setAttribute('contentEditable', 'false');
+        this.data.isEdit = false;
+        this._editText = '';
+        this._editLinks = [];
+        if (this.containEl.classList.contains('mm-edit-node')) {
+            this.containEl.classList.remove('mm-edit-node');
+        }
+        (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.insertController.endEdit(this);
         if (text != this._oldText) {
             this.mindmap.execute('changeNodeText', {
                 node: this,
@@ -823,11 +904,114 @@ class Node$1 {
                 oldText: this._oldText
             });
         }
-        this.contentEl.setAttribute('contentEditable', 'false');
-        this.data.isEdit = false;
-        if (this.containEl.classList.contains('mm-edit-node')) {
-            this.containEl.classList.remove('mm-edit-node');
+        else {
+            this.setText(text);
         }
+    }
+    getEditableTextData(markdown) {
+        const links = [];
+        const externalLink = /(?<!!)\[([^\]]*)\]\(([^)]*)\)/g;
+        const internalLink = /(?<!!)\[\[([^\]]+)]]/g;
+        let text = markdown.replace(externalLink, (match, label, href) => {
+            links.push({
+                markdown: match,
+                href,
+                label: label || href,
+                isInternal: false,
+                isWholeExternal: match === markdown.trim(),
+            });
+            return label || '';
+        });
+        text = text.replace(internalLink, (match, linktext) => {
+            const [path, alias] = `${linktext}`.split('|');
+            links.push({
+                markdown: match,
+                href: path,
+                label: alias || path.split('/').pop() || path,
+                isInternal: true,
+                isWholeExternal: false,
+            });
+            return alias || '';
+        });
+        return {
+            text: text.trim(),
+            links,
+        };
+    }
+    getMarkdownFromEditedText(text) {
+        if (!this._editLinks.length) {
+            return text;
+        }
+        const oldEditData = this.getEditableTextData(this._oldText || '');
+        const isOriginalEditState = text === oldEditData.text &&
+            this._editLinks.length === oldEditData.links.length &&
+            this._editLinks.every((link, index) => link.markdown === oldEditData.links[index].markdown);
+        if (isOriginalEditState) {
+            return this._oldText || text;
+        }
+        if (this._editLinks.length === 1 && this._editLinks[0].isWholeExternal) {
+            const link = this._editLinks[0];
+            return `[${text}](${link.href})`;
+        }
+        return `${text}${this._editLinks.map((link) => link.markdown).join('')}`;
+    }
+    renderLinkLayer(links) {
+        this.linkLayerEl.innerHTML = '';
+        this.setNodeLinkCount(links.length);
+        links.forEach((link, index) => {
+            const visualLink = this.linkLayerEl.ownerDocument.createElement('a');
+            visualLink.classList.add('mm-node-link');
+            if (link.isInternal) {
+                visualLink.classList.add('internal-link');
+                visualLink.setAttribute('href', link.href);
+                visualLink.setAttribute('data-href', link.href);
+            }
+            else {
+                visualLink.setAttribute('href', link.href);
+                visualLink.setAttribute('target', '_blank');
+                visualLink.setAttribute('rel', 'noopener noreferrer');
+            }
+            visualLink.setAttribute('title', link.href);
+            visualLink.setAttribute('aria-label', link.label);
+            visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+            this.linkLayerEl.appendChild(visualLink);
+        });
+    }
+    setNodeLinkCount(count) {
+        this._linkCount = count;
+        if (count > 0) {
+            this.containEl.classList.add('mm-node-has-link');
+            this.containEl.style.setProperty('--mm-node-link-space', `${0.35 + count * 1.1}em`);
+            requestAnimationFrame(() => {
+                this.syncLinkLayerPosition();
+            });
+        }
+        else {
+            this.containEl.classList.remove('mm-node-has-link');
+            this.containEl.style.removeProperty('--mm-node-link-space');
+            this.containEl.style.removeProperty('--mm-node-link-layer-left');
+        }
+    }
+    syncLinkLayerPosition() {
+        if (this._linkCount <= 0) {
+            this.containEl.style.removeProperty('--mm-node-link-layer-left');
+            return;
+        }
+        const fontSize = parseFloat(getComputedStyle(this.contentEl).fontSize) || 16;
+        const linkSpace = (0.35 + this._linkCount * 1.1) * fontSize;
+        const iconGap = 0.35 * fontSize;
+        const left = Math.max(0, this.contentEl.offsetWidth - linkSpace + iconGap);
+        this.containEl.style.setProperty('--mm-node-link-layer-left', `${left}px`);
+    }
+    refreshEditText() {
+        if (!this.data.isEdit)
+            return;
+        const editData = this.getEditableTextData(this.contentEl.innerText.trim() || '');
+        this._editText = editData.text;
+        this._editLinks = editData.links;
+        this.contentEl.innerText = editData.text;
+        this.renderLinkLayer(editData.links);
+        keepLastIndex(this.contentEl);
     }
     getLevel() {
         var level = 0, parent = this.parent;
@@ -877,6 +1061,7 @@ class Node$1 {
     }
     refreshBox() {
         this.box = this.getDomBox();
+        this.syncLinkLayerPosition();
     }
     getBox() {
         return Object.assign({}, this.box);
@@ -1014,6 +1199,14 @@ class Node$1 {
             anchor = anchor.parent;
         }
     }
+    clearTreeCacheData() {
+        var _a;
+        const root = ((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.root) || this;
+        (function clear(node) {
+            node.boundingRect = null;
+            node.children.forEach((child) => clear(child));
+        })(root);
+    }
     addChild(node, i) {
         if (this.children.indexOf(node) == -1) {
             if (i > -1) {
@@ -1037,7 +1230,7 @@ class Node$1 {
     setText(text) {
         this.data.text = text;
         this.contentEl.innerHTML = '';
-        this.parseText();
+        return this.parseText();
     }
     removeLineBreak() {
         var l_newText = this.data.text.replace('<br>', ' ');
@@ -1680,6 +1873,9 @@ class Layout {
         n.containEl.setAttribute('class', '');
         n.containEl.classList.add('mm-node');
         n.containEl.classList.add('mm-node-' + direct);
+        if (n._linkCount > 0) {
+            n.containEl.classList.add('mm-node-has-link');
+        }
         if (n.isLeaf() && !n.containEl.classList.contains('mm-node-leaf')) {
             n.containEl.classList.add('mm-node-leaf');
         }
@@ -7890,18 +8086,20 @@ class ChangeNodeText extends Command {
     }
     execute() {
         //if(!this.isFirst){
-        this.node.setText(this.text);
+        this.node.setText(this.text).then(() => {
+            this.node.refreshBox();
+            this.node.clearCacheData();
+            this.refresh(this.node.mindmap);
+        });
         //}
-        this.node.refreshBox();
-        this.node.clearCacheData();
-        this.refresh(this.node.mindmap);
         return true; //exit with no error
     }
     undo() {
-        this.node.setText(this.oldText);
-        this.node.clearCacheData();
-        this.node.refreshBox();
-        this.refresh(this.node.mindmap);
+        this.node.setText(this.oldText).then(() => {
+            this.node.clearCacheData();
+            this.node.refreshBox();
+            this.refresh(this.node.mindmap);
+        });
         this.isFirst = false;
     }
 }
@@ -9473,7 +9671,7 @@ class MindMap {
                 var targetEl = evt.target;
                 var href = targetEl.getAttr("href");
                 if (href) {
-                    this.view.app.workspace.openLinkText(href, this.view.file.path, evt.ctrlKey || evt.metaKey);
+                    this.view.app.workspace.openLinkText(href, this.view.file.path, true);
                 }
             }
             if (targetEl.hasClass('mm-node-bar')) {
@@ -37357,6 +37555,436 @@ exports.fillTemplate = fillTemplate;
 })));
 });
 
+const VAULT_IMAGE_EXTENSIONS = new Set([
+    'avif',
+    'bmp',
+    'gif',
+    'jpeg',
+    'jpg',
+    'png',
+    'svg',
+    'webp',
+]);
+const IMPORTABLE_IMAGE_TYPES = {
+    avif: ['image/avif'],
+    bmp: ['image/bmp'],
+    gif: ['image/gif'],
+    jpeg: ['image/jpeg'],
+    jpg: ['image/jpeg'],
+    png: ['image/png'],
+    webp: ['image/webp'],
+};
+function isVaultImage(file) {
+    return VAULT_IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
+}
+function importLocalImage(app, sourcePath, file) {
+    var _a;
+    return __awaiter(this, void 0, void 0, function* () {
+        const filename = file.name.replace(/[\\/]/g, '-').trim();
+        const extension = ((_a = filename.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase()) || '';
+        const allowedTypes = IMPORTABLE_IMAGE_TYPES[extension];
+        if (!filename || !allowedTypes || (file.type && !allowedTypes.includes(file.type))) {
+            throw new Error('unsupported-image-type');
+        }
+        const attachmentPath = yield app.fileManager.getAvailablePathForAttachment(filename, sourcePath);
+        const data = yield file.arrayBuffer();
+        return app.vault.createBinary(attachmentPath, data);
+    });
+}
+
+class ExternalLinkModal extends obsidian.Modal {
+    constructor(app, initialTitle, onSubmit, onCancel) {
+        super(app);
+        this.submitted = false;
+        this.shouldRestoreSelection = false;
+        this.initialTitle = initialTitle;
+        this.onSubmit = onSubmit;
+        this.onCancel = onCancel;
+    }
+    onOpen() {
+        this.setTitle(t('Insert external link'));
+        const form = this.contentEl.createEl('form', { cls: 'mm-insert-link-form' });
+        const titleLabel = form.createEl('label', { text: t('Link title') });
+        const titleInput = titleLabel.createEl('input', {
+            type: 'text',
+            value: this.initialTitle,
+        });
+        titleInput.maxLength = 500;
+        const urlLabel = form.createEl('label', { text: t('Link URL') });
+        const urlInput = urlLabel.createEl('input', {
+            type: 'url',
+            placeholder: 'https://example.com',
+        });
+        urlInput.maxLength = 4096;
+        const validationEl = form.createDiv({ cls: 'mm-insert-validation' });
+        const actions = form.createDiv({ cls: 'mm-insert-actions' });
+        const cancelButton = actions.createEl('button', {
+            text: t('Cancel'),
+            type: 'button',
+        });
+        const insertButton = actions.createEl('button', {
+            text: t('Insert'),
+            type: 'submit',
+            cls: 'mod-cta',
+        });
+        cancelButton.addEventListener('click', () => this.close());
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const url = normalizeExternalUrl(urlInput.value);
+            if (!url) {
+                validationEl.setText(t('Invalid URL'));
+                urlInput.focus();
+                return;
+            }
+            const title = titleInput.value.trim() || url;
+            this.submitted = true;
+            this.onSubmit({ title, url });
+            this.close();
+        });
+        insertButton.setAttribute('aria-label', t('Insert external link'));
+        setTimeout(() => (this.initialTitle ? urlInput : titleInput).focus());
+    }
+    onClose() {
+        this.contentEl.empty();
+        if (!this.submitted)
+            this.onCancel();
+    }
+}
+function normalizeExternalUrl(value) {
+    const trimmed = value.trim();
+    if (!trimmed)
+        return null;
+    try {
+        const url = new URL(trimmed);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:')
+            return null;
+        return url.toString();
+    }
+    catch (_a) {
+        return null;
+    }
+}
+function createExternalMarkdownLink(title, url) {
+    const safeTitle = title.replace(/\\/g, '\\\\').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+    const safeUrl = url.replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/</g, '%3C').replace(/>/g, '%3E');
+    return `[${safeTitle}](<${safeUrl}>)`;
+}
+
+class NodeMarkdownInsertion {
+    constructor(editorEl) {
+        this.range = null;
+        this.editorEl = editorEl;
+    }
+    capture() {
+        var _a;
+        const selection = (_a = this.editorEl.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            if (this.editorEl.contains(range.commonAncestorContainer)) {
+                this.range = range.cloneRange();
+                return;
+            }
+        }
+        this.range = this.createRangeAtEnd();
+    }
+    getSelectedText() {
+        var _a;
+        return ((_a = this.range) === null || _a === void 0 ? void 0 : _a.toString()) || '';
+    }
+    restore() {
+        var _a;
+        const range = this.getUsableRange();
+        const selection = (_a = this.editorEl.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.getSelection();
+        this.editorEl.focus();
+        if (!selection)
+            return;
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    insert(markdown) {
+        const range = this.getUsableRange();
+        range.deleteContents();
+        const textNode = this.editorEl.ownerDocument.createTextNode(markdown);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        this.range = range.cloneRange();
+        this.restore();
+    }
+    getUsableRange() {
+        if (this.range && this.editorEl.contains(this.range.commonAncestorContainer)) {
+            return this.range;
+        }
+        this.range = this.createRangeAtEnd();
+        return this.range;
+    }
+    createRangeAtEnd() {
+        const range = this.editorEl.ownerDocument.createRange();
+        range.selectNodeContents(this.editorEl);
+        range.collapse(false);
+        return range;
+    }
+}
+
+class VaultFileSuggestModal extends obsidian.FuzzySuggestModal {
+    constructor(app, title, files, onChoose, onCancel) {
+        super(app);
+        this.chosen = false;
+        this.shouldRestoreSelection = false;
+        this.files = files;
+        this.onChoose = onChoose;
+        this.onCancel = onCancel;
+        this.setPlaceholder(title);
+        this.emptyStateText = title;
+    }
+    getItems() {
+        return this.files;
+    }
+    getItemText(file) {
+        return file.path;
+    }
+    onChooseItem(file) {
+        this.chosen = true;
+        this.onChoose(file);
+    }
+    onClose() {
+        super.onClose();
+        if (!this.chosen)
+            this.onCancel();
+    }
+}
+
+class NodeInsertController {
+    constructor(app) {
+        this.activeNode = null;
+        this.insertion = null;
+        this.toolbarEl = null;
+        this.activeCloseable = null;
+        this.app = app;
+    }
+    beginEdit(node) {
+        if (this.activeNode && this.activeNode !== node)
+            this.endEdit();
+        this.activeNode = node;
+        this.insertion = new NodeMarkdownInsertion(node.contentEl);
+        this.insertion.capture();
+        const toolbar = this.ensureToolbar(node.contentEl.ownerDocument);
+        node.containEl.appendChild(toolbar);
+    }
+    endEdit(node) {
+        var _a;
+        if (node && this.activeNode !== node)
+            return;
+        this.activeNode = null;
+        this.insertion = null;
+        const closeable = this.activeCloseable;
+        this.activeCloseable = null;
+        closeable === null || closeable === void 0 ? void 0 : closeable.close();
+        (_a = this.toolbarEl) === null || _a === void 0 ? void 0 : _a.remove();
+    }
+    destroy() {
+        this.endEdit();
+        this.toolbarEl = null;
+    }
+    ensureToolbar(doc) {
+        var _a, _b;
+        if (((_a = this.toolbarEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === doc)
+            return this.toolbarEl;
+        (_b = this.toolbarEl) === null || _b === void 0 ? void 0 : _b.remove();
+        const toolbar = doc.createElement('div');
+        toolbar.classList.add('mm-node-insert-toolbar');
+        toolbar.setAttribute('role', 'toolbar');
+        toolbar.setAttribute('aria-label', t('Node insert toolbar'));
+        toolbar.addEventListener('mousedown', (event) => {
+            var _a;
+            (_a = this.insertion) === null || _a === void 0 ? void 0 : _a.capture();
+            event.preventDefault();
+            event.stopPropagation();
+        });
+        toolbar.addEventListener('click', (event) => event.stopPropagation());
+        toolbar.addEventListener('dblclick', (event) => event.stopPropagation());
+        toolbar.appendChild(this.createButton(doc, 'link', t('Insert external link'), () => this.openExternalLink()));
+        toolbar.appendChild(this.createButton(doc, 'file', t('Insert Vault file'), () => this.openVaultFile()));
+        toolbar.appendChild(this.createButton(doc, 'image', t('Insert image'), (event) => this.openImageMenu(event), true));
+        this.toolbarEl = toolbar;
+        return toolbar;
+    }
+    createButton(doc, icon, label, onClick, hasMenu = false) {
+        const button = doc.createElement('button');
+        button.type = 'button';
+        button.classList.add('clickable-icon');
+        button.setAttribute('aria-label', label);
+        button.setAttribute('title', label);
+        if (hasMenu)
+            button.setAttribute('aria-haspopup', 'menu');
+        obsidian.setIcon(button, icon);
+        button.addEventListener('click', onClick);
+        return button;
+    }
+    openExternalLink() {
+        const session = this.getSession();
+        if (!session)
+            return;
+        const modal = new ExternalLinkModal(this.app, session.insertion.getSelectedText(), (value) => {
+            this.activeCloseable = null;
+            this.insertExternalLink(session.node, session.insertion, value);
+        }, () => {
+            this.activeCloseable = null;
+            this.restoreSession(session.node, session.insertion);
+        });
+        this.activeCloseable = modal;
+        modal.open();
+    }
+    openVaultFile() {
+        const session = this.getSession();
+        if (!session)
+            return;
+        const files = this.app.vault.getFiles().filter((file) => !isVaultImage(file));
+        this.openFileModal(t('Choose Vault file'), files, session.node, session.insertion, false);
+    }
+    openImageMenu(event) {
+        const session = this.getSession();
+        if (!session)
+            return;
+        const button = event.currentTarget;
+        button.setAttribute('aria-expanded', 'true');
+        let actionChosen = false;
+        const menu = new obsidian.Menu();
+        menu.addItem((item) => item
+            .setTitle(t('Choose Vault image'))
+            .setIcon('image')
+            .onClick(() => {
+            actionChosen = true;
+            this.activeCloseable = null;
+            const files = this.app.vault.getFiles().filter(isVaultImage);
+            this.openFileModal(t('Choose Vault image'), files, session.node, session.insertion, true);
+        }));
+        menu.addItem((item) => item
+            .setTitle(t('Import local image'))
+            .setIcon('upload')
+            .onClick(() => {
+            actionChosen = true;
+            this.activeCloseable = null;
+            void this.importImage(session.node, session.insertion);
+        }));
+        menu.onHide(() => {
+            button.setAttribute('aria-expanded', 'false');
+            if (!actionChosen)
+                this.restoreSession(session.node, session.insertion);
+            if (this.activeCloseable === menu)
+                this.activeCloseable = null;
+        });
+        this.activeCloseable = menu;
+        const rect = button.getBoundingClientRect();
+        menu.showAtPosition({
+            x: rect.left,
+            y: rect.bottom,
+            width: rect.width,
+        }, button.ownerDocument);
+    }
+    openFileModal(title, files, node, insertion, embed) {
+        const modal = new VaultFileSuggestModal(this.app, title, files, (file) => {
+            this.activeCloseable = null;
+            this.insertVaultFile(node, insertion, file, embed);
+        }, () => {
+            this.activeCloseable = null;
+            this.restoreSession(node, insertion);
+        });
+        this.activeCloseable = modal;
+        modal.open();
+    }
+    insertExternalLink(node, insertion, value) {
+        if (!this.isActiveSession(node, insertion))
+            return;
+        insertion.insert(createExternalMarkdownLink(value.title, value.url));
+        this.refreshNode(node);
+    }
+    insertVaultFile(node, insertion, file, embed) {
+        if (!this.isActiveSession(node, insertion))
+            return;
+        const alias = embed ? '' : insertion.getSelectedText().trim();
+        const link = this.app.fileManager.generateMarkdownLink(file, this.getSourcePath(node), '', alias);
+        insertion.insert(embed && !link.startsWith('!') ? `!${link}` : link);
+        this.refreshNode(node);
+    }
+    importImage(node, insertion) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const file = yield this.chooseLocalImage(node.contentEl.ownerDocument);
+            if (!file) {
+                this.restoreSession(node, insertion);
+                return;
+            }
+            if (!this.isActiveSession(node, insertion))
+                return;
+            try {
+                const attachment = yield importLocalImage(this.app, this.getSourcePath(node), file);
+                if (!this.isActiveSession(node, insertion)) {
+                    new obsidian.Notice(`${t('Image insertion failed')}: ${attachment.path}`);
+                    return;
+                }
+                this.insertVaultFile(node, insertion, attachment, true);
+            }
+            catch (error) {
+                const message = error instanceof Error && error.message === 'unsupported-image-type'
+                    ? t('Unsupported image type')
+                    : t('Image import failed');
+                new obsidian.Notice(message);
+                this.restoreSession(node, insertion);
+            }
+        });
+    }
+    chooseLocalImage(doc) {
+        return new Promise((resolve) => {
+            const input = doc.createElement('input');
+            input.type = 'file';
+            input.accept = '.avif,.bmp,.gif,.jpeg,.jpg,.png,.webp';
+            input.hidden = true;
+            doc.body.appendChild(input);
+            const win = doc.defaultView;
+            let settled = false;
+            const finish = (file) => {
+                if (settled)
+                    return;
+                settled = true;
+                win === null || win === void 0 ? void 0 : win.removeEventListener('focus', onFocus);
+                input.remove();
+                resolve(file);
+            };
+            const onFocus = () => {
+                setTimeout(() => { var _a; return finish(((_a = input.files) === null || _a === void 0 ? void 0 : _a[0]) || null); }, 200);
+            };
+            input.addEventListener('change', () => { var _a; return finish(((_a = input.files) === null || _a === void 0 ? void 0 : _a[0]) || null); }, { once: true });
+            input.addEventListener('cancel', () => finish(null), { once: true });
+            win === null || win === void 0 ? void 0 : win.addEventListener('focus', onFocus, { once: true });
+            input.click();
+        });
+    }
+    getSession() {
+        if (!this.activeNode || !this.insertion)
+            return null;
+        this.insertion.capture();
+        return { node: this.activeNode, insertion: this.insertion };
+    }
+    restoreSession(node, insertion) {
+        if (this.isActiveSession(node, insertion))
+            insertion.restore();
+    }
+    isActiveSession(node, insertion) {
+        return this.activeNode === node && this.insertion === insertion && node.data.isEdit;
+    }
+    getSourcePath(node) {
+        var _a, _b;
+        return node.mindmap.path || ((_b = (_a = node.mindmap.view) === null || _a === void 0 ? void 0 : _a.file) === null || _b === void 0 ? void 0 : _b.path) || '';
+    }
+    refreshNode(node) {
+        node.refreshEditText();
+        node.clearCacheData();
+        node.refreshBox();
+        node.mindmap.refresh();
+        node.containEl.classList.add('mm-edit-node', 'mm-node-select');
+    }
+}
+
 var domToImageMore = createCommonjsModule(function (module, exports) {
 (function (global) {
 
@@ -39136,6 +39764,7 @@ class MindMapView extends obsidian.TextFileView {
         this.firstInit = true;
         this.yamlString = '';
         this.plugin = plugin;
+        this.insertController = new NodeInsertController(this.app);
         this.setColors();
         this.fileCache = {
             'frontmatter': {
@@ -39147,6 +39776,7 @@ class MindMapView extends obsidian.TextFileView {
         return __awaiter(this, void 0, void 0, function* () {
             // Remove draggables from render, as the DOM has already detached
             //this.plugin.removeView(this);
+            this.insertController.destroy();
             if (this.mindmap) {
                 this.mindmap.clear();
                 this.contentEl.innerHTML = '';
@@ -39160,6 +39790,7 @@ class MindMapView extends obsidian.TextFileView {
         return this.data;
     }
     setViewData(data) {
+        this.insertController.endEdit();
         if (this.mindmap) {
             this.mindmap.clear();
             this.contentEl.innerHTML = '';
@@ -39191,9 +39822,9 @@ class MindMapView extends obsidian.TextFileView {
                         this.yamlString = this.getFrontMatter();
                     }
                 }
+                this.mindmap.view = this;
                 this.mindmap.init();
                 this.mindmap.refresh();
-                this.mindmap.view = this;
                 this.firstInit = false;
             }, 100);
         }
@@ -39202,14 +39833,15 @@ class MindMapView extends obsidian.TextFileView {
             this.fileCache = this.app.metadataCache.getFileCache(view.file);
             this.yamlString = this.getFrontMatter();
             this.mindmap.path = view === null || view === void 0 ? void 0 : view.file.path;
+            this.mindmap.view = this;
             this.mindmap.init();
             this.mindmap.refresh();
-            this.mindmap.view = this;
         }
     }
     onunload() {
         this.app.workspace.offref("quick-preview");
         this.app.workspace.offref("resize");
+        this.insertController.destroy();
         if (this.mindmap) {
             this.mindmap.clear();
             this.contentEl.innerHTML = '';
@@ -40410,6 +41042,42 @@ class MindMapPlugin extends obsidian.Plugin {
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
                         mindmap.center();
+                    }
+                }
+            });
+            // Zoom in
+            this.addCommand({
+                id: 'Zoom in',
+                name: `${t('Zoom in')}`,
+                hotkeys: [
+                    {
+                        modifiers: ['Alt'],
+                        key: '=',
+                    },
+                ],
+                callback: () => {
+                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+                    if (mindmapView) {
+                        var mindmap = mindmapView.mindmap;
+                        mindmap.setScale("up");
+                    }
+                }
+            });
+            // Zoom out
+            this.addCommand({
+                id: 'Zoom out',
+                name: `${t('Zoom out')}`,
+                hotkeys: [
+                    {
+                        modifiers: ['Alt'],
+                        key: '-',
+                    },
+                ],
+                callback: () => {
+                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+                    if (mindmapView) {
+                        var mindmap = mindmapView.mindmap;
+                        mindmap.setScale("down");
                     }
                 }
             });
