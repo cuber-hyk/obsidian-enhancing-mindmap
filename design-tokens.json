@@ -1,0 +1,9 @@
+{
+  "$description": "仅在用户确认相关 UI 方向后添加精确令牌值。",
+  "color": {},
+  "typography": {},
+  "spacing": {},
+  "radius": {},
+  "shadow": {},
+  "motion": {}
+}

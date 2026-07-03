@@ -52,7 +52,7 @@ export default class MindMap {
     edgeGroup: any;
     _nodeNum: number = 0;
     _tempNum: number = 0;
-    view?: MindMapView;
+    view: MindMapView;
     colors: string[] = [];
     _dragNode: INode;
     exec: Exec;
@@ -1515,7 +1515,7 @@ export default class MindMap {
                     this.view.app.workspace.openLinkText(
                         href,
                         this.view.file.path,
-                        evt.ctrlKey || evt.metaKey
+                        true
                     );
                 }
             }
