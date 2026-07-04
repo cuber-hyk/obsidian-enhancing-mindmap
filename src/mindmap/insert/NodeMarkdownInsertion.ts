@@ -45,6 +45,16 @@ export default class NodeMarkdownInsertion {
     this.restore();
   }
 
+  append(markdown: string): void {
+    const range = this.createRangeAtEnd();
+    const textNode = this.editorEl.ownerDocument.createTextNode(markdown);
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    this.range = range.cloneRange();
+    this.restore();
+  }
+
   private getUsableRange(): Range {
     if (this.range && this.editorEl.contains(this.range.commonAncestorContainer)) {
       return this.range;

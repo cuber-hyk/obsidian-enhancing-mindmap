@@ -64,6 +64,11 @@ export default {
   "Import local image":"导入本地图片",
   "Image insertion failed":"图片已导入，但无法插入节点",
   "Unsupported image type":"不支持的图片类型",
-  "Image import failed":"图片导入失败"
+  "Image import failed":"图片导入失败",
+  "Edit link":"编辑链接",
+  "Delete link":"删除链接",
+  "Link target":"链接目标",
+  "Save":"保存",
+  "Save link":"保存链接"
 
 };
