@@ -1,5 +1,8 @@
 import { App, Modal } from 'obsidian';
 import { t } from '../../lang/helpers';
+import {
+  normalizeExternalLinkTarget,
+} from '../link/NodeLinkMarkdown';
 
 export interface ExternalLinkValue {
   title: string;
@@ -57,7 +60,7 @@ export default class ExternalLinkModal extends Modal {
     cancelButton.addEventListener('click', () => this.close());
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const url = normalizeExternalUrl(urlInput.value);
+      const url = normalizeExternalLinkTarget(urlInput.value);
       if (!url) {
         validationEl.setText(t('Invalid URL'));
         urlInput.focus();
@@ -78,23 +81,4 @@ export default class ExternalLinkModal extends Modal {
     this.contentEl.empty();
     if (!this.submitted) this.onCancel();
   }
-}
-
-export function normalizeExternalUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-export function createExternalMarkdownLink(title: string, url: string): string {
-  const safeTitle = title.replace(/\\/g, '\\\\').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
-  const safeUrl = url.replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/</g, '%3C').replace(/>/g, '%3E');
-  return `[${safeTitle}](<${safeUrl}>)`;
 }

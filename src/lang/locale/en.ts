@@ -46,8 +46,6 @@ export default {
     "Redo":"Redo",
     'Replace by the previous text':'Replace by the previous text',
     'Edit node':'Edit node',
-    'Add sibling/end editing':'Insert sibling / End editing',
-    'Insert child':'Insert child',
     'Delete node & child':'Delete node & child',
     'Select the node\'s text':'Select the node\'s text',
     'Bold the node\'s text':'Bold the node\'s text',
@@ -100,4 +98,9 @@ export default {
     "Image insertion failed":"The image was imported but could not be inserted",
     "Unsupported image type":"Unsupported image type",
     "Image import failed":"Image import failed",
+    "Edit link":"Edit link",
+    "Delete link":"Delete link",
+    "Link target":"Link target",
+    "Save":"Save",
+    "Save link":"Save link",
 };

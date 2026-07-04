@@ -1,6 +1,18 @@
 import MindMap from './mindmap'
-import {MarkdownRenderer,TFile,parseLinktext,resolveSubpath} from 'obsidian'
+import {MarkdownRenderer,TFile,parseLinktext,resolveSubpath,setTooltip} from 'obsidian'
 import {t} from '../lang/helpers'
+import {
+    composeNodeMarkdown,
+    NodeLinkData,
+    parseNodeMarkdown,
+} from './link/NodeLinkMarkdown'
+import {
+    clampNodeImageWidth,
+    createNodeImageMarkdown,
+    DEFAULT_NODE_IMAGE_WIDTH,
+    NodeImageData,
+    parseNodeImages,
+} from './image/NodeImageMarkdown'
 
 
 export function keepLastIndex(dom:HTMLElement) {
@@ -38,19 +50,6 @@ interface BOX {
     bottom?:number;
 }
 
-interface NodeLinkData {
-    markdown:string;
-    href:string;
-    label:string;
-    isInternal:boolean;
-    isWholeExternal:boolean;
-}
-
-interface EditableTextData {
-    text:string;
-    links:NodeLinkData[];
-}
-
 export class INodeData implements INode{
     id:string;
     text:string;
@@ -78,6 +77,8 @@ export default class Node {
     _oldText?:string;
     _editText?:string;
     _editLinks:NodeLinkData[]=[];
+    _editStructureChanged:boolean=false;
+    _selectedEditImageEl?:HTMLElement;
     _linkCount:number=0;
     parent?:Node;
     //isRoot?:boolean;
@@ -149,9 +150,10 @@ export default class Node {
     _delay(){
            this.linkLayerEl.innerHTML = '';
            this.setNodeLinkCount(0);
+           const sourceLinks = parseNodeMarkdown(this.data.text).links;
            var linkIndex = 0;
            this.contentEl.querySelectorAll('a').forEach((link) => {
-             if (this.decorateNodeLink(link, linkIndex)) {
+             if (this.decorateNodeLink(link, linkIndex, sourceLinks[linkIndex])) {
                 linkIndex++;
              }
            });
@@ -239,6 +241,8 @@ export default class Node {
                     (img) => {
                       if (el.hasAttribute("width"))
                         img.setAttribute("width", el.getAttribute("width"));
+                      else
+                        img.setAttribute("width", `${DEFAULT_NODE_IMAGE_WIDTH}`);
                       if (el.hasAttribute("alt"))
                         img.setAttribute("alt", el.getAttribute("alt"));
                     }
@@ -275,18 +279,19 @@ export default class Node {
          },100)
     }
 
-    decorateNodeLink(link: HTMLAnchorElement, index: number) {
+    decorateNodeLink(link: HTMLAnchorElement, index: number, sourceLink?: NodeLinkData) {
         if (link.querySelector('img') || link.closest('.markdown-embed-link')) {
             return false;
         }
 
         const href = link.getAttribute('href') || link.getAttribute('data-href') || '';
-        const label = link.textContent.trim() || href;
+        const label = sourceLink?.label || link.textContent.trim() || href;
         const visualLink = link.cloneNode(false) as HTMLAnchorElement;
 
         visualLink.classList.add('mm-node-link');
-        visualLink.setAttribute('title', href);
         visualLink.setAttribute('aria-label', label);
+        setTooltip(visualLink, label, {placement: 'top'});
+        visualLink.dataset.linkIndex = `${index}`;
         visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
         visualLink.textContent = '';
 
@@ -327,13 +332,14 @@ export default class Node {
     edit(){
         this.contentEl.innerText='';
         this._oldText = this.data.text;
-        var editData = this.getEditableTextData(this.data.text);
+        var editData = parseNodeMarkdown(this.data.text);
         this._editText = editData.text;
         this._editLinks = editData.links;
+        this._editStructureChanged = false;
         //var _t =  this.data.text.replace(/\r\n/g,"<br/>")
        // _t = _t.replace(/\n/g,"<br/>");
       //  console.log(_t);
-        this.contentEl.innerText = editData.text;
+        this.renderEditableContent(this.data.text, editData.links);
         this.renderLinkLayer(editData.links);
         this.contentEl.setAttribute('contentEditable','true');
         this.contentEl.focus();
@@ -568,15 +574,19 @@ export default class Node {
 
     cancelEdit(){
         console.log("CancelEdit");
-        var text = this.getMarkdownFromEditedText(this.contentEl.innerText.trim()||'');
-        if(text.length == 0){
+        var text = this.getMarkdownFromEditedText();
+        if(text.length == 0 && !this._editStructureChanged){
             text = this._oldText
+        }else if(text.length == 0){
+            text = t('Sub title')
         }
 
         this.contentEl.setAttribute('contentEditable','false');
         this.data.isEdit = false;
         this._editText = '';
         this._editLinks = [];
+        this._editStructureChanged = false;
+        this._selectedEditImageEl = undefined;
 
         if(this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.remove('mm-edit-node')
@@ -595,45 +605,13 @@ export default class Node {
 
     }
 
-    getEditableTextData(markdown: string): EditableTextData {
-        const links: NodeLinkData[] = [];
-        const externalLink = /(?<!!)\[([^\]]*)\]\(([^)]*)\)/g;
-        const internalLink = /(?<!!)\[\[([^\]]+)]]/g;
-        let text = markdown.replace(externalLink, (match, label, href) => {
-            links.push({
-                markdown: match,
-                href,
-                label: label || href,
-                isInternal: false,
-                isWholeExternal: match === markdown.trim(),
-            });
-            return label || '';
-        });
-
-        text = text.replace(internalLink, (match, linktext) => {
-            const [path, alias] = `${linktext}`.split('|');
-            links.push({
-                markdown: match,
-                href: path,
-                label: alias || path.split('/').pop() || path,
-                isInternal: true,
-                isWholeExternal: false,
-            });
-            return alias || '';
-        });
-
-        return {
-            text: text.trim(),
-            links,
-        };
-    }
-
-    getMarkdownFromEditedText(text: string) {
+    getMarkdownFromEditedText() {
+        const text = this.getEditedContentMarkdown().trim();
         if (!this._editLinks.length) {
             return text;
         }
 
-        const oldEditData = this.getEditableTextData(this._oldText || '');
+        const oldEditData = parseNodeMarkdown(this._oldText || '');
         const isOriginalEditState =
             text === oldEditData.text &&
             this._editLinks.length === oldEditData.links.length &&
@@ -643,12 +621,266 @@ export default class Node {
             return this._oldText || text;
         }
 
-        if (this._editLinks.length === 1 && this._editLinks[0].isWholeExternal) {
-            const link = this._editLinks[0];
-            return `[${text}](${link.href})`;
+        return composeNodeMarkdown(text, this._editLinks);
+    }
+
+    renderEditableContent(markdown: string, links: NodeLinkData[]) {
+        this.contentEl.innerHTML = '';
+        const images = parseNodeImages(markdown);
+        const items = [
+            ...links.map((link) => ({type: 'link' as const, start: link.start, end: link.end})),
+            ...images.map((image) => ({type: 'image' as const, start: image.start, end: image.end, image})),
+        ].sort((a, b) => a.start - b.start);
+
+        let textStart = 0;
+        items.forEach((item) => {
+            if (item.start < textStart) return;
+            this.appendEditableText(markdown.slice(textStart, item.start));
+            if (item.type === 'image') {
+                this.contentEl.appendChild(this.createEditableImage(item.image));
+            }
+            textStart = item.end;
+        });
+        this.appendEditableText(markdown.slice(textStart));
+    }
+
+    appendEditableText(text: string) {
+        if (!text) return;
+        this.contentEl.appendChild(this.contentEl.ownerDocument.createTextNode(text));
+    }
+
+    createEditableImage(image: NodeImageData): HTMLElement {
+        const wrapper = this.contentEl.ownerDocument.createElement('span');
+        wrapper.classList.add('mm-node-image-attachment');
+        wrapper.setAttribute('contenteditable', 'false');
+        wrapper.setAttribute('tabindex', '0');
+        wrapper.dataset.imageKind = image.kind;
+        wrapper.dataset.imageTarget = image.target;
+        wrapper.dataset.imageAlt = image.alt;
+        wrapper.dataset.imageWidth = `${clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH)}`;
+
+        const img = this.contentEl.ownerDocument.createElement('img');
+        img.draggable = false;
+        img.alt = image.alt;
+        img.width = Number(wrapper.dataset.imageWidth);
+        img.src = this.resolveNodeImageSrc(image);
+        wrapper.appendChild(img);
+
+        const handle = this.contentEl.ownerDocument.createElement('span');
+        handle.classList.add('mm-node-image-resize-handle');
+        wrapper.appendChild(handle);
+
+        wrapper.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.selectEditImage(wrapper);
+        });
+        handle.addEventListener('mousedown', (event) => {
+            this.startImageResize(event, wrapper);
+        });
+
+        return wrapper;
+    }
+
+    resolveNodeImageSrc(image: NodeImageData): string {
+        if (image.kind === 'vault' && this.mindmap?.view) {
+            const target = this.mindmap.view.app.metadataCache.getFirstLinkpathDest(image.target, this.mindmap.path);
+            if (target instanceof TFile) {
+                return this.mindmap.view.app.vault.getResourcePath(target);
+            }
+        }
+        return image.target;
+    }
+
+    selectEditImage(imageEl: HTMLElement) {
+        this.clearSelectedEditImage();
+        this._selectedEditImageEl = imageEl;
+        imageEl.classList.add('is-selected');
+        imageEl.focus();
+    }
+
+    clearSelectedEditImage() {
+        if (!this._selectedEditImageEl) return;
+        this._selectedEditImageEl.classList.remove('is-selected');
+        this._selectedEditImageEl = undefined;
+    }
+
+    deleteEditImageByKeyboard(key: string): boolean {
+        const imageEl = this.getImageForKeyboardDelete(key);
+        if (!imageEl) {
+            return false;
+        }
+        this.deleteEditImageElement(imageEl);
+        return true;
+    }
+
+    getImageForKeyboardDelete(key: string): HTMLElement | null {
+        if (this._selectedEditImageEl && this.contentEl.contains(this._selectedEditImageEl)) {
+            return this._selectedEditImageEl;
         }
 
-        return `${text}${this._editLinks.map((link) => link.markdown).join('')}`;
+        const selection = this.contentEl.ownerDocument.defaultView?.getSelection();
+        if (!selection || selection.rangeCount === 0) return null;
+        const range = selection.getRangeAt(0);
+        if (!this.contentEl.contains(range.commonAncestorContainer)) return null;
+
+        const anchorEl = this.getElementFromSelectionNode(selection.anchorNode);
+        const selectedImage = anchorEl?.closest('.mm-node-image-attachment');
+        if (selectedImage instanceof HTMLElement && this.contentEl.contains(selectedImage)) {
+            return selectedImage;
+        }
+
+        if (!range.collapsed) {
+            const images = Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment'));
+            return images.find((image) => range.intersectsNode(image)) as HTMLElement || null;
+        }
+
+        const adjacent = key === 'Backspace'
+            ? this.getPreviousEditableNode(range.startContainer, range.startOffset)
+            : this.getNextEditableNode(range.startContainer, range.startOffset);
+        if (adjacent instanceof HTMLElement) {
+            const adjacentImage = adjacent.closest('.mm-node-image-attachment');
+            if (adjacentImage instanceof HTMLElement && this.contentEl.contains(adjacentImage)) {
+                return adjacentImage;
+            }
+        }
+        return null;
+    }
+
+    deleteEditImageElement(imageEl: HTMLElement) {
+        imageEl.remove();
+        this._selectedEditImageEl = undefined;
+        this._editStructureChanged = true;
+        this.normalizeEditContentAfterImageDelete();
+        this.refreshEditingLayout();
+    }
+
+    normalizeEditContentAfterImageDelete() {
+        const text = this.getEditedContentMarkdown().trim();
+        const hasImage = Boolean(this.contentEl.querySelector('.mm-node-image-attachment'));
+        if (!text && !hasImage) {
+            this.contentEl.innerText = t('Sub title');
+            this.selectText();
+            return;
+        }
+
+        this.contentEl.focus();
+        keepLastIndex(this.contentEl);
+    }
+
+    getElementFromSelectionNode(node: globalThis.Node | null): HTMLElement | null {
+        if (node instanceof HTMLElement) return node;
+        return node?.parentNode instanceof HTMLElement ? node.parentNode : null;
+    }
+
+    getPreviousEditableNode(container: globalThis.Node, offset: number): globalThis.Node | null {
+        if (container === this.contentEl) {
+            return this.contentEl.childNodes[offset - 1] || null;
+        }
+        if (container instanceof Text && offset > 0) return null;
+        let node: globalThis.Node | null = container;
+        while (node && node !== this.contentEl) {
+            if (node.previousSibling) return this.getDeepLastNode(node.previousSibling);
+            node = node.parentNode;
+        }
+        return null;
+    }
+
+    getNextEditableNode(container: globalThis.Node, offset: number): globalThis.Node | null {
+        if (container === this.contentEl) {
+            return this.contentEl.childNodes[offset] || null;
+        }
+        if (container instanceof Text && offset < container.length) return null;
+        let node: globalThis.Node | null = container;
+        while (node && node !== this.contentEl) {
+            if (node.nextSibling) return this.getDeepFirstNode(node.nextSibling);
+            node = node.parentNode;
+        }
+        return null;
+    }
+
+    getDeepLastNode(node: globalThis.Node): globalThis.Node {
+        let current = node;
+        while (current.lastChild) {
+            current = current.lastChild;
+        }
+        return current;
+    }
+
+    getDeepFirstNode(node: globalThis.Node): globalThis.Node {
+        let current = node;
+        while (current.firstChild) {
+            current = current.firstChild;
+        }
+        return current;
+    }
+
+    startImageResize(event: MouseEvent, imageEl: HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.selectEditImage(imageEl);
+
+        const startX = event.clientX;
+        const startWidth = Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH;
+        const doc = imageEl.ownerDocument;
+
+        const move = (moveEvent: MouseEvent) => {
+            const width = clampNodeImageWidth(startWidth + moveEvent.clientX - startX);
+            imageEl.dataset.imageWidth = `${width}`;
+            const img = imageEl.querySelector('img');
+            if (img instanceof HTMLImageElement) {
+                img.width = width;
+            }
+            this._editStructureChanged = true;
+        };
+        const up = () => {
+            doc.removeEventListener('mousemove', move);
+            doc.removeEventListener('mouseup', up);
+            this.refreshEditingLayout();
+        };
+
+        doc.addEventListener('mousemove', move);
+        doc.addEventListener('mouseup', up);
+    }
+
+    getEditedContentMarkdown(): string {
+        const parts: string[] = [];
+        this.contentEl.childNodes.forEach((child) => {
+            if (child instanceof Text) {
+                parts.push(child.textContent || '');
+                return;
+            }
+            if (!(child instanceof HTMLElement)) return;
+            if (child.classList.contains('mm-node-image-attachment')) {
+                const image = this.readEditedImage(child);
+                if (image) parts.push(createNodeImageMarkdown(image));
+                return;
+            }
+            parts.push(child.innerText || '');
+        });
+        return parts.join('');
+    }
+
+    readEditedImage(imageEl: HTMLElement): NodeImageData | null {
+        const target = imageEl.dataset.imageTarget || '';
+        if (!target) return null;
+        const kind = imageEl.dataset.imageKind === 'markdown' ? 'markdown' : 'vault';
+        const width = clampNodeImageWidth(Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH);
+        return {
+            markdown: '',
+            target,
+            alt: imageEl.dataset.imageAlt || '',
+            width,
+            kind,
+            start: 0,
+            end: 0,
+        };
+    }
+
+    refreshEditingLayout() {
+        this.clearTreeCacheData();
+        this.refreshBox();
+        this.mindmap&&this.mindmap.emit('renderEditNode',{node:this});
     }
 
     renderLinkLayer(links: NodeLinkData[]) {
@@ -657,7 +889,7 @@ export default class Node {
         links.forEach((link, index) => {
             const visualLink = this.linkLayerEl.ownerDocument.createElement('a');
             visualLink.classList.add('mm-node-link');
-            if (link.isInternal) {
+            if (link.kind === 'vault') {
                 visualLink.classList.add('internal-link');
                 visualLink.setAttribute('href', link.href);
                 visualLink.setAttribute('data-href', link.href);
@@ -666,11 +898,26 @@ export default class Node {
                 visualLink.setAttribute('target', '_blank');
                 visualLink.setAttribute('rel', 'noopener noreferrer');
             }
-            visualLink.setAttribute('title', link.href);
-            visualLink.setAttribute('aria-label', link.label);
+            const label = link.label || link.href;
+            visualLink.setAttribute('aria-label', label);
+            setTooltip(visualLink, label, {placement: 'top'});
+            visualLink.dataset.linkIndex = `${index}`;
             visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
             this.linkLayerEl.appendChild(visualLink);
         });
+    }
+
+    getDisplayedLinks(): NodeLinkData[] {
+        const links = this.data.isEdit
+            ? this._editLinks
+            : parseNodeMarkdown(this.data.text).links;
+        return links.map((link) => ({...link}));
+    }
+
+    setEditedLinks(links: NodeLinkData[]) {
+        if (!this.data.isEdit) return;
+        this._editLinks = links.map((link) => ({...link}));
+        this.renderLinkLayer(this._editLinks);
     }
 
     setNodeLinkCount(count: number) {
@@ -704,11 +951,12 @@ export default class Node {
     refreshEditText() {
         if (!this.data.isEdit) return;
 
-        const editData = this.getEditableTextData(this.contentEl.innerText.trim() || '');
+        const rawMarkdown = this.getEditedContentMarkdown().trim() || '';
+        const editData = parseNodeMarkdown(rawMarkdown);
         this._editText = editData.text;
-        this._editLinks = editData.links;
-        this.contentEl.innerText = editData.text;
-        this.renderLinkLayer(editData.links);
+        this._editLinks = [...this._editLinks, ...editData.links];
+        this.renderEditableContent(rawMarkdown, editData.links);
+        this.renderLinkLayer(this._editLinks);
         keepLastIndex(this.contentEl);
     }
 

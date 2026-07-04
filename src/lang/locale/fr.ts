@@ -45,8 +45,6 @@ export default {
     "Redo":"Rétablir",
     'Replace by the previous text':'Remplacer par le texte précédent',
     'Edit node':'Modifier le nœud',
-    'Add sibling/end editing':'Insérer un noeud frère / Terminer la modification',
-    'Insert child':'Insérer un noeud enfant',
     'Delete node & child':'Supprimer le nœud (et ses enfants)',
     'Select the node\'s text':'Sélectionner le texte du nœud',
     'Bold the node\'s text':'Mettre en gras le texte du nœud',

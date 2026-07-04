@@ -75,11 +75,14 @@ export class RemoveNode extends Command {
         if(this.node.data.isRoot == true){
             return false;
         }
+        const nextSelectNode = this.parent?.children[this.node.getIndex() + 1] ||
+            this.parent?.children[this.node.getIndex() - 1] ||
+            this.parent;
         this.node.clearCacheData();
         this.mind.clearSelectNode();
         this.index = this.mind.removeNode(this.node);
         this.refresh();
-        this.parent && this.parent.select();
+        nextSelectNode && nextSelectNode.select();
         return true; //exit with no error
     }
 

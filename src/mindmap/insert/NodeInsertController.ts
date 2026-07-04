@@ -3,9 +3,10 @@ import { t } from '../../lang/helpers';
 import type INode from '../INode';
 import { importLocalImage, isVaultImage } from './AttachmentImporter';
 import ExternalLinkModal, {
-  createExternalMarkdownLink,
   ExternalLinkValue,
 } from './ExternalLinkModal';
+import { createVaultImageMarkdown } from '../image/NodeImageMarkdown';
+import { createExternalMarkdownLink } from '../link/NodeLinkMarkdown';
 import NodeMarkdownInsertion from './NodeMarkdownInsertion';
 import VaultFileSuggestModal from './VaultFileSuggestModal';
 
@@ -205,7 +206,7 @@ export default class NodeInsertController {
     value: ExternalLinkValue,
   ): void {
     if (!this.isActiveSession(node, insertion)) return;
-    insertion.insert(createExternalMarkdownLink(value.title, value.url));
+    insertion.append(createExternalMarkdownLink(value.title, value.url));
     this.refreshNode(node);
   }
 
@@ -224,7 +225,12 @@ export default class NodeInsertController {
       '',
       alias,
     );
-    insertion.insert(embed && !link.startsWith('!') ? `!${link}` : link);
+    const markdown = embed ? createVaultImageMarkdown(file.path) : link;
+    if (embed) {
+      insertion.insert(markdown);
+    } else {
+      insertion.append(markdown);
+    }
     this.refreshNode(node);
   }
 
