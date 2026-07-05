@@ -1,10 +1,10 @@
 {
 	"id": "obsidian-enhancing-mindmap",
 	"name": "Enhancing Mindmap",
-	"version": "0.2.5",
+	"version": "0.2.6",
 	"minAppVersion": "1.5.7",
 	"description": "This is a enhancing mindmap plugin for Obsidian. You can edit mindmap on markdown.",
-	"author": "Mark",
-	"authorUrl": "https://github.com/MarkMindCkm/obsidian-enhancing-mindmap",
+	"author": "cuberhyk",
+	"authorUrl": "https://github.com/cuber-hyk/obsidian-enhancing-mindmap",
 	"isDesktopOnly": false
 }
