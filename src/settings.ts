@@ -11,4 +11,5 @@ export class MindMapSettings {
     //strokeArray?:string=''
     strokeArray?:any[];
     focusOnMove:boolean;
+    showLinkTitle:boolean = false;
 }

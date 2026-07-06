@@ -32,6 +32,8 @@ export default {
 
     "Stroke Array":"Tableau de traits",
     "Stroke Array Desc":"Couleur du lien de nœud basée sur cette valeur ou couleur aléatoire",
+    "Show link title":"Afficher le titre du lien",
+    "Show link title desc":"Afficher le titre du lien à côté de l'icône de lien sur les nœuds",
     "Save fail":"Échec de l'enregistrement des données",
     "Save success":"Enregistrement des données réussi",
     "Toggle markdown/mindmap":"Basculer entre le mode markdown et le mode carte mentale",

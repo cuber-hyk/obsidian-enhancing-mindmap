@@ -140,6 +140,8 @@ var en = {
     "Clockwise": "Clockwise",
     "Stroke Array": "Stroke array",
     "Stroke Array Desc": "Node link color base on this value or random color",
+    "Show link title": "Show link title",
+    "Show link title desc": "Display link titles next to link icons on mindmap nodes",
     "Save fail": "Save data err",
     "Save success": "Save data success",
     "Toggle markdown/mindmap": "Toggle to markdown/mindmap mode",
@@ -244,6 +246,8 @@ var fr = {
     "Clockwise": "Sens des aiguilles d'une montre",
     "Stroke Array": "Tableau de traits",
     "Stroke Array Desc": "Couleur du lien de nœud basée sur cette valeur ou couleur aléatoire",
+    "Show link title": "Afficher le titre du lien",
+    "Show link title desc": "Afficher le titre du lien à côté de l'icône de lien sur les nœuds",
     "Save fail": "Échec de l'enregistrement des données",
     "Save success": "Enregistrement des données réussi",
     "Toggle markdown/mindmap": "Basculer entre le mode markdown et le mode carte mentale",
@@ -370,6 +374,8 @@ var zhCN = {
     "Add brother node": "添加兄弟节点",
     "Stroke Array": "颜色组",
     "Stroke Array Desc": "节点连线颜色将按照颜色组生成,否则生成随机颜色",
+    "Show link title": "显示链接标题",
+    "Show link title desc": "在链接图标旁显示链接标题",
     "Save fail": "保存失败",
     "Save success": "保存成功",
     "Toggle markdown/mindmap": "切换为 markdown 或 mindmap 模式",
@@ -400,6 +406,8 @@ var zhCN = {
 
 // 繁體中文
 var zhTW = {
+    "Show link title": "顯示連結標題",
+    "Show link title desc": "在連結圖示旁顯示連結標題",
     "Edit link": "編輯連結",
     "Delete link": "刪除連結",
     "Link target": "連結目標",
@@ -1006,7 +1014,7 @@ class Node$1 {
         obsidian.setTooltip(visualLink, label, { placement: 'top' });
         visualLink.dataset.linkIndex = `${index}`;
         visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
-        visualLink.textContent = '';
+        this.decorateVisualNodeLink(visualLink, label);
         if (!visualLink.classList.contains('internal-link')) {
             visualLink.setAttribute('target', '_blank');
             visualLink.setAttribute('rel', 'noopener noreferrer');
@@ -1548,8 +1556,25 @@ class Node$1 {
             obsidian.setTooltip(visualLink, label, { placement: 'top' });
             visualLink.dataset.linkIndex = `${index}`;
             visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+            this.decorateVisualNodeLink(visualLink, label);
             this.linkLayerEl.appendChild(visualLink);
         });
+        requestAnimationFrame(() => {
+            this.syncLinkLayerPosition();
+        });
+    }
+    decorateVisualNodeLink(visualLink, label) {
+        visualLink.textContent = '';
+        if (!this.shouldShowLinkTitle())
+            return;
+        const titleEl = visualLink.ownerDocument.createElement('span');
+        titleEl.classList.add('mm-node-link-title');
+        titleEl.textContent = label;
+        visualLink.appendChild(titleEl);
+    }
+    shouldShowLinkTitle() {
+        var _a, _b;
+        return Boolean((_b = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting) === null || _b === void 0 ? void 0 : _b.showLinkTitle);
     }
     getDisplayedLinks() {
         const links = this.data.isEdit
@@ -1567,6 +1592,7 @@ class Node$1 {
         this._linkCount = count;
         if (count > 0) {
             this.containEl.classList.add('mm-node-has-link');
+            this.containEl.classList.toggle('mm-node-show-link-title', this.shouldShowLinkTitle());
             this.containEl.style.setProperty('--mm-node-link-space', `${0.35 + count * 1.1}em`);
             requestAnimationFrame(() => {
                 this.syncLinkLayerPosition();
@@ -1574,6 +1600,7 @@ class Node$1 {
         }
         else {
             this.containEl.classList.remove('mm-node-has-link');
+            this.containEl.classList.remove('mm-node-show-link-title');
             this.containEl.style.removeProperty('--mm-node-link-space');
             this.containEl.style.removeProperty('--mm-node-link-layer-left');
         }
@@ -1584,8 +1611,14 @@ class Node$1 {
             return;
         }
         const fontSize = parseFloat(getComputedStyle(this.contentEl).fontSize) || 16;
-        const linkSpace = (0.35 + this._linkCount * 1.1) * fontSize;
         const iconGap = 0.35 * fontSize;
+        const linkLayerWidth = this.linkLayerEl.scrollWidth || this.linkLayerEl.offsetWidth;
+        const linkSpace = this.shouldShowLinkTitle()
+            ? Math.ceil(linkLayerWidth + iconGap)
+            : (0.35 + this._linkCount * 1.1) * fontSize;
+        if (this.shouldShowLinkTitle()) {
+            this.containEl.style.setProperty('--mm-node-link-space', `${linkSpace}px`);
+        }
         const left = Math.max(0, this.contentEl.offsetWidth - linkSpace + iconGap);
         this.containEl.style.setProperty('--mm-node-link-layer-left', `${left}px`);
     }
@@ -1647,8 +1680,8 @@ class Node$1 {
         return JSON.parse(JSON.stringify(this.data));
     }
     refreshBox() {
-        this.box = this.getDomBox();
         this.syncLinkLayerPosition();
+        this.box = this.getDomBox();
     }
     getBox() {
         return Object.assign({}, this.box);
@@ -1661,6 +1694,11 @@ class Node$1 {
         var l = parseInt(this.containEl.style.left);
         var w = Math.ceil(this.contentEl.offsetWidth);
         var h = Math.ceil(this.contentEl.offsetHeight);
+        if (this.shouldShowLinkTitle() && this._linkCount > 0) {
+            const linkLeft = parseFloat(this.containEl.style.getPropertyValue('--mm-node-link-layer-left')) || 0;
+            const linkWidth = this.linkLayerEl.scrollWidth || this.linkLayerEl.offsetWidth;
+            w = Math.max(w, Math.ceil(linkLeft + linkWidth));
+        }
         return {
             x: l,
             y: t,
@@ -2462,6 +2500,9 @@ class Layout {
         n.containEl.classList.add('mm-node-' + direct);
         if (n._linkCount > 0) {
             n.containEl.classList.add('mm-node-has-link');
+            if (n.shouldShowLinkTitle()) {
+                n.containEl.classList.add('mm-node-show-link-title');
+            }
         }
         if (n.isLeaf() && !n.containEl.classList.contains('mm-node-leaf')) {
             n.containEl.classList.add('mm-node-leaf');
@@ -9559,7 +9600,8 @@ class MindMap {
             color: 'inherit',
             exportMdModel: 'default',
             headLevel: 2,
-            layoutDirect: ''
+            layoutDirect: '',
+            showLinkTitle: false
         }, setting || {});
         this.data = data;
         this.appEl = document.createElement('div');
@@ -40880,6 +40922,26 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             this.plugin.settings.focusOnMove = value;
             this.plugin.saveData(this.plugin.settings);
         }));
+        new obsidian.Setting(containerEl)
+            .setName(`${t('Show link title')}`)
+            .setDesc(`${t('Show link title desc')}`)
+            .addToggle((toggle) => toggle
+            .setValue(Boolean(this.plugin.settings.showLinkTitle))
+            .onChange((value) => {
+            this.plugin.settings.showLinkTitle = value;
+            this.plugin.saveData(this.plugin.settings);
+            const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
+            mindmapLeaves.forEach((leaf) => {
+                var v = leaf.view;
+                v.mindmap.setting.showLinkTitle = value;
+                v.mindmap.traverseBF((n) => {
+                    n.renderLinkLayer(n.getDisplayedLinks());
+                    n.clearCacheData();
+                    n.refreshBox();
+                });
+                v.mindmap.refresh();
+            });
+        }));
     }
 }
 
@@ -41916,7 +41978,8 @@ class MindMapPlugin extends obsidian.Plugin {
                 fontSize: 16,
                 background: 'transparent',
                 layout: 'mindmap',
-                layoutDirect: 'mindmap'
+                layoutDirect: 'mindmap',
+                showLinkTitle: false
             }, yield this.loadData());
         });
     }

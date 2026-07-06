@@ -87,6 +87,9 @@ export default class Layout {
         n.containEl.classList.add('mm-node-' + direct);
         if(n._linkCount > 0){
             n.containEl.classList.add('mm-node-has-link');
+            if(n.shouldShowLinkTitle()){
+                n.containEl.classList.add('mm-node-show-link-title');
+            }
         }
         
         if (n.isLeaf() && !n.containEl.classList.contains('mm-node-leaf')) {

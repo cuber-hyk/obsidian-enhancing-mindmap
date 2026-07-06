@@ -25,6 +25,8 @@
 }
 .mm-node .mm-node-content {
   padding: 2px 4px;
+  min-width: 2em;
+  min-height: 1.4em;
   max-width: 800px;
   word-break: break-word;
 }
@@ -86,6 +88,45 @@
 
 .mm-node-link-layer .mm-node-link:hover::after,
 .mm-node-link-layer .mm-node-link:focus::after {
+  color: var(--text-accent);
+}
+
+.mm-node.mm-node-show-link-title .mm-node-link-layer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  width: auto;
+  height: auto;
+}
+
+.mm-node.mm-node-show-link-title .mm-node-link-layer .mm-node-link {
+  position: static;
+  gap: 0.25em;
+  justify-content: flex-start;
+  width: auto;
+  max-width: 12em;
+  height: 1.2em;
+  transform: none;
+}
+
+.mm-node.mm-node-show-link-title .mm-node-link-layer .mm-node-link::after {
+  flex: 0 0 auto;
+  order: 0;
+}
+
+.mm-node-link-title {
+  order: 1;
+  overflow: hidden;
+  max-width: 10em;
+  color: var(--text-muted);
+  font-size: 0.75em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-node-link-layer .mm-node-link:hover .mm-node-link-title,
+.mm-node-link-layer .mm-node-link:focus .mm-node-link-title {
   color: var(--text-accent);
 }
 

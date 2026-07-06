@@ -25,7 +25,8 @@ interface Setting {
     headLevel: number,
     layoutDirect: string,
     strokeArray?:any[],
-    focusOnMove?: boolean
+    focusOnMove?: boolean,
+    showLinkTitle?: boolean
 }
 
 export default class MindMap {
@@ -79,7 +80,8 @@ export default class MindMap {
             color: 'inherit',
             exportMdModel: 'default',
             headLevel: 2,
-            layoutDirect: ''
+            layoutDirect: '',
+            showLinkTitle: false
         }, setting || {});
 
 
