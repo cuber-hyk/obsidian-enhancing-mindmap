@@ -37,6 +37,10 @@ adr_reviewed: not_required
 - 本地图片通过 `getAvailablePathForAttachment()` 和 Vault API 写入，遵循 Obsidian 附件目录及重名规则。
 - Vault 链接统一通过 `generateMarkdownLink()` 生成，遵循用户的链接格式设置。
 - 工具栏打开弹窗前保存 DOM Range，确认或取消后恢复节点选区与焦点。
+- 脑图视图右下角由 `MindMapNavigatorController` 显示画布导航控件；控件包含小视图、视口框、缩放滑动条、加减按钮、百分比显示、隐藏/恢复按钮和 hover 四角拖拽缩放点。
+- 导航控件复用 `MindMap.mindScale`、`scale()` 和滚动容器状态；滑动条、按钮和 Ctrl/Meta 滚轮缩放必须保持同一个缩放来源。
+- 小视图使用可见节点 box 的几何摘要渲染，不复制节点 DOM；点击小视图定位主画布，拖拽视口框按缩略比例移动滚动位置。
+- 导航控件尺寸调整只影响当前视图生命周期内的面板宽度和小视图高度，不写入节点 Markdown 或插件设置。
 - `.xmind` 文件拖入画布时走独立导入流程，与节点附件插入无关。
 
 ## 事实来源
@@ -46,6 +50,7 @@ adr_reviewed: not_required
 - 链接解析与交互：`src/mindmap/link/*.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
+- 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 视图生命周期：`src/MindMapView.ts`
 - 命令：`src/main.ts`
 - 样式：`styles.css`

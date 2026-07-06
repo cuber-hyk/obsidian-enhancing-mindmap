@@ -12,6 +12,7 @@ import jsZip from 'jszip'
 import { t } from 'src/lang/helpers'
 import NodeKeyboardController from './interaction/NodeKeyboardController'
 import NodeLinkController from './link/NodeLinkController'
+import MindMapNavigatorController from './navigation/MindMapNavigatorController'
 
 let tempDispLevel = 0;
 
@@ -59,6 +60,7 @@ export default class MindMap {
     exec: Exec;
     nodeKeyboardController: NodeKeyboardController;
     nodeLinkController: NodeLinkController;
+    navigatorController: MindMapNavigatorController;
     scalePointer: number[] = [];
     mindScale = 100;
     timeOut: any = null;
@@ -116,6 +118,7 @@ export default class MindMap {
         this.exec = new Exec();
         this.nodeKeyboardController = new NodeKeyboardController(this);
         this.nodeLinkController = new NodeLinkController(this);
+        this.navigatorController = new MindMapNavigatorController(this);
 
         // link line
         this.edgeGroup = this.draw.group();
@@ -1708,6 +1711,7 @@ export default class MindMap {
 
     clear() {
         this.clearNode();
+        this.navigatorController?.destroy();
         this.removeEvent();
         this.draw?.clear();
     }
@@ -1940,6 +1944,7 @@ export default class MindMap {
 
     refresh() {
         this.layout();
+        this.navigatorController?.scheduleUpdate();
     }
 
     emit(name: string, data?: any) {
@@ -2212,6 +2217,7 @@ export default class MindMap {
         } else {
             this.appEl.style.transform = "scale(" + this.mindScale / 100 + ")";
         }
+        this.navigatorController?.update();
 
     }
 
