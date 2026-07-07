@@ -228,13 +228,7 @@ export default class MindMapNavigatorController {
       this.contentEl.appendChild(marker);
     });
 
-    const scale = this.mindmap.mindScale / 100;
-    const viewport = {
-      x: this.mindmap.containerEL.scrollLeft / scale,
-      y: this.mindmap.containerEL.scrollTop / scale,
-      width: this.mindmap.containerEL.clientWidth / scale,
-      height: this.mindmap.containerEL.clientHeight / scale,
-    };
+    const viewport = this.getViewportRect();
     this.viewportEl.style.display = 'block';
     this.viewportEl.style.left = `${metrics.offsetX + (viewport.x - bounds.x) * metrics.ratio}px`;
     this.viewportEl.style.top = `${metrics.offsetY + (viewport.y - bounds.y) * metrics.ratio}px`;
@@ -269,12 +263,34 @@ export default class MindMapNavigatorController {
     const metrics = this.getOverviewMetrics(bounds);
     const targetX = bounds.x + (clientX - metrics.rect.left - metrics.offsetX) / metrics.ratio;
     const targetY = bounds.y + (clientY - metrics.rect.top - metrics.offsetY) / metrics.ratio;
-    const scale = this.mindmap.mindScale / 100;
-    this.mindmap.containerEL.scrollLeft =
-      targetX * scale - this.mindmap.containerEL.clientWidth / 2;
-    this.mindmap.containerEL.scrollTop =
-      targetY * scale - this.mindmap.containerEL.clientHeight / 2;
+    this.centerCanvasPoint(targetX, targetY);
     this.scheduleUpdate();
+  }
+
+  private getScale() {
+    const scale = this.mindmap.mindScale / 100;
+    return Number.isFinite(scale) && scale > 0 ? scale : 1;
+  }
+
+  private getViewportRect(): Rect {
+    const scale = this.getScale();
+    const containerRect = this.mindmap.containerEL.getBoundingClientRect();
+    const appRect = this.mindmap.appEl.getBoundingClientRect();
+    return {
+      x: (containerRect.left - appRect.left) / scale,
+      y: (containerRect.top - appRect.top) / scale,
+      width: this.mindmap.containerEL.clientWidth / scale,
+      height: this.mindmap.containerEL.clientHeight / scale,
+    };
+  }
+
+  private centerCanvasPoint(x: number, y: number) {
+    const scale = this.getScale();
+    const viewport = this.getViewportRect();
+    this.mindmap.containerEL.scrollLeft +=
+      (x - (viewport.x + viewport.width / 2)) * scale;
+    this.mindmap.containerEL.scrollTop +=
+      (y - (viewport.y + viewport.height / 2)) * scale;
   }
 
   private getOverviewMetrics(bounds: Rect) {
@@ -374,7 +390,7 @@ export default class MindMapNavigatorController {
     if (!this.viewportDrag) return;
     event.preventDefault();
     event.stopPropagation();
-    const scale = this.mindmap.mindScale / 100;
+    const scale = this.getScale();
     this.mindmap.containerEL.scrollLeft =
       this.viewportDrag.startScrollLeft +
       ((event.clientX - this.viewportDrag.startX) / this.viewportDrag.overviewRatio) * scale;
