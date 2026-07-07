@@ -43,6 +43,8 @@ export default {
 
   "Stroke Array":"颜色组",
   "Stroke Array Desc":"节点连线颜色将按照颜色组生成,否则生成随机颜色",
+  "Show link title":"显示链接标题",
+  "Show link title desc":"在链接图标旁显示链接标题",
   "Save fail":"保存失败",
   "Save success":"保存成功",
   "Toggle markdown/mindmap":"切换为 markdown 或 mindmap 模式",

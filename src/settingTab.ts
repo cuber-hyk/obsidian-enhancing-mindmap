@@ -181,6 +181,29 @@ export class MindMapSettingsTab extends PluginSettingTab {
                 }),
             );
 
+        new Setting(containerEl)
+            .setName(`${t('Show link title')}`)
+            .setDesc(`${t('Show link title desc')}`)
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(Boolean(this.plugin.settings.showLinkTitle))
+                    .onChange((value) => {
+                        this.plugin.settings.showLinkTitle = value;
+                        this.plugin.saveData(this.plugin.settings);
+                        const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
+                        mindmapLeaves.forEach((leaf) => {
+                            var v = leaf.view as MindMapView;
+                            v.mindmap.setting.showLinkTitle = value;
+                            v.mindmap.traverseBF((n: MyNode) => {
+                                n.renderLinkLayer(n.getDisplayedLinks());
+                                n.clearCacheData();
+                                n.refreshBox();
+                            });
+                            v.mindmap.refresh();
+                        });
+                    }),
+            );
+
 
 
 

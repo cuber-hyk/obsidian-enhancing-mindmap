@@ -293,7 +293,7 @@ export default class Node {
         setTooltip(visualLink, label, {placement: 'top'});
         visualLink.dataset.linkIndex = `${index}`;
         visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
-        visualLink.textContent = '';
+        this.decorateVisualNodeLink(visualLink, label);
 
         if (!visualLink.classList.contains('internal-link')) {
             visualLink.setAttribute('target', '_blank');
@@ -903,8 +903,26 @@ export default class Node {
             setTooltip(visualLink, label, {placement: 'top'});
             visualLink.dataset.linkIndex = `${index}`;
             visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+            this.decorateVisualNodeLink(visualLink, label);
             this.linkLayerEl.appendChild(visualLink);
         });
+        requestAnimationFrame(() => {
+            this.syncLinkLayerPosition();
+        });
+    }
+
+    decorateVisualNodeLink(visualLink: HTMLAnchorElement, label: string) {
+        visualLink.textContent = '';
+        if (!this.shouldShowLinkTitle()) return;
+
+        const titleEl = visualLink.ownerDocument.createElement('span');
+        titleEl.classList.add('mm-node-link-title');
+        titleEl.textContent = label;
+        visualLink.appendChild(titleEl);
+    }
+
+    shouldShowLinkTitle(): boolean {
+        return Boolean(this.mindmap?.setting?.showLinkTitle);
     }
 
     getDisplayedLinks(): NodeLinkData[] {
@@ -924,12 +942,14 @@ export default class Node {
         this._linkCount = count;
         if (count > 0) {
             this.containEl.classList.add('mm-node-has-link');
+            this.containEl.classList.toggle('mm-node-show-link-title', this.shouldShowLinkTitle());
             this.containEl.style.setProperty('--mm-node-link-space', `${0.35 + count * 1.1}em`);
             requestAnimationFrame(() => {
                 this.syncLinkLayerPosition();
             });
         } else {
             this.containEl.classList.remove('mm-node-has-link');
+            this.containEl.classList.remove('mm-node-show-link-title');
             this.containEl.style.removeProperty('--mm-node-link-space');
             this.containEl.style.removeProperty('--mm-node-link-layer-left');
         }
@@ -942,8 +962,14 @@ export default class Node {
         }
 
         const fontSize = parseFloat(getComputedStyle(this.contentEl).fontSize) || 16;
-        const linkSpace = (0.35 + this._linkCount * 1.1) * fontSize;
         const iconGap = 0.35 * fontSize;
+        const linkLayerWidth = this.linkLayerEl.scrollWidth || this.linkLayerEl.offsetWidth;
+        const linkSpace = this.shouldShowLinkTitle()
+            ? Math.ceil(linkLayerWidth + iconGap)
+            : (0.35 + this._linkCount * 1.1) * fontSize;
+        if (this.shouldShowLinkTitle()) {
+            this.containEl.style.setProperty('--mm-node-link-space', `${linkSpace}px`);
+        }
         const left = Math.max(0, this.contentEl.offsetWidth - linkSpace + iconGap);
         this.containEl.style.setProperty('--mm-node-link-layer-left', `${left}px`);
     }
@@ -1017,8 +1043,8 @@ export default class Node {
     }
 
     refreshBox(){
-        this.box = this.getDomBox();
         this.syncLinkLayerPosition();
+        this.box = this.getDomBox();
     }
 
     getBox(){
@@ -1034,6 +1060,11 @@ export default class Node {
         var l = parseInt(this.containEl.style.left);
         var w = Math.ceil(this.contentEl.offsetWidth);
         var h = Math.ceil(this.contentEl.offsetHeight);
+        if (this.shouldShowLinkTitle() && this._linkCount > 0) {
+            const linkLeft = parseFloat(this.containEl.style.getPropertyValue('--mm-node-link-layer-left')) || 0;
+            const linkWidth = this.linkLayerEl.scrollWidth || this.linkLayerEl.offsetWidth;
+            w = Math.max(w, Math.ceil(linkLeft + linkWidth));
+        }
 
         return {
             x: l,

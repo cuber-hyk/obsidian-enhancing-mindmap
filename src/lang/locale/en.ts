@@ -33,6 +33,8 @@ export default {
 
     "Stroke Array":"Stroke array",
     "Stroke Array Desc":"Node link color base on this value or random color",
+    "Show link title":"Show link title",
+    "Show link title desc":"Display link titles next to link icons on mindmap nodes",
     "Save fail":"Save data err",
     "Save success":"Save data success",
     "Toggle markdown/mindmap":"Toggle to markdown/mindmap mode",

@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-07-04
+updated: 2026-07-06
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -25,9 +25,10 @@ adr_reviewed: not_required
 - Vault 文件选择器插入 Markdown、视频、PDF、音频等非图片文件，并在 Obsidian 新标签页打开。
 - 外部链接和 Vault 文件链接作为节点附件追加，不替换当前选区或节点正文；链接标题只用于悬停提示和编辑界面。
 - 节点将外部链接和 Vault 链接显示为绝对定位的链接图标；编辑态隐藏原始 Markdown 链接地址，保存时保留链接 Markdown。
+- 链接标题显示由全局设置 `showLinkTitle` 控制，默认关闭；开启后在链接图标右侧显示轻量标题文本，标题为空时回退显示目标。
 - 链接图标单击后按链接类型跳转；右键使用 Obsidian 原生菜单编辑标题/目标或删除链接。删除无需确认，只影响目标链接，并进入节点文本撤销历史。
 - Vault 链接编辑时通过 Vault 文件选择器更换目标；外部链接目标仍限制为 `http` 或 `https`。
-- 节点通过 `.mm-node-has-link` 为链接图标预留宽度，布局刷新必须保留该状态类，避免分支和子节点使用旧宽度。
+- 节点通过 `.mm-node-has-link` 为链接图标或链接标题预留宽度，布局刷新必须保留该状态类，避免分支和子节点使用旧宽度。
 - `ChangeNodeText` 等待 `setText()` 的 Markdown 渲染完成后再刷新节点尺寸与布局，避免保存链接时出现图标闪烁或空节点宽度。
 - 图片入口可选择现有 Vault 图片，或导入 AVIF、BMP、GIF、JPEG、PNG、WebP 本地图片；新插入图片使用节点图片默认宽度，避免原图尺寸撑开脑图布局。
 - 图片附件保存为 Markdown 源文本，编辑态显示图片本体而不是原始 `![[...]]` 文本。
@@ -36,6 +37,11 @@ adr_reviewed: not_required
 - 本地图片通过 `getAvailablePathForAttachment()` 和 Vault API 写入，遵循 Obsidian 附件目录及重名规则。
 - Vault 链接统一通过 `generateMarkdownLink()` 生成，遵循用户的链接格式设置。
 - 工具栏打开弹窗前保存 DOM Range，确认或取消后恢复节点选区与焦点。
+- 脑图视图右下角由 `MindMapNavigatorController` 显示画布导航控件；控件包含小视图、视口框、缩放滑动条、加减按钮、百分比显示、可见/总节点数、隐藏/恢复按钮和 hover 四角拖拽缩放点。
+- 导航控件复用 `MindMap.mindScale`、`scale()` 和滚动容器状态；滑动条、按钮和 Ctrl/Meta 滚轮缩放必须保持同一个缩放来源。
+- 小视图使用可见节点 box 的几何摘要渲染，不复制节点 DOM；点击小视图定位主画布，拖拽视口框按缩略比例移动滚动位置。
+- 导航控件节点数统计显示 `可见 / 总数 节点`，可见数来自 `root.getShowNodeList()`，总数从运行时节点树递归 `children` 计算，根节点计入两者。
+- 导航控件尺寸调整只影响当前视图生命周期内的面板宽度和小视图高度，不写入节点 Markdown 或插件设置。
 - `.xmind` 文件拖入画布时走独立导入流程，与节点附件插入无关。
 
 ## 事实来源
@@ -45,6 +51,7 @@ adr_reviewed: not_required
 - 链接解析与交互：`src/mindmap/link/*.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
+- 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 视图生命周期：`src/MindMapView.ts`
 - 命令：`src/main.ts`
 - 样式：`styles.css`

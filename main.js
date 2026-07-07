@@ -140,6 +140,8 @@ var en = {
     "Clockwise": "Clockwise",
     "Stroke Array": "Stroke array",
     "Stroke Array Desc": "Node link color base on this value or random color",
+    "Show link title": "Show link title",
+    "Show link title desc": "Display link titles next to link icons on mindmap nodes",
     "Save fail": "Save data err",
     "Save success": "Save data success",
     "Toggle markdown/mindmap": "Toggle to markdown/mindmap mode",
@@ -244,6 +246,8 @@ var fr = {
     "Clockwise": "Sens des aiguilles d'une montre",
     "Stroke Array": "Tableau de traits",
     "Stroke Array Desc": "Couleur du lien de nœud basée sur cette valeur ou couleur aléatoire",
+    "Show link title": "Afficher le titre du lien",
+    "Show link title desc": "Afficher le titre du lien à côté de l'icône de lien sur les nœuds",
     "Save fail": "Échec de l'enregistrement des données",
     "Save success": "Enregistrement des données réussi",
     "Toggle markdown/mindmap": "Basculer entre le mode markdown et le mode carte mentale",
@@ -370,6 +374,8 @@ var zhCN = {
     "Add brother node": "添加兄弟节点",
     "Stroke Array": "颜色组",
     "Stroke Array Desc": "节点连线颜色将按照颜色组生成,否则生成随机颜色",
+    "Show link title": "显示链接标题",
+    "Show link title desc": "在链接图标旁显示链接标题",
     "Save fail": "保存失败",
     "Save success": "保存成功",
     "Toggle markdown/mindmap": "切换为 markdown 或 mindmap 模式",
@@ -400,6 +406,8 @@ var zhCN = {
 
 // 繁體中文
 var zhTW = {
+    "Show link title": "顯示連結標題",
+    "Show link title desc": "在連結圖示旁顯示連結標題",
     "Edit link": "編輯連結",
     "Delete link": "刪除連結",
     "Link target": "連結目標",
@@ -1006,7 +1014,7 @@ class Node$1 {
         obsidian.setTooltip(visualLink, label, { placement: 'top' });
         visualLink.dataset.linkIndex = `${index}`;
         visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
-        visualLink.textContent = '';
+        this.decorateVisualNodeLink(visualLink, label);
         if (!visualLink.classList.contains('internal-link')) {
             visualLink.setAttribute('target', '_blank');
             visualLink.setAttribute('rel', 'noopener noreferrer');
@@ -1548,8 +1556,25 @@ class Node$1 {
             obsidian.setTooltip(visualLink, label, { placement: 'top' });
             visualLink.dataset.linkIndex = `${index}`;
             visualLink.style.setProperty('--mm-node-link-offset', `${index * 1.1}em`);
+            this.decorateVisualNodeLink(visualLink, label);
             this.linkLayerEl.appendChild(visualLink);
         });
+        requestAnimationFrame(() => {
+            this.syncLinkLayerPosition();
+        });
+    }
+    decorateVisualNodeLink(visualLink, label) {
+        visualLink.textContent = '';
+        if (!this.shouldShowLinkTitle())
+            return;
+        const titleEl = visualLink.ownerDocument.createElement('span');
+        titleEl.classList.add('mm-node-link-title');
+        titleEl.textContent = label;
+        visualLink.appendChild(titleEl);
+    }
+    shouldShowLinkTitle() {
+        var _a, _b;
+        return Boolean((_b = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting) === null || _b === void 0 ? void 0 : _b.showLinkTitle);
     }
     getDisplayedLinks() {
         const links = this.data.isEdit
@@ -1567,6 +1592,7 @@ class Node$1 {
         this._linkCount = count;
         if (count > 0) {
             this.containEl.classList.add('mm-node-has-link');
+            this.containEl.classList.toggle('mm-node-show-link-title', this.shouldShowLinkTitle());
             this.containEl.style.setProperty('--mm-node-link-space', `${0.35 + count * 1.1}em`);
             requestAnimationFrame(() => {
                 this.syncLinkLayerPosition();
@@ -1574,6 +1600,7 @@ class Node$1 {
         }
         else {
             this.containEl.classList.remove('mm-node-has-link');
+            this.containEl.classList.remove('mm-node-show-link-title');
             this.containEl.style.removeProperty('--mm-node-link-space');
             this.containEl.style.removeProperty('--mm-node-link-layer-left');
         }
@@ -1584,8 +1611,14 @@ class Node$1 {
             return;
         }
         const fontSize = parseFloat(getComputedStyle(this.contentEl).fontSize) || 16;
-        const linkSpace = (0.35 + this._linkCount * 1.1) * fontSize;
         const iconGap = 0.35 * fontSize;
+        const linkLayerWidth = this.linkLayerEl.scrollWidth || this.linkLayerEl.offsetWidth;
+        const linkSpace = this.shouldShowLinkTitle()
+            ? Math.ceil(linkLayerWidth + iconGap)
+            : (0.35 + this._linkCount * 1.1) * fontSize;
+        if (this.shouldShowLinkTitle()) {
+            this.containEl.style.setProperty('--mm-node-link-space', `${linkSpace}px`);
+        }
         const left = Math.max(0, this.contentEl.offsetWidth - linkSpace + iconGap);
         this.containEl.style.setProperty('--mm-node-link-layer-left', `${left}px`);
     }
@@ -1647,8 +1680,8 @@ class Node$1 {
         return JSON.parse(JSON.stringify(this.data));
     }
     refreshBox() {
-        this.box = this.getDomBox();
         this.syncLinkLayerPosition();
+        this.box = this.getDomBox();
     }
     getBox() {
         return Object.assign({}, this.box);
@@ -1661,6 +1694,11 @@ class Node$1 {
         var l = parseInt(this.containEl.style.left);
         var w = Math.ceil(this.contentEl.offsetWidth);
         var h = Math.ceil(this.contentEl.offsetHeight);
+        if (this.shouldShowLinkTitle() && this._linkCount > 0) {
+            const linkLeft = parseFloat(this.containEl.style.getPropertyValue('--mm-node-link-layer-left')) || 0;
+            const linkWidth = this.linkLayerEl.scrollWidth || this.linkLayerEl.offsetWidth;
+            w = Math.max(w, Math.ceil(linkLeft + linkWidth));
+        }
         return {
             x: l,
             y: t,
@@ -2462,6 +2500,9 @@ class Layout {
         n.containEl.classList.add('mm-node-' + direct);
         if (n._linkCount > 0) {
             n.containEl.classList.add('mm-node-has-link');
+            if (n.shouldShowLinkTitle()) {
+                n.containEl.classList.add('mm-node-show-link-title');
+            }
         }
         if (n.isLeaf() && !n.containEl.classList.contains('mm-node-leaf')) {
             n.containEl.classList.add('mm-node-leaf');
@@ -9538,6 +9579,369 @@ class NodeLinkController {
     }
 }
 
+const MIN_SCALE = 20;
+const MAX_SCALE = 300;
+const SCALE_STEP = 10;
+const DEFAULT_PANEL_WIDTH = 210;
+const DEFAULT_OVERVIEW_HEIGHT = 116;
+const MIN_PANEL_WIDTH = 170;
+const MAX_PANEL_WIDTH = 360;
+const MIN_OVERVIEW_HEIGHT = 90;
+const MAX_OVERVIEW_HEIGHT = 260;
+class MindMapNavigatorController {
+    constructor(mindmap) {
+        this.rafId = null;
+        this.resizeObserver = null;
+        this.panelWidth = DEFAULT_PANEL_WIDTH;
+        this.overviewHeight = DEFAULT_OVERVIEW_HEIGHT;
+        this.panelResize = null;
+        this.viewportDrag = null;
+        this.onZoomOut = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.mindmap.scale(this.mindmap.mindScale - SCALE_STEP);
+        };
+        this.onZoomIn = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.mindmap.scale(this.mindmap.mindScale + SCALE_STEP);
+        };
+        this.onZoomInput = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.mindmap.scale(Number(this.zoomInput.value));
+        };
+        this.onHide = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.rootEl.classList.add('is-hidden');
+        };
+        this.onRestore = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.rootEl.classList.remove('is-hidden');
+            this.scheduleUpdate();
+        };
+        this.onPanelResizePointerDown = (event) => {
+            var _a;
+            event.preventDefault();
+            event.stopPropagation();
+            const target = event.currentTarget;
+            const corner = target.dataset.corner;
+            if (!corner)
+                return;
+            this.panelResize = {
+                corner,
+                startX: event.clientX,
+                startY: event.clientY,
+                startWidth: this.panelWidth,
+                startHeight: this.overviewHeight,
+            };
+            this.rootEl.classList.add('is-resizing');
+            (_a = target.setPointerCapture) === null || _a === void 0 ? void 0 : _a.call(target, event.pointerId);
+            document.addEventListener('pointermove', this.onPanelResizePointerMove);
+            document.addEventListener('pointerup', this.onPanelResizePointerUp);
+        };
+        this.onOverviewPointerDown = (event) => {
+            var _a, _b, _c, _d;
+            event.preventDefault();
+            event.stopPropagation();
+            const isViewportDrag = event.target === this.viewportEl;
+            if (!isViewportDrag) {
+                this.panToOverviewPoint(event.clientX, event.clientY);
+                return;
+            }
+            const nodes = ((_b = (_a = this.mindmap.root) === null || _a === void 0 ? void 0 : _a.getShowNodeList) === null || _b === void 0 ? void 0 : _b.call(_a)) || [];
+            if (!nodes.length)
+                return;
+            const bounds = this.getContentBounds(nodes.map((node) => node.getBox()));
+            const metrics = this.getOverviewMetrics(bounds);
+            this.viewportDrag = {
+                startX: event.clientX,
+                startY: event.clientY,
+                startScrollLeft: this.mindmap.containerEL.scrollLeft,
+                startScrollTop: this.mindmap.containerEL.scrollTop,
+                overviewRatio: metrics.ratio,
+            };
+            (_d = (_c = this.viewportEl).setPointerCapture) === null || _d === void 0 ? void 0 : _d.call(_c, event.pointerId);
+            document.addEventListener('pointermove', this.onViewportPointerMove);
+            document.addEventListener('pointerup', this.onViewportPointerUp);
+        };
+        this.onViewportPointerMove = (event) => {
+            if (!this.viewportDrag)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const scale = this.mindmap.mindScale / 100;
+            this.mindmap.containerEL.scrollLeft =
+                this.viewportDrag.startScrollLeft +
+                    ((event.clientX - this.viewportDrag.startX) / this.viewportDrag.overviewRatio) * scale;
+            this.mindmap.containerEL.scrollTop =
+                this.viewportDrag.startScrollTop +
+                    ((event.clientY - this.viewportDrag.startY) / this.viewportDrag.overviewRatio) * scale;
+            this.scheduleUpdate();
+        };
+        this.onViewportPointerUp = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.detachViewportDrag();
+        };
+        this.onPanelResizePointerMove = (event) => {
+            if (!this.panelResize)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const dx = event.clientX - this.panelResize.startX;
+            const dy = event.clientY - this.panelResize.startY;
+            const widthDelta = this.panelResize.corner.includes('w') ? -dx : dx;
+            const heightDelta = this.panelResize.corner.includes('n') ? -dy : dy;
+            this.panelWidth = this.clamp(this.panelResize.startWidth + widthDelta, MIN_PANEL_WIDTH, MAX_PANEL_WIDTH);
+            this.overviewHeight = this.clamp(this.panelResize.startHeight + heightDelta, MIN_OVERVIEW_HEIGHT, MAX_OVERVIEW_HEIGHT);
+            this.updateSize();
+            this.scheduleUpdate();
+        };
+        this.onPanelResizePointerUp = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.detachPanelResize();
+        };
+        this.onScroll = () => {
+            this.scheduleUpdate();
+        };
+        this.onWindowResize = () => {
+            this.scheduleUpdate();
+        };
+        this.mindmap = mindmap;
+        this.mindmap.containerEL.classList.add('mm-mindmap-container');
+        this.rootEl = document.createElement('div');
+        this.rootEl.classList.add('mm-navigator');
+        const hideButton = this.createButton('×', 'Hide navigator');
+        hideButton.classList.add('mm-navigator-hide-button');
+        const restoreButton = this.createButton('▣', 'Show navigator');
+        restoreButton.classList.add('mm-navigator-restore-button');
+        this.overviewEl = document.createElement('div');
+        this.overviewEl.classList.add('mm-navigator-overview');
+        this.contentEl = document.createElement('div');
+        this.contentEl.classList.add('mm-navigator-content');
+        this.viewportEl = document.createElement('div');
+        this.viewportEl.classList.add('mm-navigator-viewport');
+        this.overviewEl.appendChild(this.contentEl);
+        this.overviewEl.appendChild(this.viewportEl);
+        this.createResizeHandles();
+        const zoomEl = document.createElement('div');
+        zoomEl.classList.add('mm-navigator-zoom');
+        const zoomOutButton = this.createButton('-', 'Zoom out');
+        const zoomInButton = this.createButton('+', 'Zoom in');
+        this.zoomInput = document.createElement('input');
+        this.zoomInput.type = 'range';
+        this.zoomInput.min = `${MIN_SCALE}`;
+        this.zoomInput.max = `${MAX_SCALE}`;
+        this.zoomInput.step = '1';
+        this.zoomInput.classList.add('mm-navigator-zoom-input');
+        this.zoomInput.setAttribute('aria-label', 'Zoom');
+        this.zoomLabel = document.createElement('span');
+        this.zoomLabel.classList.add('mm-navigator-zoom-label');
+        this.nodeCountEl = document.createElement('span');
+        this.nodeCountEl.classList.add('mm-navigator-node-count');
+        zoomEl.appendChild(zoomOutButton);
+        zoomEl.appendChild(this.zoomInput);
+        zoomEl.appendChild(zoomInButton);
+        zoomEl.appendChild(this.zoomLabel);
+        this.rootEl.appendChild(hideButton);
+        this.rootEl.appendChild(restoreButton);
+        this.rootEl.appendChild(this.overviewEl);
+        this.rootEl.appendChild(zoomEl);
+        this.rootEl.appendChild(this.nodeCountEl);
+        this.mindmap.containerEL.appendChild(this.rootEl);
+        zoomOutButton.addEventListener('click', this.onZoomOut);
+        zoomInButton.addEventListener('click', this.onZoomIn);
+        hideButton.addEventListener('click', this.onHide);
+        restoreButton.addEventListener('click', this.onRestore);
+        this.zoomInput.addEventListener('input', this.onZoomInput);
+        this.overviewEl.addEventListener('pointerdown', this.onOverviewPointerDown);
+        this.mindmap.containerEL.addEventListener('scroll', this.onScroll);
+        this.resizeObserver = new ResizeObserver(() => this.scheduleUpdate());
+        this.resizeObserver.observe(this.mindmap.containerEL);
+        window.addEventListener('resize', this.onWindowResize);
+        this.update();
+    }
+    destroy() {
+        var _a;
+        if (this.rafId !== null) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
+        this.detachViewportDrag();
+        this.detachPanelResize();
+        (_a = this.resizeObserver) === null || _a === void 0 ? void 0 : _a.disconnect();
+        this.resizeObserver = null;
+        window.removeEventListener('resize', this.onWindowResize);
+        this.mindmap.containerEL.removeEventListener('scroll', this.onScroll);
+        this.mindmap.containerEL.classList.remove('mm-mindmap-container');
+        this.rootEl.remove();
+    }
+    scheduleUpdate() {
+        if (this.rafId !== null)
+            return;
+        this.rafId = requestAnimationFrame(() => {
+            this.rafId = null;
+            this.update();
+        });
+    }
+    update() {
+        this.updatePlacement();
+        this.updateSize();
+        this.updateZoom();
+        this.updateNodeCount();
+        this.renderOverview();
+    }
+    updatePlacement() {
+        const rect = this.mindmap.containerEL.getBoundingClientRect();
+        this.rootEl.style.right = `${Math.max(16, window.innerWidth - rect.right + 16)}px`;
+        this.rootEl.style.bottom = `${Math.max(16, window.innerHeight - rect.bottom + 16)}px`;
+    }
+    createButton(label, ariaLabel) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.classList.add('clickable-icon', 'mm-navigator-zoom-button');
+        button.textContent = label;
+        button.setAttribute('aria-label', ariaLabel);
+        return button;
+    }
+    createResizeHandles() {
+        ['nw', 'ne', 'sw', 'se'].forEach((corner) => {
+            const handle = document.createElement('span');
+            handle.classList.add('mm-navigator-resize-handle', `mm-navigator-resize-${corner}`);
+            handle.dataset.corner = corner;
+            handle.setAttribute('aria-hidden', 'true');
+            handle.addEventListener('pointerdown', this.onPanelResizePointerDown);
+            this.rootEl.appendChild(handle);
+        });
+    }
+    updateSize() {
+        this.rootEl.style.width = `${this.panelWidth}px`;
+        this.overviewEl.style.height = `${this.overviewHeight}px`;
+    }
+    updateZoom() {
+        const scale = Math.round(this.mindmap.mindScale);
+        this.zoomInput.value = `${scale}`;
+        this.zoomLabel.textContent = `${scale}%`;
+    }
+    updateNodeCount() {
+        var _a;
+        const root = this.mindmap.root;
+        const visibleCount = ((_a = root === null || root === void 0 ? void 0 : root.getShowNodeList) === null || _a === void 0 ? void 0 : _a.call(root).length) || 0;
+        const totalCount = root ? this.countNodeTree(root) : 0;
+        this.nodeCountEl.textContent = `${visibleCount} / ${totalCount} 节点`;
+        this.nodeCountEl.setAttribute('aria-label', `Visible nodes ${visibleCount}, total nodes ${totalCount}`);
+    }
+    countNodeTree(node) {
+        const children = Array.isArray(node.children) ? node.children : [];
+        return children.reduce((count, child) => count + this.countNodeTree(child), 1);
+    }
+    renderOverview() {
+        var _a, _b;
+        const nodes = ((_b = (_a = this.mindmap.root) === null || _a === void 0 ? void 0 : _a.getShowNodeList) === null || _b === void 0 ? void 0 : _b.call(_a)) || [];
+        if (!nodes.length) {
+            this.contentEl.innerHTML = '';
+            this.viewportEl.style.display = 'none';
+            return;
+        }
+        const bounds = this.getContentBounds(nodes.map((node) => node.getBox()));
+        if (bounds.width <= 0 || bounds.height <= 0) {
+            this.contentEl.innerHTML = '';
+            this.viewportEl.style.display = 'none';
+            return;
+        }
+        const metrics = this.getOverviewMetrics(bounds);
+        this.contentEl.innerHTML = '';
+        nodes.forEach((node) => {
+            const box = node.getBox();
+            const marker = document.createElement('span');
+            marker.classList.add('mm-navigator-node');
+            marker.style.left = `${metrics.offsetX + (box.x - bounds.x) * metrics.ratio}px`;
+            marker.style.top = `${metrics.offsetY + (box.y - bounds.y) * metrics.ratio}px`;
+            marker.style.width = `${Math.max(2, box.width * metrics.ratio)}px`;
+            marker.style.height = `${Math.max(2, box.height * metrics.ratio)}px`;
+            this.contentEl.appendChild(marker);
+        });
+        const scale = this.mindmap.mindScale / 100;
+        const viewport = {
+            x: this.mindmap.containerEL.scrollLeft / scale,
+            y: this.mindmap.containerEL.scrollTop / scale,
+            width: this.mindmap.containerEL.clientWidth / scale,
+            height: this.mindmap.containerEL.clientHeight / scale,
+        };
+        this.viewportEl.style.display = 'block';
+        this.viewportEl.style.left = `${metrics.offsetX + (viewport.x - bounds.x) * metrics.ratio}px`;
+        this.viewportEl.style.top = `${metrics.offsetY + (viewport.y - bounds.y) * metrics.ratio}px`;
+        this.viewportEl.style.width = `${Math.max(8, viewport.width * metrics.ratio)}px`;
+        this.viewportEl.style.height = `${Math.max(8, viewport.height * metrics.ratio)}px`;
+    }
+    getContentBounds(rects) {
+        let left = Number.POSITIVE_INFINITY;
+        let top = Number.POSITIVE_INFINITY;
+        let right = Number.NEGATIVE_INFINITY;
+        let bottom = Number.NEGATIVE_INFINITY;
+        rects.forEach((rect) => {
+            left = Math.min(left, rect.x);
+            top = Math.min(top, rect.y);
+            right = Math.max(right, rect.x + rect.width);
+            bottom = Math.max(bottom, rect.y + rect.height);
+        });
+        return {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        };
+    }
+    panToOverviewPoint(clientX, clientY) {
+        var _a, _b;
+        const nodes = ((_b = (_a = this.mindmap.root) === null || _a === void 0 ? void 0 : _a.getShowNodeList) === null || _b === void 0 ? void 0 : _b.call(_a)) || [];
+        if (!nodes.length)
+            return;
+        const bounds = this.getContentBounds(nodes.map((node) => node.getBox()));
+        const metrics = this.getOverviewMetrics(bounds);
+        const targetX = bounds.x + (clientX - metrics.rect.left - metrics.offsetX) / metrics.ratio;
+        const targetY = bounds.y + (clientY - metrics.rect.top - metrics.offsetY) / metrics.ratio;
+        const scale = this.mindmap.mindScale / 100;
+        this.mindmap.containerEL.scrollLeft =
+            targetX * scale - this.mindmap.containerEL.clientWidth / 2;
+        this.mindmap.containerEL.scrollTop =
+            targetY * scale - this.mindmap.containerEL.clientHeight / 2;
+        this.scheduleUpdate();
+    }
+    getOverviewMetrics(bounds) {
+        const rect = this.overviewEl.getBoundingClientRect();
+        const width = rect.width || 180;
+        const height = rect.height || 110;
+        const padding = 8;
+        const ratio = Math.min((width - padding * 2) / bounds.width, (height - padding * 2) / bounds.height);
+        const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+        return {
+            rect,
+            ratio: safeRatio,
+            offsetX: padding + (width - padding * 2 - bounds.width * safeRatio) / 2,
+            offsetY: padding + (height - padding * 2 - bounds.height * safeRatio) / 2,
+        };
+    }
+    detachViewportDrag() {
+        this.viewportDrag = null;
+        document.removeEventListener('pointermove', this.onViewportPointerMove);
+        document.removeEventListener('pointerup', this.onViewportPointerUp);
+    }
+    detachPanelResize() {
+        this.panelResize = null;
+        this.rootEl.classList.remove('is-resizing');
+        document.removeEventListener('pointermove', this.onPanelResizePointerMove);
+        document.removeEventListener('pointerup', this.onPanelResizePointerUp);
+    }
+    clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+}
+
 let tempDispLevel = 0;
 class MindMap {
     constructor(data, containerEL, setting) {
@@ -9559,7 +9963,8 @@ class MindMap {
             color: 'inherit',
             exportMdModel: 'default',
             headLevel: 2,
-            layoutDirect: ''
+            layoutDirect: '',
+            showLinkTitle: false
         }, setting || {});
         this.data = data;
         this.appEl = document.createElement('div');
@@ -9584,6 +9989,7 @@ class MindMap {
         this.exec = new Exec();
         this.nodeKeyboardController = new NodeKeyboardController(this);
         this.nodeLinkController = new NodeLinkController(this);
+        this.navigatorController = new MindMapNavigatorController(this);
         // link line
         this.edgeGroup = this.draw.group();
         this.appClickFn = this.appClickFn.bind(this);
@@ -10810,10 +11216,11 @@ class MindMap {
         }
     }
     clear() {
-        var _a;
+        var _a, _b;
         this.clearNode();
+        (_a = this.navigatorController) === null || _a === void 0 ? void 0 : _a.destroy();
         this.removeEvent();
-        (_a = this.draw) === null || _a === void 0 ? void 0 : _a.clear();
+        (_b = this.draw) === null || _b === void 0 ? void 0 : _b.clear();
     }
     //get node list rect point
     getBoundingRect(list) {
@@ -11009,7 +11416,9 @@ class MindMap {
         this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
     }
     refresh() {
+        var _a;
         this.layout();
+        (_a = this.navigatorController) === null || _a === void 0 ? void 0 : _a.scheduleUpdate();
     }
     emit(name, data) {
         var evt = new CustomEvent(name, {
@@ -11213,6 +11622,7 @@ class MindMap {
         return md.trim();
     }
     scale(num) {
+        var _a;
         if (num < 20) {
             num = 20;
         }
@@ -11227,6 +11637,7 @@ class MindMap {
         else {
             this.appEl.style.transform = "scale(" + this.mindScale / 100 + ")";
         }
+        (_a = this.navigatorController) === null || _a === void 0 ? void 0 : _a.update();
     }
     setScale(type) {
         if (type == "up") {
@@ -40880,6 +41291,26 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             this.plugin.settings.focusOnMove = value;
             this.plugin.saveData(this.plugin.settings);
         }));
+        new obsidian.Setting(containerEl)
+            .setName(`${t('Show link title')}`)
+            .setDesc(`${t('Show link title desc')}`)
+            .addToggle((toggle) => toggle
+            .setValue(Boolean(this.plugin.settings.showLinkTitle))
+            .onChange((value) => {
+            this.plugin.settings.showLinkTitle = value;
+            this.plugin.saveData(this.plugin.settings);
+            const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
+            mindmapLeaves.forEach((leaf) => {
+                var v = leaf.view;
+                v.mindmap.setting.showLinkTitle = value;
+                v.mindmap.traverseBF((n) => {
+                    n.renderLinkLayer(n.getDisplayedLinks());
+                    n.clearCacheData();
+                    n.refreshBox();
+                });
+                v.mindmap.refresh();
+            });
+        }));
     }
 }
 
@@ -41916,7 +42347,8 @@ class MindMapPlugin extends obsidian.Plugin {
                 fontSize: 16,
                 background: 'transparent',
                 layout: 'mindmap',
-                layoutDirect: 'mindmap'
+                layoutDirect: 'mindmap',
+                showLinkTitle: false
             }, yield this.loadData());
         });
     }

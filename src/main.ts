@@ -1160,7 +1160,8 @@ export default class MindMapPlugin extends Plugin {
       fontSize: 16,
       background: 'transparent',
       layout: 'mindmap',
-      layoutDirect: 'mindmap'
+      layoutDirect: 'mindmap',
+      showLinkTitle: false
     }, await this.loadData());
   }
 
