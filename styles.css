@@ -39,6 +39,7 @@
 
 .mm-navigator.is-hidden .mm-navigator-overview,
 .mm-navigator.is-hidden .mm-navigator-zoom,
+.mm-navigator.is-hidden .mm-navigator-node-count,
 .mm-navigator.is-hidden .mm-navigator-hide-button,
 .mm-navigator.is-hidden .mm-navigator-resize-handle {
   display: none;
@@ -145,6 +146,17 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
+  white-space: nowrap;
+}
+
+.mm-navigator-node-count {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-align: right;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

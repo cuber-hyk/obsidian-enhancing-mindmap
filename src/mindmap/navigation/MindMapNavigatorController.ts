@@ -27,6 +27,7 @@ export default class MindMapNavigatorController {
   private viewportEl: HTMLElement;
   private zoomInput: HTMLInputElement;
   private zoomLabel: HTMLElement;
+  private nodeCountEl: HTMLElement;
   private rafId: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private panelWidth = DEFAULT_PANEL_WIDTH;
@@ -85,6 +86,8 @@ export default class MindMapNavigatorController {
     this.zoomInput.setAttribute('aria-label', 'Zoom');
     this.zoomLabel = document.createElement('span');
     this.zoomLabel.classList.add('mm-navigator-zoom-label');
+    this.nodeCountEl = document.createElement('span');
+    this.nodeCountEl.classList.add('mm-navigator-node-count');
 
     zoomEl.appendChild(zoomOutButton);
     zoomEl.appendChild(this.zoomInput);
@@ -94,6 +97,7 @@ export default class MindMapNavigatorController {
     this.rootEl.appendChild(restoreButton);
     this.rootEl.appendChild(this.overviewEl);
     this.rootEl.appendChild(zoomEl);
+    this.rootEl.appendChild(this.nodeCountEl);
 
     this.mindmap.containerEL.appendChild(this.rootEl);
 
@@ -138,6 +142,7 @@ export default class MindMapNavigatorController {
     this.updatePlacement();
     this.updateSize();
     this.updateZoom();
+    this.updateNodeCount();
     this.renderOverview();
   }
 
@@ -176,6 +181,22 @@ export default class MindMapNavigatorController {
     const scale = Math.round(this.mindmap.mindScale);
     this.zoomInput.value = `${scale}`;
     this.zoomLabel.textContent = `${scale}%`;
+  }
+
+  private updateNodeCount() {
+    const root = this.mindmap.root;
+    const visibleCount = root?.getShowNodeList?.().length || 0;
+    const totalCount = root ? this.countNodeTree(root) : 0;
+    this.nodeCountEl.textContent = `${visibleCount} / ${totalCount} 节点`;
+    this.nodeCountEl.setAttribute('aria-label', `Visible nodes ${visibleCount}, total nodes ${totalCount}`);
+  }
+
+  private countNodeTree(node: { children?: unknown[] }): number {
+    const children = Array.isArray(node.children) ? node.children : [];
+    return children.reduce(
+      (count, child) => count + this.countNodeTree(child as { children?: unknown[] }),
+      1,
+    );
   }
 
   private renderOverview() {
