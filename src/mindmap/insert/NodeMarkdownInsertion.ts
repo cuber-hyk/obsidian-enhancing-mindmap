@@ -33,7 +33,11 @@ export default class NodeMarkdownInsertion {
     selection.addRange(range);
   }
 
-  insert(markdown: string): void {
+  hasUsableRange(): boolean {
+    return Boolean(this.range && this.editorEl.contains(this.range.commonAncestorContainer));
+  }
+
+  insert(markdown: string): Text {
     const range = this.getUsableRange();
     range.deleteContents();
 
@@ -43,6 +47,7 @@ export default class NodeMarkdownInsertion {
     range.collapse(true);
     this.range = range.cloneRange();
     this.restore();
+    return textNode;
   }
 
   append(markdown: string): void {

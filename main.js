@@ -39277,6 +39277,14 @@ const IMPORTABLE_IMAGE_TYPES = {
     png: ['image/png'],
     webp: ['image/webp'],
 };
+const CLIPBOARD_IMAGE_EXTENSIONS = {
+    'image/avif': 'avif',
+    'image/bmp': 'bmp',
+    'image/gif': 'gif',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+};
 function isVaultImage(file) {
     return VAULT_IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
 }
@@ -39293,6 +39301,32 @@ function importLocalImage(app, sourcePath, file) {
         const data = yield file.arrayBuffer();
         return app.vault.createBinary(attachmentPath, data);
     });
+}
+function importClipboardImage(app, sourcePath, image) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const extension = CLIPBOARD_IMAGE_EXTENSIONS[image.type];
+        if (!extension)
+            throw new Error('unsupported-image-type');
+        const filename = `Pasted image ${formatTimestamp(new Date())}.${extension}`;
+        const file = new File([image], filename, {
+            type: image.type,
+            lastModified: image.lastModified,
+        });
+        return importLocalImage(app, sourcePath, file);
+    });
+}
+function formatTimestamp(date) {
+    const pad = (value, length = 2) => `${value}`.padStart(length, '0');
+    return [
+        date.getFullYear(),
+        pad(date.getMonth() + 1),
+        pad(date.getDate()),
+        '-',
+        pad(date.getHours()),
+        pad(date.getMinutes()),
+        pad(date.getSeconds()),
+        pad(date.getMilliseconds(), 3),
+    ].join('');
 }
 
 class ExternalLinkModal extends obsidian.Modal {
@@ -39385,6 +39419,9 @@ class NodeMarkdownInsertion {
         selection.removeAllRanges();
         selection.addRange(range);
     }
+    hasUsableRange() {
+        return Boolean(this.range && this.editorEl.contains(this.range.commonAncestorContainer));
+    }
     insert(markdown) {
         const range = this.getUsableRange();
         range.deleteContents();
@@ -39394,6 +39431,7 @@ class NodeMarkdownInsertion {
         range.collapse(true);
         this.range = range.cloneRange();
         this.restore();
+        return textNode;
     }
     append(markdown) {
         const range = this.createRangeAtEnd();
@@ -39425,6 +39463,21 @@ class NodeInsertController {
         this.insertion = null;
         this.toolbarEl = null;
         this.activeCloseable = null;
+        this.handlePaste = (event) => {
+            var _a;
+            if (!this.activeNode || !this.insertion)
+                return;
+            const item = Array.from(((_a = event.clipboardData) === null || _a === void 0 ? void 0 : _a.items) || []).find((candidate) => (candidate.kind === 'file' && candidate.type.startsWith('image/')));
+            const image = item === null || item === void 0 ? void 0 : item.getAsFile();
+            if (!image)
+                return;
+            event.preventDefault();
+            const node = this.activeNode;
+            const sessionInsertion = this.insertion;
+            const pasteInsertion = new NodeMarkdownInsertion(node.contentEl);
+            pasteInsertion.capture();
+            void this.importPastedImage(node, sessionInsertion, pasteInsertion, image);
+        };
         this.app = app;
     }
     beginEdit(node) {
@@ -39433,19 +39486,21 @@ class NodeInsertController {
         this.activeNode = node;
         this.insertion = new NodeMarkdownInsertion(node.contentEl);
         this.insertion.capture();
+        node.contentEl.addEventListener('paste', this.handlePaste);
         const toolbar = this.ensureToolbar(node.contentEl.ownerDocument);
         node.containEl.appendChild(toolbar);
     }
     endEdit(node) {
-        var _a;
+        var _a, _b;
         if (node && this.activeNode !== node)
             return;
+        (_a = this.activeNode) === null || _a === void 0 ? void 0 : _a.contentEl.removeEventListener('paste', this.handlePaste);
         this.activeNode = null;
         this.insertion = null;
         const closeable = this.activeCloseable;
         this.activeCloseable = null;
         closeable === null || closeable === void 0 ? void 0 : closeable.close();
-        (_a = this.toolbarEl) === null || _a === void 0 ? void 0 : _a.remove();
+        (_b = this.toolbarEl) === null || _b === void 0 ? void 0 : _b.remove();
     }
     destroy() {
         this.endEdit();
@@ -39604,6 +39659,39 @@ class NodeInsertController {
             }
         });
     }
+    importPastedImage(node, sessionInsertion, pasteInsertion, image) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let attachment;
+            try {
+                attachment = yield importClipboardImage(this.app, this.getSourcePath(node), image);
+            }
+            catch (error) {
+                const message = error instanceof Error && error.message === 'unsupported-image-type'
+                    ? t('Unsupported image type')
+                    : t('Image import failed');
+                new obsidian.Notice(message);
+                if (this.isActiveSession(node, sessionInsertion))
+                    pasteInsertion.restore();
+                return;
+            }
+            if (!this.isActiveSession(node, sessionInsertion) || !pasteInsertion.hasUsableRange()) {
+                new obsidian.Notice(`${t('Image insertion failed')}: ${attachment.path}`);
+                return;
+            }
+            try {
+                const markdown = createVaultImageMarkdown(attachment.path);
+                const imageData = parseNodeImages(markdown)[0];
+                const insertedText = pasteInsertion.insert(markdown);
+                insertedText.replaceWith(node.createEditableImage(imageData));
+                this.refreshNodeLayout(node);
+            }
+            catch (error) {
+                new obsidian.Notice(`${t('Image insertion failed')}: ${attachment.path}`);
+                if (this.isActiveSession(node, sessionInsertion))
+                    pasteInsertion.restore();
+            }
+        });
+    }
     chooseLocalImage(doc) {
         return new Promise((resolve) => {
             const input = doc.createElement('input');
@@ -39649,6 +39737,9 @@ class NodeInsertController {
     }
     refreshNode(node) {
         node.refreshEditText();
+        this.refreshNodeLayout(node);
+    }
+    refreshNodeLayout(node) {
         node.clearCacheData();
         node.refreshBox();
         node.mindmap.refresh();
