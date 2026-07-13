@@ -11,6 +11,7 @@ import importXmind  from './import/xmindZen'
 import jsZip from 'jszip'
 import { t } from 'src/lang/helpers'
 import NodeKeyboardController from './interaction/NodeKeyboardController'
+import NodeSelectionController from './interaction/NodeSelectionController'
 import NodeLinkController from './link/NodeLinkController'
 import MindMapNavigatorController from './navigation/MindMapNavigatorController'
 
@@ -59,6 +60,7 @@ export default class MindMap {
     _dragNode: INode;
     exec: Exec;
     nodeKeyboardController: NodeKeyboardController;
+    nodeSelectionController: NodeSelectionController;
     nodeLinkController: NodeLinkController;
     navigatorController: MindMapNavigatorController;
     scalePointer: number[] = [];
@@ -117,6 +119,7 @@ export default class MindMap {
         //history
         this.exec = new Exec();
         this.nodeKeyboardController = new NodeKeyboardController(this);
+        this.nodeSelectionController = new NodeSelectionController(this);
         this.nodeLinkController = new NodeLinkController(this);
         this.navigatorController = new MindMapNavigatorController(this);
 
@@ -259,6 +262,7 @@ export default class MindMap {
     }
 
     clearSelectNode() {
+        this.nodeSelectionController?.clearSelection();
         if (this.selectNode) {
             this.lastSelectedNode = this.selectNode;
             this.selectNode.unSelect();
@@ -306,7 +310,7 @@ export default class MindMap {
         document.addEventListener('keydown', this.appKeydown);
         document.addEventListener('compositionstart',this.compositionStart)
         document.addEventListener('compositionend',this.compositionEnd)
-        document.body.addEventListener('mousewheel', this.appMousewheel);
+        this.containerEL.addEventListener('wheel', this.appMousewheel, {passive: false});
 
         if(Platform.isDesktop){
             this.appEl.addEventListener('mousedown', this.appMouseDown);
@@ -338,7 +342,7 @@ export default class MindMap {
         document.removeEventListener('compositionstart',this.compositionStart)
         document.removeEventListener('compositionend',this.compositionEnd)
 
-        document.body.removeEventListener('mousewheel', this.appMousewheel);
+        this.containerEL.removeEventListener('wheel', this.appMousewheel);
 
         if(Platform.isDesktop){
             this.appEl.removeEventListener('mousedown', this.appMouseDown);
@@ -353,6 +357,7 @@ export default class MindMap {
         this.off('initNode', this.initNode);
         this.off('renderEditNode', this.renderEditNode);
         this.off('mindMapChange', this.mindMapChange);
+        this.nodeSelectionController?.destroy();
     }
 
     initNode(evt: CustomEvent) {
@@ -387,6 +392,7 @@ export default class MindMap {
     }
     appKeydown(e: KeyboardEvent) {
         if (!this.isFocused) return; // Check if Mindmap is in focus or not
+        if (this.nodeSelectionController.handleKeydown(e)) return;
         this.nodeKeyboardController.handleKeydown(e);
     }
 
@@ -401,6 +407,7 @@ export default class MindMap {
 
     appKeyup(e: KeyboardEvent) {
         if (!this.isFocused) return; // Check if Mindmap is in focus or not
+        if (this.nodeSelectionController.handleKeyup(e)) return;
         var keyCode = e.keyCode || e.which || e.charCode;
         var ctrlKey = e.ctrlKey || e.metaKey;
         var shiftKey = e.shiftKey;
@@ -1365,6 +1372,7 @@ export default class MindMap {
 
     appClickFn(evt: MouseEvent) {
         if (this.nodeLinkController.handleClick(evt)) return;
+        if (this.nodeSelectionController.handleClick(evt)) return;
         var targetEl = evt.target as HTMLElement;
 
         if (targetEl) {
@@ -1426,12 +1434,14 @@ export default class MindMap {
             if (evt.target.closest('.mm-node')) {
                 var id = evt.target.closest('.mm-node').getAttribute('data-id');
                 this._dragNode = this.getNodeById(id);
+                if (this.nodeSelectionController.handleDragStart(evt, this._dragNode)) return;
                 this.drag = true;
             }
         }
     }
 
     appDragend(evt: MouseEvent) {
+        this.nodeSelectionController.finishDrag();
         this.drag = false;
         this._indicateDom.style.display = 'none'
     }
@@ -1451,6 +1461,10 @@ export default class MindMap {
         if(target.closest('.mm-node')){
             var nodeId =target.closest('.mm-node').getAttribute('data-id');
             var node = this.getNodeById(nodeId);
+            if (this.nodeSelectionController.isInvalidGroupDropTarget(node)) {
+                this._indicateDom.style.display = 'none';
+                return;
+            }
             var box = node.getBox();
             this._dragType = this._getDragType(node, x, y);
             this._indicateDom.style.display = 'block';
@@ -1541,6 +1555,10 @@ export default class MindMap {
                 evt.preventDefault();
                 var dropNodeId = evt.target.closest('.mm-node').getAttribute('data-id');
                 var dropNode = this.getNodeById(dropNodeId);
+                if (this.nodeSelectionController.handleDrop(evt, dropNode, this._dragType)) {
+                    this._indicateDom.style.display = 'none';
+                    return;
+                }
                 if (this._dragNode.data.isRoot) {
 
                 } else {
@@ -1618,6 +1636,8 @@ export default class MindMap {
     }
 
     appMouseMove(evt: MouseEvent) {
+        this.nodeSelectionController.handleMouseMove(evt);
+        if (this.nodeSelectionController.isMarqueeActive()) return;
         const targetEl = evt.target as HTMLElement;
         this.scalePointer = [];
         this.scalePointer.push(evt.offsetX, evt.offsetY);
@@ -1638,6 +1658,7 @@ export default class MindMap {
     }
 
     appMouseDown(evt:MouseEvent){
+        if (this.nodeSelectionController.handleMouseDown(evt)) return;
         const targetEl = evt.target as HTMLElement;
         if(!targetEl.closest('.mm-node')){
             this.drag = true;
@@ -1649,6 +1670,7 @@ export default class MindMap {
     }
 
     appMouseUp(evt:MouseEvent){
+        this.nodeSelectionController.handleMouseUp(evt);
         this.drag = false;
     }
 
@@ -1671,32 +1693,18 @@ export default class MindMap {
         }
     }
 
-    appMousewheel(evt: any) {
-        // if(!evt) evt = window.event;
+    appMousewheel(evt: WheelEvent) {
+        if (this.nodeSelectionController.handleWheel(evt)) return;
         var ctrlKey = evt.ctrlKey || evt.metaKey;
-        var delta;
-        if (evt.wheelDelta) {
-            //IE、chrome  -120
-            delta = evt.wheelDelta / 120;
-        } else if (evt.detail) {
-            //FF 3
-            delta = -evt.detail / 3;
-        }
+        if (!ctrlKey || !evt.deltaY) return;
 
-        if (delta) {
-            if (delta < 0) {
-                if (ctrlKey) {
-                    this.setScale("down");
-                }
-            } else {
-                if (ctrlKey) {
-                    this.setScale("up");
-                }
-            }
-        }
+        evt.preventDefault();
+        evt.stopPropagation();
+        this.setScale(evt.deltaY < 0 ? "up" : "down");
     }
 
     clearNode() {
+        this.nodeSelectionController.clearSelection();
         //delete node
         this.traverseBF((n: INode) => {
             this.contentEL.removeChild(n.containEl);
@@ -1875,6 +1883,20 @@ export default class MindMap {
 
     //execute cmd , store history
     execute(name: string, data?: any) {
+        const singleNodeCommands = [
+            'addChildNode',
+            'addSiblingNode',
+            'deleteNodeAndChild',
+            'deleteNodeExcludeChild',
+            'changeNodeText',
+            'moveNode',
+        ];
+        if (
+            this.nodeSelectionController?.hasMultipleSelection() &&
+            singleNodeCommands.indexOf(name) > -1
+        ) {
+            return null;
+        }
         return this.exec.execute(name, data);
     }
     undo() {

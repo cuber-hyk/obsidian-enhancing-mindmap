@@ -8818,6 +8818,90 @@ class MoveNode extends Command {
         }
     }
 }
+class MoveNodes extends Command {
+    constructor(data) {
+        super('moveNodes');
+        this.data = data;
+        this.nodes = [...data.nodes];
+        this.dropNode = data.dropNode;
+        this.mind = data.dropNode.mindmap;
+        this.locations = this.nodes.map((node, order) => ({
+            node,
+            parent: node.parent,
+            index: node.getIndex(),
+            order,
+        }));
+    }
+    execute() {
+        const destinationParent = this.getDestinationParent();
+        if (!destinationParent || !this.nodes.length || this.hasInvalidTarget())
+            return false;
+        this.removeNodes();
+        let insertionIndex = this.getInsertionIndex(destinationParent);
+        this.nodes.forEach((node) => {
+            destinationParent.addChild(node, insertionIndex);
+            insertionIndex++;
+        });
+        this.refreshAffectedTree(destinationParent);
+        return true;
+    }
+    undo() {
+        const destinationParent = this.getDestinationParent();
+        this.removeNodes();
+        this.locations
+            .slice()
+            .sort((a, b) => a.parent === b.parent ? a.index - b.index : a.order - b.order)
+            .forEach(({ node, parent, index }) => {
+            parent.addChild(node, index);
+        });
+        this.refreshAffectedTree(destinationParent);
+    }
+    getDestinationParent() {
+        return this.data.type === 'child' ? this.dropNode : this.dropNode.parent;
+    }
+    getInsertionIndex(destinationParent) {
+        if (this.data.type === 'child')
+            return destinationParent.children.length;
+        const dropIndex = destinationParent.children.indexOf(this.dropNode);
+        return this.data.direct === 'top' || this.data.direct === 'left'
+            ? dropIndex
+            : dropIndex + 1;
+    }
+    removeNodes() {
+        this.nodes.forEach((node) => {
+            var _a;
+            (_a = node.parent) === null || _a === void 0 ? void 0 : _a.removeChild(node);
+        });
+    }
+    hasInvalidTarget() {
+        return this.nodes.some((node) => {
+            if (node.data.isRoot)
+                return true;
+            var current = this.dropNode;
+            while (current) {
+                if (current === node)
+                    return true;
+                current = current.parent;
+            }
+            return false;
+        });
+    }
+    refreshAffectedTree(destinationParent) {
+        const parents = new Set([
+            destinationParent,
+            ...this.locations.map((location) => location.parent),
+        ]);
+        parents.forEach((parent) => parent === null || parent === void 0 ? void 0 : parent.clearCacheData());
+        this.nodes.forEach((node) => {
+            this.mind.traverseBF((child) => {
+                child.boundingRect = null;
+                child.stroke = '';
+            }, node);
+            node.clearCacheData();
+        });
+        this.refresh(this.mind);
+    }
+}
 class MovePos extends Command {
     constructor(node, oldPos, newPos) {
         super('movePos');
@@ -8973,6 +9057,11 @@ class Exec {
                     if (data) {
                         (new MoveNode(data)).execute();
                     }
+                }
+                break;
+            case 'moveNodes':
+                if (data) {
+                    this.history.execute(new MoveNodes(data));
                 }
                 break;
             case 'movePosition':
@@ -9340,6 +9429,356 @@ class NodeKeyboardController {
     consume(event) {
         event.preventDefault();
         event.stopPropagation();
+    }
+}
+
+const BLOCKED_MULTI_SELECTION_KEYS = new Set([
+    'Backspace',
+    'Delete',
+    ' ',
+    'Enter',
+    'Tab',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'Home',
+]);
+const BLANK_CLICK_MOVE_THRESHOLD = 4;
+class NodeSelectionController {
+    constructor(mindmap) {
+        this.selectedNodes = new Set();
+        this.marqueeEl = null;
+        this.marqueeStart = null;
+        this.marqueePointer = null;
+        this.marqueeSelecting = false;
+        this.groupDragging = false;
+        this.blankPointerStart = null;
+        this.blankPointerMoved = false;
+        this.suppressClickUntil = 0;
+        this.mindmap = mindmap;
+        this.handleDocumentMouseMove = this.handleDocumentMouseMove.bind(this);
+        this.handleDocumentMouseUp = this.handleDocumentMouseUp.bind(this);
+    }
+    destroy() {
+        this.finishMarquee();
+        this.clearSelection();
+    }
+    hasMultipleSelection() {
+        return this.selectedNodes.size > 1;
+    }
+    isMarqueeActive() {
+        return this.marqueeSelecting;
+    }
+    handleMouseDown(event) {
+        const target = event.target;
+        this.resetBlankPointerGesture();
+        if (event.button !== 0 ||
+            !(target instanceof Element) ||
+            target.closest('.mm-node')) {
+            return false;
+        }
+        if (!event.ctrlKey && !event.metaKey) {
+            if (this.selectedNodes.size > 0) {
+                this.blankPointerStart = { x: event.clientX, y: event.clientY };
+            }
+            return false;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        this.mindmap.clearSelectNode();
+        this.marqueeSelecting = true;
+        this.marqueeStart = { x: event.clientX, y: event.clientY };
+        this.marqueeEl = this.createMarquee();
+        this.updateMarquee(event.clientX, event.clientY);
+        const doc = this.mindmap.appEl.ownerDocument;
+        doc.addEventListener('mousemove', this.handleDocumentMouseMove);
+        doc.addEventListener('mouseup', this.handleDocumentMouseUp);
+        return true;
+    }
+    handleMouseMove(event) {
+        this.updateBlankPointerGesture(event);
+    }
+    handleMouseUp(event) {
+        this.updateBlankPointerGesture(event);
+        if (this.blankPointerMoved)
+            this.suppressClick();
+        this.resetBlankPointerGesture();
+    }
+    handleClick(event) {
+        var _a;
+        if (Date.now() <= this.suppressClickUntil) {
+            this.suppressClickUntil = 0;
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+        }
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || this.isInteractiveTarget(target))
+            return false;
+        if ((_a = this.mindmap.editNode) === null || _a === void 0 ? void 0 : _a.data.isEdit)
+            return false;
+        const nodeEl = target.closest('.mm-node');
+        if (!(nodeEl instanceof HTMLElement))
+            return false;
+        const node = this.mindmap.getNodeById(nodeEl.dataset.id || '');
+        if (!node)
+            return false;
+        if ((event.ctrlKey || event.metaKey) && !node.data.isRoot) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.toggleNode(node);
+            return true;
+        }
+        if (this.hasMultipleSelection() && this.selectedNodes.has(node)) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.replaceSelection([node]);
+            return true;
+        }
+        return false;
+    }
+    handleKeydown(event) {
+        if (event.key === 'Escape' && this.selectedNodes.size > 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.mindmap.clearSelectNode();
+            return true;
+        }
+        return this.blockSingleNodeShortcut(event);
+    }
+    handleKeyup(event) {
+        return this.blockSingleNodeShortcut(event);
+    }
+    handleWheel(event) {
+        if (!this.marqueeSelecting || !this.marqueeStart || !this.marqueePointer)
+            return false;
+        event.preventDefault();
+        event.stopPropagation();
+        const deltaY = this.getWheelDeltaY(event);
+        const oldScrollTop = this.mindmap.containerEL.scrollTop;
+        this.mindmap.containerEL.scrollTop += deltaY;
+        const scrollDelta = this.mindmap.containerEL.scrollTop - oldScrollTop;
+        this.marqueeStart.y -= scrollDelta;
+        this.updateMarquee(this.marqueePointer.x, this.marqueePointer.y);
+        return true;
+    }
+    handleDragStart(event, node) {
+        if (!this.hasMultipleSelection() || !this.selectedNodes.has(node))
+            return false;
+        this.suppressClick();
+        if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+        }
+        this.groupDragging = true;
+        return false;
+    }
+    handleDrop(event, dropNode, dragType) {
+        if (!this.groupDragging)
+            return false;
+        event.preventDefault();
+        event.stopPropagation();
+        const nodes = this.getMoveRoots();
+        if (nodes.length === 0 ||
+            event.ctrlKey ||
+            event.metaKey ||
+            !dragType ||
+            this.isInvalidDropTarget(dropNode, nodes)) {
+            return true;
+        }
+        const siblingDrop = ['top', 'left', 'down', 'right'].includes(dragType);
+        this.mindmap.execute('moveNodes', {
+            type: siblingDrop ? 'siblings' : 'child',
+            nodes,
+            dropNode,
+            direct: dragType,
+        });
+        return true;
+    }
+    isInvalidGroupDropTarget(dropNode) {
+        return this.groupDragging && this.isInvalidDropTarget(dropNode, this.getMoveRoots());
+    }
+    finishDrag() {
+        this.groupDragging = false;
+    }
+    clearSelection() {
+        const oldNodes = [...this.selectedNodes];
+        this.selectedNodes.clear();
+        oldNodes.forEach((node) => this.syncNodeVisual(node));
+    }
+    handleDocumentMouseMove(event) {
+        if (!this.marqueeSelecting)
+            return;
+        event.preventDefault();
+        this.updateMarquee(event.clientX, event.clientY);
+    }
+    handleDocumentMouseUp(event) {
+        if (!this.marqueeSelecting)
+            return;
+        event.preventDefault();
+        this.updateMarquee(event.clientX, event.clientY);
+        this.selectPrimaryNodeForSelection();
+        this.suppressClick();
+        this.finishMarquee();
+    }
+    finishMarquee() {
+        var _a;
+        const doc = this.mindmap.appEl.ownerDocument;
+        doc.removeEventListener('mousemove', this.handleDocumentMouseMove);
+        doc.removeEventListener('mouseup', this.handleDocumentMouseUp);
+        (_a = this.marqueeEl) === null || _a === void 0 ? void 0 : _a.remove();
+        this.marqueeEl = null;
+        this.marqueeStart = null;
+        this.marqueePointer = null;
+        this.marqueeSelecting = false;
+    }
+    createMarquee() {
+        const marquee = this.mindmap.appEl.ownerDocument.createElement('div');
+        marquee.classList.add('mm-selection-marquee');
+        this.mindmap.appEl.ownerDocument.body.appendChild(marquee);
+        return marquee;
+    }
+    updateMarquee(clientX, clientY) {
+        if (!this.marqueeStart || !this.marqueeEl)
+            return;
+        this.marqueePointer = { x: clientX, y: clientY };
+        const rect = this.createRect(this.marqueeStart.x, this.marqueeStart.y, clientX, clientY);
+        this.marqueeEl.style.left = `${rect.left}px`;
+        this.marqueeEl.style.top = `${rect.top}px`;
+        this.marqueeEl.style.width = `${rect.right - rect.left}px`;
+        this.marqueeEl.style.height = `${rect.bottom - rect.top}px`;
+        const nodes = this.mindmap.root
+            .getShowNodeList()
+            .filter((node) => !node.data.isRoot && this.intersects(rect, node.containEl.getBoundingClientRect()));
+        this.replaceSelection(nodes, false);
+    }
+    replaceSelection(nodes, updatePrimary = true) {
+        const oldNodes = [...this.selectedNodes];
+        this.selectedNodes = new Set(nodes);
+        if (updatePrimary)
+            this.selectPrimaryNodeForSelection();
+        new Set([...oldNodes, ...nodes]).forEach((node) => this.syncNodeVisual(node));
+    }
+    selectPrimaryNodeForSelection() {
+        let primary = this.mindmap.selectNode;
+        if (!primary || !this.selectedNodes.has(primary)) {
+            primary = [...this.selectedNodes][0];
+        }
+        this.setPrimaryNode(primary);
+    }
+    toggleNode(node) {
+        if (this.selectedNodes.size === 0) {
+            const activeNode = this.mindmap.selectNode;
+            if (activeNode && !activeNode.data.isRoot)
+                this.selectedNodes.add(activeNode);
+        }
+        if (this.selectedNodes.has(node)) {
+            this.selectedNodes.delete(node);
+        }
+        else {
+            this.selectedNodes.add(node);
+        }
+        const primary = this.selectedNodes.has(this.mindmap.selectNode)
+            ? this.mindmap.selectNode
+            : [...this.selectedNodes][0];
+        this.setPrimaryNode(primary);
+        this.syncNodeVisual(node);
+        this.selectedNodes.forEach((selectedNode) => this.syncNodeVisual(selectedNode));
+    }
+    setPrimaryNode(node) {
+        const current = this.mindmap.selectNode;
+        if (current && current !== node)
+            current.unSelect();
+        if (node) {
+            if (!node.isSelect)
+                node.select();
+            this.mindmap.selectNode = node;
+        }
+        else {
+            this.mindmap.selectNode = null;
+        }
+        if (current)
+            this.syncNodeVisual(current);
+    }
+    syncNodeVisual(node) {
+        const selected = this.selectedNodes.has(node);
+        node.containEl.classList.toggle('mm-node-multi-select', selected);
+        node.containEl.setAttribute('aria-selected', selected ? 'true' : 'false');
+        node.containEl.setAttribute('draggable', selected || node.isSelect ? 'true' : 'false');
+    }
+    getMoveRoots() {
+        return this.mindmap.root.getShowNodeList().filter((node) => {
+            if (!this.selectedNodes.has(node))
+                return false;
+            let parent = node.parent;
+            while (parent) {
+                if (this.selectedNodes.has(parent))
+                    return false;
+                parent = parent.parent;
+            }
+            return true;
+        });
+    }
+    isInvalidDropTarget(dropNode, nodes) {
+        return nodes.some((node) => {
+            let current = dropNode;
+            while (current) {
+                if (current === node)
+                    return true;
+                current = current.parent;
+            }
+            return false;
+        });
+    }
+    blockSingleNodeShortcut(event) {
+        if (!this.hasMultipleSelection() || !BLOCKED_MULTI_SELECTION_KEYS.has(event.key))
+            return false;
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+    }
+    suppressClick() {
+        this.suppressClickUntil = Date.now() + 200;
+    }
+    updateBlankPointerGesture(event) {
+        if (!this.blankPointerStart || this.blankPointerMoved)
+            return;
+        const deltaX = event.clientX - this.blankPointerStart.x;
+        const deltaY = event.clientY - this.blankPointerStart.y;
+        this.blankPointerMoved =
+            deltaX * deltaX + deltaY * deltaY > BLANK_CLICK_MOVE_THRESHOLD * BLANK_CLICK_MOVE_THRESHOLD;
+    }
+    resetBlankPointerGesture() {
+        this.blankPointerStart = null;
+        this.blankPointerMoved = false;
+    }
+    getWheelDeltaY(event) {
+        let deltaY = event.deltaY;
+        if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+            deltaY *= 16;
+        }
+        else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+            deltaY *= this.mindmap.containerEL.clientHeight;
+        }
+        return deltaY;
+    }
+    isInteractiveTarget(target) {
+        return Boolean(target.closest('.mm-node-bar, .mm-node-link, button, input, textarea, select, [contenteditable="true"]'));
+    }
+    createRect(x1, y1, x2, y2) {
+        const left = Math.min(x1, x2);
+        const top = Math.min(y1, y2);
+        const right = Math.max(x1, x2);
+        const bottom = Math.max(y1, y2);
+        return new DOMRect(left, top, right - left, bottom - top);
+    }
+    intersects(selection, node) {
+        return !(node.right < selection.left ||
+            node.left > selection.right ||
+            node.bottom < selection.top ||
+            node.top > selection.bottom);
     }
 }
 
@@ -10001,6 +10440,7 @@ class MindMap {
         //history
         this.exec = new Exec();
         this.nodeKeyboardController = new NodeKeyboardController(this);
+        this.nodeSelectionController = new NodeSelectionController(this);
         this.nodeLinkController = new NodeLinkController(this);
         this.navigatorController = new MindMapNavigatorController(this);
         // link line
@@ -10125,6 +10565,8 @@ class MindMap {
         return snode;
     }
     clearSelectNode() {
+        var _a;
+        (_a = this.nodeSelectionController) === null || _a === void 0 ? void 0 : _a.clearSelection();
         if (this.selectNode) {
             this.lastSelectedNode = this.selectNode;
             this.selectNode.unSelect();
@@ -10168,7 +10610,7 @@ class MindMap {
         document.addEventListener('keydown', this.appKeydown);
         document.addEventListener('compositionstart', this.compositionStart);
         document.addEventListener('compositionend', this.compositionEnd);
-        document.body.addEventListener('mousewheel', this.appMousewheel);
+        this.containerEL.addEventListener('wheel', this.appMousewheel, { passive: false });
         if (obsidian.Platform.isDesktop) {
             this.appEl.addEventListener('mousedown', this.appMouseDown);
             this.appEl.addEventListener('mouseup', this.appMouseUp);
@@ -10182,6 +10624,7 @@ class MindMap {
         this.on('mindMapChange', this.mindMapChange);
     }
     removeEvent() {
+        var _a;
         this.appEl.removeEventListener('click', this.appClickFn);
         this.appEl.removeEventListener('contextmenu', this.appContextMenu);
         this.appEl.removeEventListener('dragstart', this.appDragstart);
@@ -10194,7 +10637,7 @@ class MindMap {
         document.removeEventListener('keydown', this.appKeydown);
         document.removeEventListener('compositionstart', this.compositionStart);
         document.removeEventListener('compositionend', this.compositionEnd);
-        document.body.removeEventListener('mousewheel', this.appMousewheel);
+        this.containerEL.removeEventListener('wheel', this.appMousewheel);
         if (obsidian.Platform.isDesktop) {
             this.appEl.removeEventListener('mousedown', this.appMouseDown);
             this.appEl.removeEventListener('mouseup', this.appMouseUp);
@@ -10205,6 +10648,7 @@ class MindMap {
         this.off('initNode', this.initNode);
         this.off('renderEditNode', this.renderEditNode);
         this.off('mindMapChange', this.mindMapChange);
+        (_a = this.nodeSelectionController) === null || _a === void 0 ? void 0 : _a.destroy();
     }
     initNode(evt) {
         this._tempNum++;
@@ -10239,6 +10683,8 @@ class MindMap {
     appKeydown(e) {
         if (!this.isFocused)
             return; // Check if Mindmap is in focus or not
+        if (this.nodeSelectionController.handleKeydown(e))
+            return;
         this.nodeKeyboardController.handleKeydown(e);
     }
     compositionStart(e) {
@@ -10250,6 +10696,8 @@ class MindMap {
     appKeyup(e) {
         if (!this.isFocused)
             return; // Check if Mindmap is in focus or not
+        if (this.nodeSelectionController.handleKeyup(e))
+            return;
         var keyCode = e.keyCode || e.which || e.charCode;
         var ctrlKey = e.ctrlKey || e.metaKey;
         var shiftKey = e.shiftKey;
@@ -10917,6 +11365,8 @@ class MindMap {
         var _a;
         if (this.nodeLinkController.handleClick(evt))
             return;
+        if (this.nodeSelectionController.handleClick(evt))
+            return;
         var targetEl = evt.target;
         if (targetEl) {
             if (targetEl.tagName == 'A' && targetEl.hasClass("internal-link")) {
@@ -10969,11 +11419,14 @@ class MindMap {
             if (evt.target.closest('.mm-node')) {
                 var id = evt.target.closest('.mm-node').getAttribute('data-id');
                 this._dragNode = this.getNodeById(id);
+                if (this.nodeSelectionController.handleDragStart(evt, this._dragNode))
+                    return;
                 this.drag = true;
             }
         }
     }
     appDragend(evt) {
+        this.nodeSelectionController.finishDrag();
         this.drag = false;
         this._indicateDom.style.display = 'none';
     }
@@ -10990,6 +11443,10 @@ class MindMap {
         if (target.closest('.mm-node')) {
             var nodeId = target.closest('.mm-node').getAttribute('data-id');
             var node = this.getNodeById(nodeId);
+            if (this.nodeSelectionController.isInvalidGroupDropTarget(node)) {
+                this._indicateDom.style.display = 'none';
+                return;
+            }
             var box = node.getBox();
             this._dragType = this._getDragType(node, x, y);
             this._indicateDom.style.display = 'block';
@@ -11075,6 +11532,10 @@ class MindMap {
                 evt.preventDefault();
                 var dropNodeId = evt.target.closest('.mm-node').getAttribute('data-id');
                 var dropNode = this.getNodeById(dropNodeId);
+                if (this.nodeSelectionController.handleDrop(evt, dropNode, this._dragType)) {
+                    this._indicateDom.style.display = 'none';
+                    return;
+                }
                 if (this._dragNode.data.isRoot) ;
                 else {
                     if (evt.ctrlKey) { // Ctrl key pressed: copy the node
@@ -11142,6 +11603,9 @@ class MindMap {
         }
     }
     appMouseMove(evt) {
+        this.nodeSelectionController.handleMouseMove(evt);
+        if (this.nodeSelectionController.isMarqueeActive())
+            return;
         const targetEl = evt.target;
         this.scalePointer = [];
         this.scalePointer.push(evt.offsetX, evt.offsetY);
@@ -11162,6 +11626,8 @@ class MindMap {
         }
     }
     appMouseDown(evt) {
+        if (this.nodeSelectionController.handleMouseDown(evt))
+            return;
         const targetEl = evt.target;
         if (!targetEl.closest('.mm-node')) {
             this.drag = true;
@@ -11172,6 +11638,7 @@ class MindMap {
         }
     }
     appMouseUp(evt) {
+        this.nodeSelectionController.handleMouseUp(evt);
         this.drag = false;
     }
     appDblclickFn(evt) {
@@ -11193,32 +11660,18 @@ class MindMap {
         }
     }
     appMousewheel(evt) {
-        // if(!evt) evt = window.event;
+        if (this.nodeSelectionController.handleWheel(evt))
+            return;
         var ctrlKey = evt.ctrlKey || evt.metaKey;
-        var delta;
-        if (evt.wheelDelta) {
-            //IE、chrome  -120
-            delta = evt.wheelDelta / 120;
-        }
-        else if (evt.detail) {
-            //FF 3
-            delta = -evt.detail / 3;
-        }
-        if (delta) {
-            if (delta < 0) {
-                if (ctrlKey) {
-                    this.setScale("down");
-                }
-            }
-            else {
-                if (ctrlKey) {
-                    this.setScale("up");
-                }
-            }
-        }
+        if (!ctrlKey || !evt.deltaY)
+            return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        this.setScale(evt.deltaY < 0 ? "up" : "down");
     }
     clearNode() {
         var _a;
+        this.nodeSelectionController.clearSelection();
         //delete node
         this.traverseBF((n) => {
             this.contentEL.removeChild(n.containEl);
@@ -11370,6 +11823,19 @@ class MindMap {
     }
     //execute cmd , store history
     execute(name, data) {
+        var _a;
+        const singleNodeCommands = [
+            'addChildNode',
+            'addSiblingNode',
+            'deleteNodeAndChild',
+            'deleteNodeExcludeChild',
+            'changeNodeText',
+            'moveNode',
+        ];
+        if (((_a = this.nodeSelectionController) === null || _a === void 0 ? void 0 : _a.hasMultipleSelection()) &&
+            singleNodeCommands.indexOf(name) > -1) {
+            return null;
+        }
         return this.exec.execute(name, data);
     }
     undo() {
@@ -41834,6 +42300,8 @@ class MindMapPlugin extends obsidian.Plugin {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
+                        if (mindmap.nodeSelectionController.hasMultipleSelection())
+                            return;
                         if (mindmap.selectNode) {
                             mindmap.setDisplayedLevel(mindmap.selectNode.getLevel() + 1);
                             mindmap.refresh();
@@ -41856,6 +42324,8 @@ class MindMapPlugin extends obsidian.Plugin {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
+                        if (mindmap.nodeSelectionController.hasMultipleSelection())
+                            return;
                         var node = mindmap.selectNode;
                         if (node) { // Expand
                             mindmap.setChildrenDisplayedLevel(mindmap.getMaxNodeDisplayedLevel(node) + 1);
@@ -41880,6 +42350,8 @@ class MindMapPlugin extends obsidian.Plugin {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
+                        if (mindmap.nodeSelectionController.hasMultipleSelection())
+                            return;
                         if (mindmap.selectNode) {
                             mindmap.setDisplayedLevel(mindmap.selectNode.getLevel() - 1);
                             mindmap.refresh();
@@ -41902,6 +42374,8 @@ class MindMapPlugin extends obsidian.Plugin {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
+                        if (mindmap.nodeSelectionController.hasMultipleSelection())
+                            return;
                         var node = mindmap.selectNode;
                         if ((node) &&
                             (mindmap.getMaxNodeDisplayedLevel(node) > node.getLevel())) { // Collapse only if current selected node would not be hidden
@@ -41927,6 +42401,8 @@ class MindMapPlugin extends obsidian.Plugin {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
+                        if (mindmap.nodeSelectionController.hasMultipleSelection())
+                            return;
                         var node = mindmap.selectNode;
                         if (node) {
                             mindmap._toggleExpandNode(node);

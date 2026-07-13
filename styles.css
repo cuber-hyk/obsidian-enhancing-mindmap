@@ -396,6 +396,23 @@
   border-radius: 0.25rem;
 }
 
+.mm-node.mm-node-multi-select {
+  outline: 1px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.mm-node.mm-node-select.mm-node-multi-select {
+  outline-width: 2px;
+}
+
+.mm-selection-marquee {
+  position: fixed;
+  z-index: 90;
+  border: 1px dashed var(--interactive-accent);
+  background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  pointer-events: none;
+}
+
 .mm-node.mm-edit-node .mm-node-content {
   min-width: 1em;
   min-height: 1.4em;
