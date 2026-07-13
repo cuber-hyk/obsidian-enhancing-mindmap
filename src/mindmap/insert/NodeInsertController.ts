@@ -1,11 +1,18 @@
 import { App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import { t } from '../../lang/helpers';
 import type INode from '../INode';
-import { importLocalImage, isVaultImage } from './AttachmentImporter';
+import {
+  importClipboardImage,
+  importLocalImage,
+  isVaultImage,
+} from './AttachmentImporter';
 import ExternalLinkModal, {
   ExternalLinkValue,
 } from './ExternalLinkModal';
-import { createVaultImageMarkdown } from '../image/NodeImageMarkdown';
+import {
+  createVaultImageMarkdown,
+  parseNodeImages,
+} from '../image/NodeImageMarkdown';
 import { createExternalMarkdownLink } from '../link/NodeLinkMarkdown';
 import NodeMarkdownInsertion from './NodeMarkdownInsertion';
 import VaultFileSuggestModal from './VaultFileSuggestModal';
@@ -31,6 +38,7 @@ export default class NodeInsertController {
     this.activeNode = node;
     this.insertion = new NodeMarkdownInsertion(node.contentEl);
     this.insertion.capture();
+    node.contentEl.addEventListener('paste', this.handlePaste);
     const toolbar = this.ensureToolbar(node.contentEl.ownerDocument);
     node.containEl.appendChild(toolbar);
   }
@@ -38,6 +46,7 @@ export default class NodeInsertController {
   endEdit(node?: INode): void {
     if (node && this.activeNode !== node) return;
 
+    this.activeNode?.contentEl.removeEventListener('paste', this.handlePaste);
     this.activeNode = null;
     this.insertion = null;
     const closeable = this.activeCloseable;
@@ -258,6 +267,58 @@ export default class NodeInsertController {
     }
   }
 
+  private handlePaste = (event: ClipboardEvent): void => {
+    if (!this.activeNode || !this.insertion) return;
+
+    const item = Array.from(event.clipboardData?.items || []).find((candidate) => (
+      candidate.kind === 'file' && candidate.type.startsWith('image/')
+    ));
+    const image = item?.getAsFile();
+    if (!image) return;
+
+    event.preventDefault();
+    const node = this.activeNode;
+    const sessionInsertion = this.insertion;
+    const pasteInsertion = new NodeMarkdownInsertion(node.contentEl);
+    pasteInsertion.capture();
+    void this.importPastedImage(node, sessionInsertion, pasteInsertion, image);
+  };
+
+  private async importPastedImage(
+    node: INode,
+    sessionInsertion: NodeMarkdownInsertion,
+    pasteInsertion: NodeMarkdownInsertion,
+    image: File,
+  ): Promise<void> {
+    let attachment: TFile;
+    try {
+      attachment = await importClipboardImage(this.app, this.getSourcePath(node), image);
+    } catch (error) {
+      const message = error instanceof Error && error.message === 'unsupported-image-type'
+        ? t('Unsupported image type')
+        : t('Image import failed');
+      new Notice(message);
+      if (this.isActiveSession(node, sessionInsertion)) pasteInsertion.restore();
+      return;
+    }
+
+    if (!this.isActiveSession(node, sessionInsertion) || !pasteInsertion.hasUsableRange()) {
+      new Notice(`${t('Image insertion failed')}: ${attachment.path}`);
+      return;
+    }
+
+    try {
+      const markdown = createVaultImageMarkdown(attachment.path);
+      const imageData = parseNodeImages(markdown)[0];
+      const insertedText = pasteInsertion.insert(markdown);
+      insertedText.replaceWith(node.createEditableImage(imageData));
+      this.refreshNodeLayout(node);
+    } catch (error) {
+      new Notice(`${t('Image insertion failed')}: ${attachment.path}`);
+      if (this.isActiveSession(node, sessionInsertion)) pasteInsertion.restore();
+    }
+  }
+
   private chooseLocalImage(doc: Document): Promise<File | null> {
     return new Promise((resolve) => {
       const input = doc.createElement('input');
@@ -306,6 +367,10 @@ export default class NodeInsertController {
 
   private refreshNode(node: INode): void {
     node.refreshEditText();
+    this.refreshNodeLayout(node);
+  }
+
+  private refreshNodeLayout(node: INode): void {
     node.clearCacheData();
     node.refreshBox();
     node.mindmap.refresh();

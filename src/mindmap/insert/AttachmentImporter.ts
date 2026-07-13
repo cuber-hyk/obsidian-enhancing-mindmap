@@ -21,6 +21,15 @@ const IMPORTABLE_IMAGE_TYPES: Record<string, string[]> = {
   webp: ['image/webp'],
 };
 
+const CLIPBOARD_IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/avif': 'avif',
+  'image/bmp': 'bmp',
+  'image/gif': 'gif',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
 export function isVaultImage(file: TFile): boolean {
   return VAULT_IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
 }
@@ -40,4 +49,34 @@ export async function importLocalImage(
   const attachmentPath = await app.fileManager.getAvailablePathForAttachment(filename, sourcePath);
   const data = await file.arrayBuffer();
   return app.vault.createBinary(attachmentPath, data);
+}
+
+export async function importClipboardImage(
+  app: App,
+  sourcePath: string,
+  image: File,
+): Promise<TFile> {
+  const extension = CLIPBOARD_IMAGE_EXTENSIONS[image.type];
+  if (!extension) throw new Error('unsupported-image-type');
+
+  const filename = `Pasted image ${formatTimestamp(new Date())}.${extension}`;
+  const file = new File([image], filename, {
+    type: image.type,
+    lastModified: image.lastModified,
+  });
+  return importLocalImage(app, sourcePath, file);
+}
+
+function formatTimestamp(date: Date): string {
+  const pad = (value: number, length = 2) => `${value}`.padStart(length, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    '-',
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+    pad(date.getMilliseconds(), 3),
+  ].join('');
 }
