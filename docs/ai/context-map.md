@@ -28,7 +28,7 @@
 | 任务类型 | 优先读取 | 代码入口 | 说明 |
 |---|---|---|---|
 | 模糊想法 | `CONTEXT.md`、`docs/capabilities/mindmap-editing.md` | `src/mindmap/INode.ts`、`src/mindmap/mindmap.ts` | 使用 `dev-brainstorm`，确认后转入 `dev-plan`。 |
-| 功能或缺陷 | `CONTEXT.md`、相关能力文档 | `src/main.ts`、`src/MindMapView.ts`、相关 `src/mindmap/*.ts` | 先使用 `dev-orient`。节点插入、键盘状态机、链接操作、图片附件和画布导航分别由 `src/mindmap/insert/`、`src/mindmap/interaction/`、`src/mindmap/link/`、`src/mindmap/image/`、`src/mindmap/navigation/` 负责。 |
+| 功能或缺陷 | `CONTEXT.md`、相关能力文档 | `src/main.ts`、`src/MindMapView.ts`、相关 `src/mindmap/*.ts` | 先使用 `dev-orient`。节点插入、键盘状态机与节点多选、链接操作、图片附件和画布导航分别由 `src/mindmap/insert/`、`src/mindmap/interaction/`、`src/mindmap/link/`、`src/mindmap/image/`、`src/mindmap/navigation/` 负责。 |
 | 审计 | `CONTEXT.md`、相关能力文档 | 相关 `src/` 入口及 `package.json` 脚本 | 使用 `dev-audit`，报告写入 `docs/audits/`。 |
 | 发布说明 | `CHANGELOG.md` | `manifest.json`、`versions.json`、Git 历史 | 使用 `dev-changelog`。 |
 | 架构决策 | `CONTEXT.md`、相关能力文档与 ADR | 公开视图、命令及节点入口 | 仅在 ADR 门禁通过后创建 ADR。 |
@@ -71,3 +71,4 @@
 - 2026-07-03：增加节点键盘状态机和链接操作 owner 模块路由。
 - 2026-07-04：增加图片附件 owner 模块路由。
 - 2026-07-06：增加画布导航控件 owner 模块路由。
+- 2026-07-13：增加节点多选状态与手势 owner 模块路由。

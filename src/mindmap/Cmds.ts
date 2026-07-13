@@ -228,6 +228,115 @@ export class MoveNode extends Command {
     }
 }
 
+interface MoveNodesData {
+    type:string;
+    nodes:INode[];
+    dropNode:INode;
+    direct:string;
+}
+
+interface NodeLocation {
+    node:INode;
+    parent:INode;
+    index:number;
+    order:number;
+}
+
+export class MoveNodes extends Command {
+    data:MoveNodesData;
+    nodes:INode[];
+    dropNode:INode;
+    mind:MindMap;
+    locations:NodeLocation[];
+
+    constructor(data:MoveNodesData) {
+        super('moveNodes');
+        this.data = data;
+        this.nodes = [...data.nodes];
+        this.dropNode = data.dropNode;
+        this.mind = data.dropNode.mindmap;
+        this.locations = this.nodes.map((node, order) => ({
+            node,
+            parent: node.parent,
+            index: node.getIndex(),
+            order,
+        }));
+    }
+
+    execute():boolean {
+        const destinationParent = this.getDestinationParent();
+        if (!destinationParent || !this.nodes.length || this.hasInvalidTarget()) return false;
+
+        this.removeNodes();
+        let insertionIndex = this.getInsertionIndex(destinationParent);
+        this.nodes.forEach((node) => {
+            destinationParent.addChild(node, insertionIndex);
+            insertionIndex++;
+        });
+        this.refreshAffectedTree(destinationParent);
+        return true;
+    }
+
+    undo() {
+        const destinationParent = this.getDestinationParent();
+        this.removeNodes();
+        this.locations
+            .slice()
+            .sort((a, b) => a.parent === b.parent ? a.index - b.index : a.order - b.order)
+            .forEach(({node, parent, index}) => {
+                parent.addChild(node, index);
+            });
+        this.refreshAffectedTree(destinationParent);
+    }
+
+    private getDestinationParent():INode {
+        return this.data.type === 'child' ? this.dropNode : this.dropNode.parent;
+    }
+
+    private getInsertionIndex(destinationParent:INode):number {
+        if (this.data.type === 'child') return destinationParent.children.length;
+
+        const dropIndex = destinationParent.children.indexOf(this.dropNode);
+        return this.data.direct === 'top' || this.data.direct === 'left'
+            ? dropIndex
+            : dropIndex + 1;
+    }
+
+    private removeNodes() {
+        this.nodes.forEach((node) => {
+            node.parent?.removeChild(node);
+        });
+    }
+
+    private hasInvalidTarget():boolean {
+        return this.nodes.some((node) => {
+            if (node.data.isRoot) return true;
+            var current = this.dropNode;
+            while (current) {
+                if (current === node) return true;
+                current = current.parent;
+            }
+            return false;
+        });
+    }
+
+    private refreshAffectedTree(destinationParent?:INode) {
+        const parents = new Set<INode>([
+            destinationParent,
+            ...this.locations.map((location) => location.parent),
+        ]);
+        parents.forEach((parent) => parent?.clearCacheData());
+        this.nodes.forEach((node) => {
+            this.mind.traverseBF((child:INode) => {
+                child.boundingRect = null;
+                child.stroke = '';
+            }, node);
+            node.clearCacheData();
+        });
+        this.refresh(this.mind);
+    }
+}
+
 
 export class MovePos extends Command {
     node:INode;

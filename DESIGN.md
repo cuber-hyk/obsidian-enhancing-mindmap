@@ -1,7 +1,7 @@
 ---
 artifact_type: design_system
 status: current
-updated: 2026-07-06
+updated: 2026-07-13
 token_source: design-tokens.json
 ---
 
@@ -28,6 +28,7 @@ token_source: design-tokens.json
 - 链接操作 UI：`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/link/EditNodeLinkModal.ts`
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/INode.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
+- 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
 - 已确认视觉示例：`docs/assets/node-insert-toolbar-concept.png`
 
 ## 设计原则
@@ -79,12 +80,18 @@ token_source: design-tokens.json
 - 小视图点击定位主画布视口；拖拽视口框不得触发节点拖拽、文本编辑或画布平移。
 - 导航控件节点数统计显示当前可见节点数与脑图总节点数，根节点计入两者，折叠节点只影响可见数。
 - 导航控件默认隐藏操作点；鼠标移入或拖拽中显示四个顶点缩放点和隐藏按钮。收起后仅保留恢复按钮。
+- 桌面端按住 `Ctrl`/`Meta` 从空白画布拖动时显示临时虚线选择框；与选择框相交的当前可见非根节点实时进入多选态，松开鼠标后选择框消失而节点选择保留。
+- 框选手势激活后，滚轮临时只负责上下滚动画布，不改变缩放；选择框锚点固定在原始画布位置并随滚动扩展跨屏选区，手势结束后恢复 `Ctrl`/`Meta` + 滚轮缩放。
+- `Ctrl`/`Meta` 单击节点用于追加或取消单个节点；静止空白单击或 `Escape` 清空多选。普通空白拖动超过点击容错阈值后只负责画布平移并保留多选，不与框选共用无修饰键手势。
+- 多选节点使用 `--interactive-accent` 描边；唯一活动节点保持更强的焦点层级，其他已选节点使用较轻描边。选择框和节点描边不得改变脑图布局尺寸。
+- 拖动任一已选节点时按现有落点指示迁移整个选择组；第一版不提供多选组复制、剪切、删除或编辑语义。
 
 ## UI 实现规则
 
 - 新插入行为放入 `src/mindmap/insert/` 下按职责命名的模块。
 - 节点键盘状态机放入 `src/mindmap/interaction/`，链接解析、菜单和编辑弹窗放入 `src/mindmap/link/`，图片 Markdown 解析放入 `src/mindmap/image/`。
 - 画布导航和缩放控件放入 `src/mindmap/navigation/`，`src/mindmap/mindmap.ts` 只保留生命周期、缩放状态和刷新通知接线。
+- 节点多选集合、框选几何、选择视觉和多选手势放入 `src/mindmap/interaction/NodeSelectionController.ts`；`src/mindmap/mindmap.ts` 只保留事件委托和生命周期接线。
 - `src/mindmap/mindmap.ts` 和 `src/mindmap/INode.ts` 仅保留生命周期与编辑接线。
 - 验证 Obsidian 深色、浅色主题以及活动节点的焦点和选区行为。
 
@@ -95,6 +102,7 @@ token_source: design-tokens.json
 - 导航控件的缩放按钮和滑动条必须提供可访问名称，百分比文本必须反映当前缩放状态，节点数统计必须反映当前可见节点数与总节点数。
 - 取消弹窗后焦点返回编辑节点，且不得改变节点文本。
 - 工具栏控件必须可通过键盘聚焦和操作。
+- 多选节点必须同步 `aria-selected`；多选状态下应阻止单节点键盘编辑、增删和导航，`Escape` 必须可以清空选择。
 
 ## 暂定规则
 

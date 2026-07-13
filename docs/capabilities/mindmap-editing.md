@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-07-06
+updated: 2026-07-13
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -44,11 +44,19 @@ adr_reviewed: not_required
 - 导航控件节点数统计显示 `可见 / 总数 节点`，可见数来自 `root.getShowNodeList()`，总数从运行时节点树递归 `children` 计算，根节点计入两者。
 - 导航控件尺寸调整只影响当前视图生命周期内的面板宽度和小视图高度，不写入节点 Markdown 或插件设置。
 - `.xmind` 文件拖入画布时走独立导入流程，与节点附件插入无关。
+- 桌面端按住 `Ctrl`/`Meta` 从空白画布拖动时，由 `NodeSelectionController` 显示临时选择框，并以屏幕坐标相交规则选择当前可见的非根节点；松开鼠标后选择框消失，多选节点描边保留。
+- 框选激活期间，`NodeSelectionController` 接管滚轮并按容器实际滚动量上下移动画布，同时反向偏移原始选择锚点，以最后指针位置实时累计跨屏选区；该手势不改变 `mindScale`，松开鼠标后恢复原有 `Ctrl`/`Meta` 滚轮缩放。
+- `Ctrl`/`Meta` 单击非根节点用于追加或取消选择，`Escape` 清空多选；普通空白左键位移不超过 4px 时按静止单击清空选择，超过阈值时只平动画布并抑制拖动结束产生的单次 `click`，保留多选状态。
+- `MindMap.selectNode` 继续保存唯一活动节点，多选集合由 `NodeSelectionController` 独立维护，避免破坏现有编辑、命令和键盘入口。
+- 多选数大于一时阻止单节点新增、编辑、删除和方向导航键；第一版不提供批量复制、剪切、删除或编辑。
+- 拖动任一已选节点会迁移整个选择组；父节点与后代同时被选中时，只迁移没有已选祖先的顶层选择根，后代随父节点移动。
+- 整组迁移拒绝根节点和选择子树内的目标，按现有兄弟/子节点落点语义保持稳定顺序，并通过一条 `MoveNodes` 历史命令完成撤销和重做。
 
 ## 事实来源
 
 - 代码：`src/mindmap/INode.ts`、`src/mindmap/mindmap.ts`
 - 节点键盘状态机：`src/mindmap/interaction/NodeKeyboardController.ts`
+- 节点多选状态与手势：`src/mindmap/interaction/NodeSelectionController.ts`
 - 链接解析与交互：`src/mindmap/link/*.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
@@ -70,4 +78,5 @@ adr_reviewed: not_required
 
 - 已在 Obsidian 1.8.4 的隔离测试 Vault 中验证三类插入、取消、保存、新标签打开、链接图标布局和深浅主题。
 - 节点键盘状态机、链接编辑/删除和图片缩放/删除需验证根节点、普通节点、编辑态、多链接、多图片、撤销/重做和 Markdown 往返。
+- 节点多选需在测试 Vault 中验证四向框选、框选期间滚轮跨屏累计选择且不缩放、松开后恢复缩放、空白静止单击清空、轻微抖动容错、普通空白拖动画布保留选择、同父/跨父/父子选择的整组迁移、非法后代目标、顺序保持、撤销/重做、深浅主题，以及与单选、编辑和单节点拖放的回归兼容性。
 - 仓库当前没有自动化测试框架；生产构建与测试 Vault 交互矩阵是本能力的主要回归门禁。

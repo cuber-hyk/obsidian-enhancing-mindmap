@@ -6,8 +6,12 @@ import INode from './INode'
 
 interface DataProps {
     node?:INode,
+    nodes?:INode[],
     parent?:INode,
     oldParent?:INode,
+    dropNode?:INode,
+    type?:string,
+    direct?:string,
 
     //change node text
     text?:string,
@@ -71,6 +75,11 @@ export default class Exec{
                     if(data){
                         (new cmd.MoveNode(data)).execute();
                     }
+                }
+            break;
+            case 'moveNodes':
+                if(data){
+                    this.history.execute(new cmd.MoveNodes(data as any));
                 }
             break;
             case 'movePosition':

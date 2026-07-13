@@ -578,6 +578,7 @@ export default class MindMapPlugin extends Plugin {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
           var mindmap = mindmapView.mindmap;
+          if(mindmap.nodeSelectionController.hasMultipleSelection()) return;
           if(mindmap.selectNode) {
             mindmap.setDisplayedLevel(mindmap.selectNode.getLevel()+1);
             mindmap.refresh();
@@ -601,6 +602,7 @@ export default class MindMapPlugin extends Plugin {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
           var mindmap = mindmapView.mindmap;
+          if(mindmap.nodeSelectionController.hasMultipleSelection()) return;
           var node = mindmap.selectNode;
           if(node)
           {// Expand
@@ -627,6 +629,7 @@ export default class MindMapPlugin extends Plugin {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
           var mindmap = mindmapView.mindmap;
+          if(mindmap.nodeSelectionController.hasMultipleSelection()) return;
             if(mindmap.selectNode) {
               mindmap.setDisplayedLevel(mindmap.selectNode.getLevel()-1);
               mindmap.refresh();
@@ -650,6 +653,7 @@ export default class MindMapPlugin extends Plugin {
           const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
           if(mindmapView){
             var mindmap = mindmapView.mindmap;
+            if(mindmap.nodeSelectionController.hasMultipleSelection()) return;
             var node = mindmap.selectNode;
             if( (node)                                                  &&
                 (mindmap.getMaxNodeDisplayedLevel(node)>node.getLevel())   )
@@ -677,6 +681,7 @@ export default class MindMapPlugin extends Plugin {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
           var mindmap = mindmapView.mindmap;
+          if(mindmap.nodeSelectionController.hasMultipleSelection()) return;
           var node = mindmap.selectNode;
           if(node)
           { mindmap._toggleExpandNode(node); }
