@@ -90,78 +90,35 @@ export default class MindMapPlugin extends Plugin {
       }
     });
 
-    // Alt + Shift + C
     this.addCommand({
       id: 'Copy Node',
       name: `${t('Copy node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'C',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          navigator.clipboard.writeText('');
-          var node = mindmap.selectNode;
-          if(node){
-            var text = mindmap.copyNode(node);
-            navigator.clipboard.writeText(text);
-          }
+          void mindmapView.mindmap.nodeClipboardController.copySelectedNode();
         }
-
       }
     });
 
-    // Alt + Shift + X
     this.addCommand({
       id: 'Cut Node',
       name: `${t('Cut node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'X',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          navigator.clipboard.writeText('');
-          var node = mindmap.selectNode;
-          if(node){
-            var text = mindmap.copyNode(node);
-            navigator.clipboard.writeText(text);
-            if (!node.data.isRoot && !node.data.isEdit) {
-              node.mindmap.execute("deleteNodeAndChild", { node });
-            }
-          }
+          void mindmapView.mindmap.nodeClipboardController.cutSelectedNode();
         }
-
       }
     });
 
-    // Alt + Shift + V
     this.addCommand({
       id: 'Paste Node',
       name: `${t('Paste node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'V',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          navigator.clipboard.readText().then(text=>{
-              mindmap.pasteNode(text);
-              // Copy once more so that the node can be copied once more
-              navigator.clipboard.writeText(text);
-          });
+          void mindmapView.mindmap.nodeClipboardController.pasteToSelectedNode();
         }
       }
     });
@@ -170,16 +127,9 @@ export default class MindMapPlugin extends Plugin {
 
 
 
-    // Alt + Shift + Z
     this.addCommand({
       id: 'Undo',
       name: `${t('Undo')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'Z',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){

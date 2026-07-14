@@ -10,6 +10,7 @@ import {uuid} from '../MindMapView'
 import importXmind  from './import/xmindZen'
 import jsZip from 'jszip'
 import { t } from 'src/lang/helpers'
+import NodeClipboardController from './interaction/NodeClipboardController'
 import NodeKeyboardController from './interaction/NodeKeyboardController'
 import NodeSelectionController from './interaction/NodeSelectionController'
 import NodeLinkController from './link/NodeLinkController'
@@ -59,6 +60,7 @@ export default class MindMap {
     colors: string[] = [];
     _dragNode: INode;
     exec: Exec;
+    nodeClipboardController: NodeClipboardController;
     nodeKeyboardController: NodeKeyboardController;
     nodeSelectionController: NodeSelectionController;
     nodeLinkController: NodeLinkController;
@@ -118,6 +120,7 @@ export default class MindMap {
 
         //history
         this.exec = new Exec();
+        this.nodeClipboardController = new NodeClipboardController(this);
         this.nodeKeyboardController = new NodeKeyboardController(this);
         this.nodeSelectionController = new NodeSelectionController(this);
         this.nodeLinkController = new NodeLinkController(this);
@@ -393,6 +396,7 @@ export default class MindMap {
     appKeydown(e: KeyboardEvent) {
         if (!this.isFocused) return; // Check if Mindmap is in focus or not
         if (this.nodeSelectionController.handleKeydown(e)) return;
+        if (this.nodeClipboardController.handleKeydown(e)) return;
         this.nodeKeyboardController.handleKeydown(e);
     }
 
@@ -2294,12 +2298,12 @@ export default class MindMap {
         }
   }
 
-  pasteNode(text:string){
+  pasteNode(text:string):boolean {
         var node = this.selectNode;
-        if(text){
+        if(text && node){
             try{
                   var json =JSON.parse(text);
-                  if(json.type&&json.type=='copyNode'){
+                  if(json.type&&json.type=='copyNode' && Array.isArray(json.text) && json.text.length){
                     var data = json.text;
                     if(!node.isExpand){
                        node.expand();
@@ -2308,15 +2312,14 @@ export default class MindMap {
                    this.execute('pasteNode',{
                        node:node,
                        data:data
-                   })
-
-                   navigator.clipboard.writeText('');
+                    })
+                    return true;
                   }
             }catch(err){
                 console.log(err)
             }
         }
-
+        return false;
   }
 
 }
