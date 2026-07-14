@@ -33,6 +33,7 @@ adr_reviewed: not_required
 - 图片入口可选择现有 Vault 图片，或导入 AVIF、BMP、GIF、JPEG、PNG、WebP 本地图片；新插入图片使用节点图片默认宽度，避免原图尺寸撑开脑图布局。
 - 图片附件保存为 Markdown 源文本，编辑态显示图片本体而不是原始 `![[...]]` 文本。
 - 编辑态点击图片会选中图片并显示缩放手柄；拖拽手柄调整图片宽度，保存节点时写回图片 Markdown。
+- 编辑态双击图片会打开 Obsidian 只读预览 Modal，使用已解析的原图片资源并按窗口等比例适配；关闭后在原编辑会话仍有效时恢复图片焦点，且不会修改节点 Markdown、图片宽度或撤销历史。阅读态双击仍沿用节点进入编辑的现有行为。
 - 图片选中后按 `Backspace` 或 `Delete` 删除该图片，删除行为通过节点文本保存链路进入撤销历史。
 - 本地图片通过 `getAvailablePathForAttachment()` 和 Vault API 写入，遵循 Obsidian 附件目录及重名规则。
 - 编辑态粘贴剪贴板图片时，`NodeInsertController` 只接管第一张具有实际 `image/*` 文件数据的图片，将其导入 Vault 并在粘贴位置写入图片 Markdown；没有图片文件数据时保留浏览器原有粘贴行为，不隐式下载 HTML 或 URL 中的远程图片。
@@ -66,7 +67,7 @@ adr_reviewed: not_required
 - 节点剪贴板状态与快捷键：`src/mindmap/interaction/NodeClipboardController.ts`
 - 节点结构 History 命令：`src/mindmap/Cmds.ts`、`src/mindmap/Execute.ts`
 - 链接解析与交互：`src/mindmap/link/*.ts`
-- 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/INode.ts`
+- 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 视图生命周期：`src/MindMapView.ts`
@@ -85,7 +86,7 @@ adr_reviewed: not_required
 ## 验证基线
 
 - 已在 Obsidian 1.8.4 的隔离测试 Vault 中验证三类插入、取消、保存、新标签打开、链接图标布局和深浅主题。
-- 节点键盘状态机、链接编辑/删除和图片缩放/删除需验证根节点、普通节点、编辑态、多链接、多图片、撤销/重做和 Markdown 往返。
+- 节点键盘状态机、链接编辑/删除以及图片预览/缩放/删除需验证根节点、普通节点、编辑态、多链接、多图片、关闭后焦点恢复、撤销/重做和 Markdown 往返。
 - 剪贴板图片粘贴需验证系统截图、文件图片、纯文本、混合剪贴板、文本中间插入、连续粘贴、立即退出或切换节点、Markdown/脑图往返及重新加载；仅有远程 HTML/URL 而没有图片文件数据的来源不在支持范围内。
 - 节点多选需在测试 Vault 中验证四向框选、框选期间滚轮跨屏累计选择且不缩放、松开后恢复缩放、空白静止单击清空、轻微抖动容错、普通空白拖动画布保留选择、同父/跨父/父子选择的整组迁移、非法后代目标、顺序保持、撤销/重做、深浅主题，以及与单选、编辑和单节点拖放的回归兼容性。
 - 多选批量删除与节点快捷键已于 2026-07-14 在授权测试 Vault 中验证；回归需覆盖同父、跨父和父子同时选择的删除与一次撤销/重做、连续粘贴、剪切写入后删除、多选不执行单节点剪贴板，以及节点编辑态和 Markdown 视图的原生剪贴板与撤销。

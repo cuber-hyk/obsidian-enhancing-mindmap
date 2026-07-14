@@ -371,6 +371,27 @@
   display: block;
 }
 
+.mm-node-image-preview-modal {
+  width: min(90vw, 1200px);
+  max-width: 90vw;
+}
+
+.mm-node-image-preview-modal .modal-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.mm-node-image-preview {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: calc(90vh - 8rem);
+  object-fit: contain;
+}
+
 .mm-node.mm-root .mm-node-content {
   font-size: 1.6em;
   padding: 14px 20px;

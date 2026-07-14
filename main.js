@@ -204,6 +204,7 @@ var en = {
     "Image insertion failed": "The image was imported but could not be inserted",
     "Unsupported image type": "Unsupported image type",
     "Image import failed": "Image import failed",
+    "Image preview": "Image preview",
     "Edit link": "Edit link",
     "Delete link": "Delete link",
     "Link target": "Link target",
@@ -397,6 +398,7 @@ var zhCN = {
     "Image insertion failed": "图片已导入，但无法插入节点",
     "Unsupported image type": "不支持的图片类型",
     "Image import failed": "图片导入失败",
+    "Image preview": "图片预览",
     "Edit link": "编辑链接",
     "Delete link": "删除链接",
     "Link target": "链接目标",
@@ -798,6 +800,31 @@ function escapeMarkdownLabel(value) {
 }
 function unescapeValue(value) {
     return value.replace(/\\([\\[\]|])/g, '$1');
+}
+
+class NodeImagePreviewModal extends obsidian.Modal {
+    constructor(app, imageSrc, imageAlt, onClose) {
+        super(app);
+        this.shouldRestoreSelection = false;
+        this.imageSrc = imageSrc;
+        this.imageAlt = imageAlt;
+        this.onCloseCallback = onClose;
+    }
+    onOpen() {
+        this.setTitle(t('Image preview'));
+        this.modalEl.classList.add('mm-node-image-preview-modal');
+        this.contentEl.createEl('img', {
+            cls: 'mm-node-image-preview',
+            attr: {
+                src: this.imageSrc,
+                alt: this.imageAlt,
+            },
+        });
+    }
+    onClose() {
+        this.contentEl.empty();
+        this.onCloseCallback();
+    }
 }
 
 function keepLastIndex(dom) {
@@ -1339,6 +1366,23 @@ class Node$1 {
             event.preventDefault();
             event.stopPropagation();
             this.selectEditImage(wrapper);
+        });
+        wrapper.addEventListener('dblclick', (event) => {
+            var _a, _b;
+            if (event.target.closest('.mm-node-image-resize-handle'))
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.selectEditImage(wrapper);
+            const app = (_b = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.view) === null || _b === void 0 ? void 0 : _b.app;
+            if (!app)
+                return;
+            const modal = new NodeImagePreviewModal(app, img.currentSrc || img.src, img.alt, () => {
+                if (this.data.isEdit && this.contentEl.contains(wrapper)) {
+                    this.selectEditImage(wrapper);
+                }
+            });
+            modal.open();
         });
         handle.addEventListener('mousedown', (event) => {
             this.startImageResize(event, wrapper);

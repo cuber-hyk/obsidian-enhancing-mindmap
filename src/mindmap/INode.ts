@@ -13,6 +13,7 @@ import {
     NodeImageData,
     parseNodeImages,
 } from './image/NodeImageMarkdown'
+import NodeImagePreviewModal from './image/NodeImagePreviewModal'
 
 
 export function keepLastIndex(dom:HTMLElement) {
@@ -674,6 +675,26 @@ export default class Node {
             event.preventDefault();
             event.stopPropagation();
             this.selectEditImage(wrapper);
+        });
+        wrapper.addEventListener('dblclick', (event) => {
+            if ((event.target as HTMLElement).closest('.mm-node-image-resize-handle')) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.selectEditImage(wrapper);
+
+            const app = this.mindmap?.view?.app;
+            if (!app) return;
+            const modal = new NodeImagePreviewModal(
+                app,
+                img.currentSrc || img.src,
+                img.alt,
+                () => {
+                    if (this.data.isEdit && this.contentEl.contains(wrapper)) {
+                        this.selectEditImage(wrapper);
+                    }
+                },
+            );
+            modal.open();
         });
         handle.addEventListener('mousedown', (event) => {
             this.startImageResize(event, wrapper);

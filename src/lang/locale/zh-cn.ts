@@ -67,6 +67,7 @@ export default {
   "Image insertion failed":"图片已导入，但无法插入节点",
   "Unsupported image type":"不支持的图片类型",
   "Image import failed":"图片导入失败",
+  "Image preview":"图片预览",
   "Edit link":"编辑链接",
   "Delete link":"删除链接",
   "Link target":"链接目标",

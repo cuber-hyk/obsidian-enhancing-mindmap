@@ -100,6 +100,7 @@ export default {
     "Image insertion failed":"The image was imported but could not be inserted",
     "Unsupported image type":"Unsupported image type",
     "Image import failed":"Image import failed",
+    "Image preview":"Image preview",
     "Edit link":"Edit link",
     "Delete link":"Delete link",
     "Link target":"Link target",
