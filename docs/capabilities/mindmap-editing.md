@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-07-13
+updated: 2026-07-14
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -17,7 +17,7 @@ adr_reviewed: not_required
 - `INode.data.text` 保存节点 Markdown 源文本。
 - `INode.edit()` 将节点内容切换为 `contentEditable` 编辑状态；节点正文以文本编辑，图片附件以可选中的图片控件编辑。
 - `INode.cancelEdit()` 从 `innerText` 生成 Markdown，通过现有命令历史记录变更；节点文本更新只走 `setText()` 的单一阅读态渲染链路。
-- `NodeKeyboardController` 是节点键盘新增和删除的唯一入口：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点；编辑态 `Enter` 保存并回到选中态，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 保存并新增子节点；选中态 `Enter` 新增同级节点，根节点例外为新增一级子节点，选中态 `Tab` 新增子节点。
+- `NodeKeyboardController` 是单节点键盘新增和删除的入口：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点；编辑态 `Enter` 保存并回到选中态，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 保存并新增子节点；选中态 `Enter` 新增同级节点，根节点例外为新增一级子节点，选中态 `Tab` 新增子节点。脑图获得焦点且节点非编辑时，`Ctrl`/`Cmd+Z` 通过同一控制器撤销上一条脑图 History 命令；编辑态与其他视图保留原生文字撤销。
 - 旧节点右侧新增按钮及 `Alt+Shift+Enter`、`Shift+Insert` 新增命令已移除。
 - 删除节点后优先选中同级节点：先选下一个同级节点，没有下一个时选上一个同级节点；没有同级节点时才回退到父节点。
 - 节点编辑时显示一个由 `NodeInsertController` 管理的上下文工具栏；编辑结束或视图销毁时移除。
@@ -50,7 +50,11 @@ adr_reviewed: not_required
 - 框选激活期间，`NodeSelectionController` 接管滚轮并按容器实际滚动量上下移动画布，同时反向偏移原始选择锚点，以最后指针位置实时累计跨屏选区；该手势不改变 `mindScale`，松开鼠标后恢复原有 `Ctrl`/`Meta` 滚轮缩放。
 - `Ctrl`/`Meta` 单击非根节点用于追加或取消选择，`Escape` 清空多选；普通空白左键位移不超过 4px 时按静止单击清空选择，超过阈值时只平动画布并抑制拖动结束产生的单次 `click`，保留多选状态。
 - `MindMap.selectNode` 继续保存唯一活动节点，多选集合由 `NodeSelectionController` 独立维护，避免破坏现有编辑、命令和键盘入口。
-- 多选数大于一时阻止单节点新增、编辑、删除和方向导航键；第一版不提供批量复制、剪切、删除或编辑。
+- 多选数大于一时阻止单节点新增、编辑和方向导航键；按 `Backspace` 或 `Delete` 会删除所有没有已选祖先的选择根及其完整子树，父节点与后代同时选中时不重复删除后代。
+- 批量删除由一条 `RemoveNodes` History 命令记录各选择根的原父节点、索引和顺序；一次撤销完整恢复全部节点，一次重做再次整体删除。删除后优先选择原主选节点之后仍存在的兄弟节点，其次选择之前的兄弟节点，最后回退到父节点。
+- `NodeClipboardController` 是单节点剪贴板操作的唯一入口；脑图获得焦点、存在唯一活动节点且节点非编辑时，`Ctrl`/`Cmd+C/X/V` 分别复制、剪切或粘贴当前节点及完整子树。多选状态不退化为只操作主选节点，节点编辑态与其他输入控件保留原生文字剪贴板。
+- 节点剪贴板继续使用现有 `copyNode` JSON 格式，粘贴目标仍为当前活动节点；复制内容可连续粘贴，剪切只有在系统剪贴板写入成功后才删除源节点。异步剪贴板完成后还必须保持同一活动 leaf 和同一活动节点，否则不在后台删除或粘贴。
+- `Copy Node`、`Cut Node`、`Paste Node` 和 `Undo` 命令继续保留并支持用户自定义热键；不再提供 `Alt+Shift+C/X/V/Z` 默认绑定。
 - 拖动任一已选节点会迁移整个选择组；父节点与后代同时被选中时，只迁移没有已选祖先的顶层选择根，后代随父节点移动。
 - 整组迁移拒绝根节点和选择子树内的目标，按现有兄弟/子节点落点语义保持稳定顺序，并通过一条 `MoveNodes` 历史命令完成撤销和重做。
 
@@ -59,6 +63,8 @@ adr_reviewed: not_required
 - 代码：`src/mindmap/INode.ts`、`src/mindmap/mindmap.ts`
 - 节点键盘状态机：`src/mindmap/interaction/NodeKeyboardController.ts`
 - 节点多选状态与手势：`src/mindmap/interaction/NodeSelectionController.ts`
+- 节点剪贴板状态与快捷键：`src/mindmap/interaction/NodeClipboardController.ts`
+- 节点结构 History 命令：`src/mindmap/Cmds.ts`、`src/mindmap/Execute.ts`
 - 链接解析与交互：`src/mindmap/link/*.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
@@ -82,4 +88,5 @@ adr_reviewed: not_required
 - 节点键盘状态机、链接编辑/删除和图片缩放/删除需验证根节点、普通节点、编辑态、多链接、多图片、撤销/重做和 Markdown 往返。
 - 剪贴板图片粘贴需验证系统截图、文件图片、纯文本、混合剪贴板、文本中间插入、连续粘贴、立即退出或切换节点、Markdown/脑图往返及重新加载；仅有远程 HTML/URL 而没有图片文件数据的来源不在支持范围内。
 - 节点多选需在测试 Vault 中验证四向框选、框选期间滚轮跨屏累计选择且不缩放、松开后恢复缩放、空白静止单击清空、轻微抖动容错、普通空白拖动画布保留选择、同父/跨父/父子选择的整组迁移、非法后代目标、顺序保持、撤销/重做、深浅主题，以及与单选、编辑和单节点拖放的回归兼容性。
+- 多选批量删除与节点快捷键已于 2026-07-14 在授权测试 Vault 中验证；回归需覆盖同父、跨父和父子同时选择的删除与一次撤销/重做、连续粘贴、剪切写入后删除、多选不执行单节点剪贴板，以及节点编辑态和 Markdown 视图的原生剪贴板与撤销。
 - 仓库当前没有自动化测试框架；生产构建与测试 Vault 交互矩阵是本能力的主要回归门禁。

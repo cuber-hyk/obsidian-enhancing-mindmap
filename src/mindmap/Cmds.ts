@@ -99,6 +99,132 @@ export class RemoveNode extends Command {
 }
 
 
+interface RemoveNodesData {
+    nodes:INode[];
+    primary?:INode;
+}
+
+interface RemovedNodeLocation {
+    node:INode;
+    parent:INode;
+    index:number;
+    order:number;
+}
+
+export class RemoveNodes extends Command {
+    nodes:INode[];
+    primary?:INode;
+    mind:MindMap;
+    locations:RemovedNodeLocation[];
+    fallback?:INode;
+
+    constructor(data:RemoveNodesData) {
+        super('removeNodes');
+        const uniqueNodes = [...new Set(data.nodes)];
+        const selectedNodes = new Set(uniqueNodes);
+        this.nodes = uniqueNodes.filter((node) => {
+            if (node.data.isRoot) return false;
+            var parent = node.parent;
+            while (parent) {
+                if (selectedNodes.has(parent)) return false;
+                parent = parent.parent;
+            }
+            return true;
+        });
+        this.primary = data.primary;
+        this.mind = this.nodes[0]?.mindmap;
+        this.locations = this.nodes.map((node, order) => ({
+            node,
+            parent: node.parent,
+            index: node.getIndex(),
+            order,
+        }));
+        this.fallback = this.findFallback(this.primary || this.nodes[0]);
+    }
+
+    execute():boolean {
+        if (
+            !this.mind ||
+            !this.locations.length ||
+            this.locations.some(({node, parent}) => node.parent !== parent || !parent.children.includes(node))
+        ) {
+            return false;
+        }
+
+        this.mind.clearSelectNode();
+        this.locations
+            .slice()
+            .sort((a, b) => a.parent === b.parent ? b.index - a.index : b.order - a.order)
+            .forEach(({node}) => {
+                node.clearCacheData();
+                this.mind.removeNode(node);
+            });
+        this.refreshAffectedTree();
+        this.fallback?.select();
+        return true;
+    }
+
+    undo() {
+        this.mind.clearSelectNode();
+        this.locations
+            .slice()
+            .sort((a, b) => a.parent === b.parent ? a.index - b.index : a.order - b.order)
+            .forEach(({node, parent, index}) => {
+                this.mind.addNode(node, parent, index);
+                node.clearCacheData();
+                node.refreshBox();
+            });
+        this.refreshAffectedTree();
+        (this.primary || this.nodes[0])?.select();
+    }
+
+    private findFallback(primary?:INode):INode {
+        var current = primary;
+        while (current?.parent) {
+            const parent = current.parent;
+            const index = parent.children.indexOf(current);
+            const nextSibling = parent.children
+                .slice(index + 1)
+                .find((node) => !this.isRemoved(node));
+            const previousSibling = parent.children
+                .slice(0, index)
+                .reverse()
+                .find((node) => !this.isRemoved(node));
+            const candidates = [
+                nextSibling,
+                previousSibling,
+                parent,
+            ];
+            const fallback = candidates.find((node) => node && !this.isRemoved(node));
+            if (fallback) return fallback;
+            current = parent;
+        }
+        return this.mind?.root;
+    }
+
+    private isRemoved(node:INode):boolean {
+        var current:INode = node;
+        while (current) {
+            if (this.nodes.includes(current)) return true;
+            current = current.parent;
+        }
+        return false;
+    }
+
+    private refreshAffectedTree() {
+        new Set(this.locations.map(({parent}) => parent)).forEach((parent) => parent.clearCacheData());
+        this.nodes.forEach((node) => {
+            this.mind.traverseBF((child:INode) => {
+                child.boundingRect = null;
+                child.stroke = '';
+            }, node);
+            node.clearCacheData();
+        });
+        this.refresh(this.mind);
+    }
+}
+
+
 export class ChangeNodeText extends Command {
     node:INode;
     oldText:string;

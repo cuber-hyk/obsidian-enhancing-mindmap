@@ -9,6 +9,8 @@ export default class NodeKeyboardController {
   }
 
   handleKeydown(event: KeyboardEvent): boolean {
+    if (this.handleUndoShortcut(event)) return true;
+
     if (
       event.defaultPrevented ||
       event.isComposing ||
@@ -70,6 +72,27 @@ export default class NodeKeyboardController {
     } else {
       this.addSiblingAfter(node);
     }
+    return true;
+  }
+
+  private handleUndoShortcut(event: KeyboardEvent): boolean {
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      this.mindmap.isComposing ||
+      (!event.ctrlKey && !event.metaKey) ||
+      event.shiftKey ||
+      event.altKey ||
+      event.key.toLowerCase() !== 'z'
+    ) {
+      return false;
+    }
+
+    const node = this.mindmap.selectNode;
+    if (!node || node.data.isEdit || !this.isNodeKeyboardTarget(event, node)) return false;
+
+    this.consume(event);
+    this.mindmap.undo();
     return true;
   }
 

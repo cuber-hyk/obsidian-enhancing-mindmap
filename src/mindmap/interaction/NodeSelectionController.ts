@@ -130,6 +130,16 @@ export default class NodeSelectionController {
       return true;
     }
 
+    if (this.isBatchDeleteEvent(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.mindmap.execute('removeNodes', {
+        nodes: this.getSelectionRoots(),
+        primary: this.mindmap.selectNode,
+      });
+      return true;
+    }
+
     return this.blockSingleNodeShortcut(event);
   }
 
@@ -171,7 +181,7 @@ export default class NodeSelectionController {
 
     event.preventDefault();
     event.stopPropagation();
-    const nodes = this.getMoveRoots();
+    const nodes = this.getSelectionRoots();
     if (
       nodes.length === 0 ||
       event.ctrlKey ||
@@ -193,7 +203,7 @@ export default class NodeSelectionController {
   }
 
   isInvalidGroupDropTarget(dropNode: Node): boolean {
-    return this.groupDragging && this.isInvalidDropTarget(dropNode, this.getMoveRoots());
+    return this.groupDragging && this.isInvalidDropTarget(dropNode, this.getSelectionRoots());
   }
 
   finishDrag(): void {
@@ -314,7 +324,7 @@ export default class NodeSelectionController {
     node.containEl.setAttribute('draggable', selected || node.isSelect ? 'true' : 'false');
   }
 
-  private getMoveRoots(): Node[] {
+  getSelectionRoots(): Node[] {
     return this.mindmap.root.getShowNodeList().filter((node: Node) => {
       if (!this.selectedNodes.has(node)) return false;
       let parent = node.parent;
@@ -324,6 +334,26 @@ export default class NodeSelectionController {
       }
       return true;
     });
+  }
+
+  private isBatchDeleteEvent(event: KeyboardEvent): boolean {
+    if (
+      !this.hasMultipleSelection() ||
+      (event.key !== 'Backspace' && event.key !== 'Delete') ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.isComposing ||
+      this.mindmap.isComposing ||
+      this.mindmap.editNode?.data.isEdit
+    ) {
+      return false;
+    }
+
+    const target = event.target;
+    return target instanceof Element && this.mindmap.appEl.contains(target) && !target.closest(
+      'input, textarea, select, button, a, [contenteditable="true"]',
+    );
   }
 
   private isInvalidDropTarget(dropNode: Node, nodes: Node[]): boolean {

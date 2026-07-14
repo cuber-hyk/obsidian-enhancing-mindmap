@@ -57,6 +57,11 @@ export default class Exec{
                     this.history.execute(new cmd.RemoveNode(node, node.mindmap));
                 }
                 break;
+            case 'removeNodes':
+                if(data){
+                    this.history.execute(new cmd.RemoveNodes(data as any));
+                }
+                break;
             case 'deleteNodeExcludeChild':
                 break;
             case 'changeNodeText':
