@@ -521,15 +521,19 @@
     z-index:50;
 }
 .mm-mindmap .mm-node.mm-edit-node .mm-node-content {
-  color: var(--mm-style-primary-color);
-  border-color: var(--mm-style-primary-border-color);
-  background: var(--mm-style-primary-background);
+  color: var(--mm-style-primary-color) !important;
+  border-color: var(--mm-style-primary-border-color) !important;
+  background: var(--mm-style-primary-background) !important;
+  caret-color: var(--mm-style-primary-color) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mm-style-primary-color) 45%, transparent) !important;
 }
 
 .mm-mindmap .mm-node.mm-root.mm-edit-node .mm-node-content {
-  color: var(--mm-style-root-color);
-  border-color: var(--mm-style-root-border-color);
-  background: var(--mm-style-root-background);
+  color: var(--mm-style-root-color) !important;
+  border-color: var(--mm-style-root-border-color) !important;
+  background: var(--mm-style-root-background) !important;
+  caret-color: var(--mm-style-root-color) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mm-style-root-color) 45%, transparent) !important;
 }
 
 .mm-mindmap-view {

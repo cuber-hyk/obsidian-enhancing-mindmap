@@ -386,19 +386,36 @@ export default class Node {
         this.renderEditableContent(this.data.text, editData.links);
         this.renderLinkLayer(editData.links);
         this.contentEl.setAttribute('contentEditable','true');
-        this.contentEl.focus();
         this.mindmap.editNode = this;
         this.data.isEdit = true;
+        if(!this.containEl.classList.contains('mm-edit-node')){
+            this.containEl.classList.add('mm-edit-node')
+        }
+        this.applyEditSurfaceStyle();
+        this.contentEl.focus();
         keepLastIndex(this.contentEl);
 
         if (this.contentEl.innerText == t('Sub title')) {
             this.selectText();
         }
-
-        if(!this.containEl.classList.contains('mm-edit-node')){
-            this.containEl.classList.add('mm-edit-node')
-        }
         this.mindmap.view?.insertController.beginEdit(this);
+    }
+
+    applyEditSurfaceStyle() {
+        const tokenPrefix = this.data.isRoot ? '--mm-style-root' : '--mm-style-primary';
+        const style = this.contentEl.style;
+        style.setProperty('color', `var(${tokenPrefix}-color)`, 'important');
+        style.setProperty('border-color', `var(${tokenPrefix}-border-color)`, 'important');
+        style.setProperty('background-color', `var(${tokenPrefix}-background)`, 'important');
+        style.setProperty('caret-color', `var(${tokenPrefix}-color)`, 'important');
+        style.setProperty('box-shadow', `0 0 0 2px color-mix(in srgb, var(${tokenPrefix}-color) 45%, transparent)`, 'important');
+    }
+
+    clearEditSurfaceStyle() {
+        const style = this.contentEl.style;
+        ['color', 'border-color', 'background-color', 'caret-color', 'box-shadow'].forEach((property) => {
+            style.removeProperty(property);
+        });
     }
 
     selectText() {
@@ -625,6 +642,7 @@ export default class Node {
             text = t('Sub title')
         }
 
+        this.clearEditSurfaceStyle();
         this.contentEl.setAttribute('contentEditable','false');
         this.data.isEdit = false;
         this._editText = '';
