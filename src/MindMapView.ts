@@ -14,9 +14,16 @@ import { FRONT_MATTER_REGEX } from './constants'
 import MindMap from "./mindmap/mindmap";
 import { INodeData } from './mindmap/INode'
 import { Transformer } from './markmapLib/markmap-lib';
-import randomColor from "randomcolor";
 import { t } from './lang/helpers'
 import NodeInsertController from './mindmap/insert/NodeInsertController';
+import { mindmapStyleTemplateFrontMatterKey } from './constants';
+import {
+  applyMindMapStyleTemplate,
+  DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
+  isMindMapStyleTemplateId,
+  resolveMindMapStyleTemplate,
+} from './mindmap/style/MindMapStyle';
+import MindMapStyleInspector from './mindmap/style/MindMapStyleInspector';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
@@ -39,7 +46,10 @@ export class MindMapView extends TextFileView implements HoverParent {
   hoverPopover: HoverPopover | null;
   id: string = (this.leaf as any).id;
   mindmap: MindMap | null;
-  colors: string[] = [];
+  currentStyleTemplateId: string = DEFAULT_MINDMAP_STYLE_TEMPLATE_ID;
+  styleInspector: MindMapStyleInspector | null = null;
+  isStyleInspectorOpen: boolean = false;
+  isApplyingStyleTemplate: boolean = false;
   timeOut: any = null;
   fileCache: any;
   firstInit: boolean = true;
@@ -54,24 +64,6 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   getDisplayText() {
     return this.file?.basename || "mindmap";
-  }
-
-  setColors() {
-    var colors:any[] = []
-    try{
-      if( this.plugin.settings.strokeArray){
-         //colors = this.plugin.settings.strokeArray.split(',')
-         colors = this.plugin.settings.strokeArray;
-      }
-    }catch(err){
-       console.log(err,'stroke array is error');
-    }
-
-    this.colors = this.colors.concat(colors);
-
-    for (var i = 0; i < 50; i++) {
-      this.colors.push(randomColor());
-    }
   }
 
   exportToSvg(){
@@ -323,7 +315,6 @@ export class MindMapView extends TextFileView implements HoverParent {
     super(leaf);
     this.plugin = plugin;
     this.insertController = new NodeInsertController(this.app);
-    this.setColors();
 
     this.fileCache = {
       'frontmatter': {
@@ -338,6 +329,8 @@ export class MindMapView extends TextFileView implements HoverParent {
     // Remove draggables from render, as the DOM has already detached
     //this.plugin.removeView(this);
     this.insertController.destroy();
+    this.isStyleInspectorOpen = false;
+    this.destroyStyleInspector();
     if (this.mindmap) {
       this.mindmap.clear();
       this.contentEl.innerHTML = '';
@@ -358,10 +351,11 @@ export class MindMapView extends TextFileView implements HoverParent {
   setViewData(data: string) {
 
     this.insertController.endEdit();
+    this.destroyStyleInspector();
     if (this.mindmap) {
       this.mindmap.clear();
-      this.contentEl.innerHTML = '';
     }
+    this.contentEl.innerHTML = '';
 
     this.data = data;
 
@@ -381,8 +375,9 @@ export class MindMapView extends TextFileView implements HoverParent {
     //   });
     // }
 
-    this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings);
-    this.mindmap.colors = this.colors;
+    this.contentEl.addClass('mm-mindmap-view');
+    const mindmapContainerEl = this.contentEl.createDiv({ cls: 'mm-mindmap-canvas' });
+    this.mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
     if (this.firstInit) {
 
       setTimeout(() => {
@@ -397,8 +392,10 @@ export class MindMapView extends TextFileView implements HoverParent {
           }
         }
         this.mindmap.view = this;
+        const styleTemplate = this.prepareMindmapStyle();
         this.mindmap.init();
-        this.mindmap.refresh();
+        applyMindMapStyleTemplate(this.mindmap, styleTemplate);
+        this.restoreStyleInspector();
         this.firstInit = false;
       }, 100);
     } else {
@@ -408,8 +405,10 @@ export class MindMapView extends TextFileView implements HoverParent {
 
       this.mindmap.path = view?.file.path;
       this.mindmap.view = this;
+      const styleTemplate = this.prepareMindmapStyle();
       this.mindmap.init();
-      this.mindmap.refresh();
+      applyMindMapStyleTemplate(this.mindmap, styleTemplate);
+      this.restoreStyleInspector();
     }
   }
 
@@ -417,6 +416,8 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.app.workspace.offref("quick-preview");
     this.app.workspace.offref("resize");
     this.insertController.destroy();
+    this.isStyleInspectorOpen = false;
+    this.destroyStyleInspector();
 
     if (this.mindmap) {
       this.mindmap.clear();
@@ -431,6 +432,7 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   onload() {
     super.onload();
+    this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
     this.registerEvent(
       this.app.workspace.on("quick-preview", () => this.onQuickPreview, this)
     );
@@ -439,10 +441,111 @@ export class MindMapView extends TextFileView implements HoverParent {
 //    );
   }
 
-  onQuickPreview(file: TFile, data: string) {
-    if (file === this.file && data !== this.data) {
-      this.setViewData(data);
+  private prepareMindmapStyle() {
+    const template = resolveMindMapStyleTemplate(this.getCurrentStyleTemplateId());
+    this.currentStyleTemplateId = template.id;
+    if (this.mindmap) {
+      this.mindmap.colors = template.branchPalette;
+    }
+    return template;
+  }
+
+  private getCurrentStyleTemplateId(): string {
+    const storedStyleTemplate = this.getStyleTemplateIdFromData(this.data)
+      || this.fileCache?.frontmatter?.[mindmapStyleTemplateFrontMatterKey];
+    if (isMindMapStyleTemplateId(storedStyleTemplate)) return storedStyleTemplate;
+    return resolveMindMapStyleTemplate(this.plugin.settings.defaultStyleTemplate).id;
+  }
+
+  private getStyleTemplateIdFromData(data: string): string | undefined {
+    const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(data)?.[1];
+    if (!frontMatter) return undefined;
+
+    const match = /^mindmap-style-template:\s*(?:["']([^"']+)["']|([^\s#]+))\s*$/m.exec(frontMatter);
+    return match?.[1] || match?.[2];
+  }
+
+  private toggleStyleInspector() {
+    if (!this.mindmap) return;
+    if (this.styleInspector) {
+      this.isStyleInspectorOpen = false;
+      this.destroyStyleInspector();
+      return;
+    }
+
+    this.isStyleInspectorOpen = true;
+    this.restoreStyleInspector();
+  }
+
+  private restoreStyleInspector() {
+    if (!this.isStyleInspectorOpen || !this.mindmap || this.styleInspector) return;
+
+    this.styleInspector = new MindMapStyleInspector({
+      parentEl: this.contentEl,
+      currentTemplateId: this.currentStyleTemplateId,
+      onPreviewTemplate: (styleTemplate) => this.previewStyleTemplate(styleTemplate.id),
+      onRestorePreview: () => this.previewStyleTemplate(this.currentStyleTemplateId),
+      onSelectTemplate: (styleTemplate) => this.applyStyleTemplate(styleTemplate.id),
+      onClose: () => {
+        this.isStyleInspectorOpen = false;
+        this.destroyStyleInspector();
+      },
+    });
+    this.styleInspector.open();
+  }
+
+  private destroyStyleInspector() {
+    this.styleInspector?.destroy();
+    this.styleInspector = null;
+  }
+
+  private previewStyleTemplate(styleTemplateId: string) {
+    if (!this.mindmap) return;
+    applyMindMapStyleTemplate(this.mindmap, styleTemplateId);
+  }
+
+  private async applyStyleTemplate(styleTemplateId: string) {
+    const mindmap = this.mindmap;
+    if (!mindmap) return;
+    const previousStyleTemplateId = this.currentStyleTemplateId;
+    const styleTemplate = applyMindMapStyleTemplate(mindmap, styleTemplateId);
+
+    const file = this.file;
+    if (!file) {
+      applyMindMapStyleTemplate(mindmap, previousStyleTemplateId);
+      throw new Error('Mindmap file is unavailable');
+    }
+    this.isApplyingStyleTemplate = true;
+    try {
+      await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        frontmatter[mindmapStyleTemplateFrontMatterKey] = styleTemplate.id;
+      });
+
+      if (this.file !== file) return;
+      this.currentStyleTemplateId = styleTemplate.id;
       this.fileCache = this.app.metadataCache.getFileCache(file);
+      this.data = await this.app.vault.read(file);
+      this.yamlString = this.getFrontMatterFromData(this.data);
+    } catch (error) {
+      if (this.mindmap === mindmap) {
+        applyMindMapStyleTemplate(mindmap, previousStyleTemplateId);
+      }
+      throw error;
+    } finally {
+      this.isApplyingStyleTemplate = false;
+    }
+  }
+
+  private getFrontMatterFromData(data: string): string {
+    const frontMatter = /^---\r?\n[\s\S]*?\r?\n---/.exec(data)?.[0];
+    return frontMatter ? `${frontMatter}\n\n` : '';
+  }
+
+  onQuickPreview(file: TFile, data: string) {
+    if (file === this.file && this.isApplyingStyleTemplate) return;
+    if (file === this.file && data !== this.data) {
+      this.fileCache = this.app.metadataCache.getFileCache(file);
+      this.setViewData(data);
     }
   }
 

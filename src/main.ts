@@ -12,8 +12,9 @@ import { MindMapSettings } from './settings';
 import { MindMapSettingsTab } from './settingTab'
 
 import { MindMapView, mindmapViewType } from "./MindMapView";
-import { frontMatterKey, basicFrontmatter } from './constants';
+import { frontMatterKey, createMindmapFrontmatter } from './constants';
 import { t } from './lang/helpers'
+import { DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, resolveMindMapStyleTemplate } from './mindmap/style/MindMapStyle';
 
 
 export default class MindMapPlugin extends Plugin {
@@ -1096,7 +1097,8 @@ export default class MindMapPlugin extends Plugin {
         `${t('Untitled mindmap')}`
       );
 
-      await this.app.vault.modify(mindmap, basicFrontmatter);
+      const styleTemplate = resolveMindMapStyleTemplate(this.settings.defaultStyleTemplate).id;
+      await this.app.vault.modify(mindmap, createMindmapFrontmatter(styleTemplate));
        setTimeout(async ()=>{
           await this.app.workspace.getLeaf().setViewState({
             type: mindmapViewType,
@@ -1116,6 +1118,7 @@ export default class MindMapPlugin extends Plugin {
       background: 'transparent',
       layout: 'mindmap',
       layoutDirect: 'mindmap',
+      defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
       showLinkTitle: false
     }, await this.loadData());
   }

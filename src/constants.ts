@@ -4,15 +4,18 @@ export const MD_VIEW_TYPE = 'markdown';
 export const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.+?/ims;
 
 export const frontMatterKey = 'mindmap-plugin';
+export const mindmapStyleTemplateFrontMatterKey = 'mindmap-style-template';
 
-
-export const basicFrontmatter = [
-  "---",
-  "",
-  `${frontMatterKey}: basic`,
-  "",
-  "---",
-  "",
-  "",
-].join("\n");
+export function createMindmapFrontmatter(styleTemplate: string) {
+  return [
+    "---",
+    "",
+    `${frontMatterKey}: basic`,
+    `${mindmapStyleTemplateFrontMatterKey}: ${styleTemplate}`,
+    "",
+    "---",
+    "",
+    "",
+  ].join("\n");
+}
 

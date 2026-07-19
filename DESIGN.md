@@ -29,6 +29,7 @@ token_source: design-tokens.json
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
+- 脑图样式检查器：`src/mindmap/style/`、`src/MindMapView.ts`、`styles.css`
 - 已确认视觉示例：`docs/assets/node-insert-toolbar-concept.png`
 
 ## 设计原则
@@ -61,6 +62,8 @@ token_source: design-tokens.json
 - 编辑态图片预览复用 Obsidian `Modal`，按当前窗口等比例适配原图片资源，不在节点内放大或改变脑图布局。
 - 链接图标右键菜单复用 Obsidian `Menu`，链接编辑复用 Obsidian 弹窗和 Vault 文件选择模式。
 - 右下角导航控件提供小视图、视口框、缩放滑动条、加减按钮、百分比显示、可见/总节点数、隐藏/恢复按钮和 hover 四角拖拽缩放点；控件属于画布级 UI，不属于节点编辑工具栏。
+- 脑图视图的样式模板入口使用标题栏调色板操作；该操作切换当前脑图视图内的右侧样式检查器，不创建 Obsidian 全局侧栏。
+- 样式检查器使用单列模板卡片，卡片以自然内容高度完整展示可换行的模板名称、根节点、分支线和调色板缩略效果；模板的具体色值由集中模板目录维护，不散落在 CSS 规则中。
 - 优先使用 Obsidian 提供的图标、弹窗和搜索选择器。
 
 ## 交互模式
@@ -80,6 +83,10 @@ token_source: design-tokens.json
 - 节点只保存 Markdown 源文本，渲染后的 HTML 不得成为第二数据源。
 - 右下角导航控件固定在脑图视图容器内，不随画布缩放；滑动条、加减按钮和 Ctrl/Meta 滚轮缩放共享同一个 `mindScale` 状态。
 - 小视图点击定位主画布视口；拖拽视口框不得触发节点拖拽、文本编辑或画布平移。
+- 点击标题栏调色板操作后打开或关闭当前导图的右侧样式检查器；除用户显式切换入口或点击关闭按钮外，检查器在模板应用与视图同步后保持打开，画布始终可见。
+- 鼠标移入或键盘聚焦检查器中的模板卡片时，仅临时预览模板；移出模板列表或失焦后恢复最后一次已保存模板，预览不得写入 frontmatter。
+- 点击模板卡片或按 `Enter` / `Space` 时立即将模板标识持久化到该脑图 Markdown 的 frontmatter，并保持检查器打开。
+- 新建脑图使用插件设置中的默认模板；切换已有脑图模板不得改写其他脑图或插件全局默认值。
 - 导航控件节点数统计显示当前可见节点数与脑图总节点数，根节点计入两者，折叠节点只影响可见数。
 - 导航控件默认隐藏操作点；鼠标移入或拖拽中显示四个顶点缩放点和隐藏按钮。收起后仅保留恢复按钮。
 - 桌面端按住 `Ctrl`/`Meta` 从空白画布拖动时显示临时虚线选择框；与选择框相交的当前可见非根节点实时进入多选态，松开鼠标后选择框消失而节点选择保留。

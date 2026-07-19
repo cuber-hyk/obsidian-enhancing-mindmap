@@ -138,6 +138,17 @@ var en = {
     "Left": "Left",
     "Centered": "Centered",
     "Clockwise": "Clockwise",
+    "Default mindmap style": "Default mindmap style",
+    "Default mindmap style desc": "Style template used for newly created mindmaps",
+    "Mindmap styles": "Mindmap styles",
+    "Choose mindmap style": "Choose mindmap style",
+    "Close mindmap style inspector": "Close mindmap style inspector",
+    "Classic blue": "Classic blue",
+    "Mint fresh": "Mint fresh",
+    "Coral energy": "Coral energy",
+    "Violet night": "Violet night",
+    "Mono ink": "Mono ink",
+    "Forest notes": "Forest notes",
     "Stroke Array": "Stroke array",
     "Stroke Array Desc": "Node link color base on this value or random color",
     "Show link title": "Show link title",
@@ -375,6 +386,17 @@ var zhCN = {
     "Add brother node": "添加兄弟节点",
     "Stroke Array": "颜色组",
     "Stroke Array Desc": "节点连线颜色将按照颜色组生成,否则生成随机颜色",
+    "Default mindmap style": "新建导图默认样式",
+    "Default mindmap style desc": "创建新思维导图时使用的样式模板",
+    "Mindmap styles": "思维导图样式",
+    "Choose mindmap style": "选择思维导图样式",
+    "Close mindmap style inspector": "关闭思维导图样式面板",
+    "Classic blue": "经典蓝",
+    "Mint fresh": "薄荷清新",
+    "Coral energy": "珊瑚活力",
+    "Violet night": "紫夜商务",
+    "Mono ink": "墨色单彩",
+    "Forest notes": "森林手账",
     "Show link title": "显示链接标题",
     "Show link title desc": "在链接图标旁显示链接标题",
     "Save fail": "保存失败",
@@ -452,15 +474,19 @@ function t(str) {
 
 const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.+?/ims;
 const frontMatterKey = 'mindmap-plugin';
-const basicFrontmatter = [
-    "---",
-    "",
-    `${frontMatterKey}: basic`,
-    "",
-    "---",
-    "",
-    "",
-].join("\n");
+const mindmapStyleTemplateFrontMatterKey = 'mindmap-style-template';
+function createMindmapFrontmatter(styleTemplate) {
+    return [
+        "---",
+        "",
+        `${frontMatterKey}: basic`,
+        `${mindmapStyleTemplateFrontMatterKey}: ${styleTemplate}`,
+        "",
+        "---",
+        "",
+        "",
+    ].join("\n");
+}
 
 function parseNodeMarkdown(markdown) {
     const links = [];
@@ -1945,531 +1971,6 @@ class Node$1 {
     }
 }
 
-var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-function createCommonjsModule(fn) {
-  var module = { exports: {} };
-	return fn(module, module.exports), module.exports;
-}
-
-function commonjsRequire (path) {
-	throw new Error('Could not dynamically require "' + path + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
-}
-
-var randomColor = createCommonjsModule(function (module, exports) {
-(function(root, factory) {
-
-  // Support CommonJS
-  {
-    var randomColor = factory();
-
-    // Support NodeJS & Component, which allow module.exports to be a function
-    if (module && module.exports) {
-      exports = module.exports = randomColor;
-    }
-
-    // Support CommonJS 1.1.1 spec
-    exports.randomColor = randomColor;
-
-  // Support AMD
-  }
-
-}(commonjsGlobal, function() {
-
-  // Seed to get repeatable colors
-  var seed = null;
-
-  // Shared color dictionary
-  var colorDictionary = {};
-
-  // Populate the color dictionary
-  loadColorBounds();
-
-  // check if a range is taken
-  var colorRanges = [];
-
-  var randomColor = function (options) {
-
-    options = options || {};
-
-    // Check if there is a seed and ensure it's an
-    // integer. Otherwise, reset the seed value.
-    if (options.seed !== undefined && options.seed !== null && options.seed === parseInt(options.seed, 10)) {
-      seed = options.seed;
-
-    // A string was passed as a seed
-    } else if (typeof options.seed === 'string') {
-      seed = stringToInteger(options.seed);
-
-    // Something was passed as a seed but it wasn't an integer or string
-    } else if (options.seed !== undefined && options.seed !== null) {
-      throw new TypeError('The seed value must be an integer or string');
-
-    // No seed, reset the value outside.
-    } else {
-      seed = null;
-    }
-
-    var H,S,B;
-
-    // Check if we need to generate multiple colors
-    if (options.count !== null && options.count !== undefined) {
-
-      var totalColors = options.count,
-          colors = [];
-      // Value false at index i means the range i is not taken yet.
-      for (var i = 0; i < options.count; i++) {
-        colorRanges.push(false);
-        }
-      options.count = null;
-
-      while (totalColors > colors.length) {
-
-        var color = randomColor(options);
-
-        if (seed !== null) {
-          options.seed = seed;
-        }
-
-        colors.push(color);
-      }
-
-      options.count = totalColors;
-
-      return colors;
-    }
-
-    // First we pick a hue (H)
-    H = pickHue(options);
-
-    // Then use H to determine saturation (S)
-    S = pickSaturation(H, options);
-
-    // Then use S and H to determine brightness (B).
-    B = pickBrightness(H, S, options);
-
-    // Then we return the HSB color in the desired format
-    return setFormat([H,S,B], options);
-  };
-
-  function pickHue(options) {
-    if (colorRanges.length > 0) {
-      var hueRange = getRealHueRange(options.hue);
-
-      var hue = randomWithin(hueRange);
-
-      //Each of colorRanges.length ranges has a length equal approximatelly one step
-      var step = (hueRange[1] - hueRange[0]) / colorRanges.length;
-
-      var j = parseInt((hue - hueRange[0]) / step);
-
-      //Check if the range j is taken
-      if (colorRanges[j] === true) {
-        j = (j + 2) % colorRanges.length;
-      }
-      else {
-        colorRanges[j] = true;
-           }
-
-      var min = (hueRange[0] + j * step) % 359,
-          max = (hueRange[0] + (j + 1) * step) % 359;
-
-      hueRange = [min, max];
-
-      hue = randomWithin(hueRange);
-
-      if (hue < 0) {hue = 360 + hue;}
-      return hue
-    }
-    else {
-      var hueRange = getHueRange(options.hue);
-
-      hue = randomWithin(hueRange);
-      // Instead of storing red as two seperate ranges,
-      // we group them, using negative numbers
-      if (hue < 0) {
-        hue = 360 + hue;
-      }
-
-      return hue;
-    }
-  }
-
-  function pickSaturation (hue, options) {
-
-    if (options.hue === 'monochrome') {
-      return 0;
-    }
-
-    if (options.luminosity === 'random') {
-      return randomWithin([0,100]);
-    }
-
-    var saturationRange = getSaturationRange(hue);
-
-    var sMin = saturationRange[0],
-        sMax = saturationRange[1];
-
-    switch (options.luminosity) {
-
-      case 'bright':
-        sMin = 55;
-        break;
-
-      case 'dark':
-        sMin = sMax - 10;
-        break;
-
-      case 'light':
-        sMax = 55;
-        break;
-   }
-
-    return randomWithin([sMin, sMax]);
-
-  }
-
-  function pickBrightness (H, S, options) {
-
-    var bMin = getMinimumBrightness(H, S),
-        bMax = 100;
-
-    switch (options.luminosity) {
-
-      case 'dark':
-        bMax = bMin + 20;
-        break;
-
-      case 'light':
-        bMin = (bMax + bMin)/2;
-        break;
-
-      case 'random':
-        bMin = 0;
-        bMax = 100;
-        break;
-    }
-
-    return randomWithin([bMin, bMax]);
-  }
-
-  function setFormat (hsv, options) {
-
-    switch (options.format) {
-
-      case 'hsvArray':
-        return hsv;
-
-      case 'hslArray':
-        return HSVtoHSL(hsv);
-
-      case 'hsl':
-        var hsl = HSVtoHSL(hsv);
-        return 'hsl('+hsl[0]+', '+hsl[1]+'%, '+hsl[2]+'%)';
-
-      case 'hsla':
-        var hslColor = HSVtoHSL(hsv);
-        var alpha = options.alpha || Math.random();
-        return 'hsla('+hslColor[0]+', '+hslColor[1]+'%, '+hslColor[2]+'%, ' + alpha + ')';
-
-      case 'rgbArray':
-        return HSVtoRGB(hsv);
-
-      case 'rgb':
-        var rgb = HSVtoRGB(hsv);
-        return 'rgb(' + rgb.join(', ') + ')';
-
-      case 'rgba':
-        var rgbColor = HSVtoRGB(hsv);
-        var alpha = options.alpha || Math.random();
-        return 'rgba(' + rgbColor.join(', ') + ', ' + alpha + ')';
-
-      default:
-        return HSVtoHex(hsv);
-    }
-
-  }
-
-  function getMinimumBrightness(H, S) {
-
-    var lowerBounds = getColorInfo(H).lowerBounds;
-
-    for (var i = 0; i < lowerBounds.length - 1; i++) {
-
-      var s1 = lowerBounds[i][0],
-          v1 = lowerBounds[i][1];
-
-      var s2 = lowerBounds[i+1][0],
-          v2 = lowerBounds[i+1][1];
-
-      if (S >= s1 && S <= s2) {
-
-         var m = (v2 - v1)/(s2 - s1),
-             b = v1 - m*s1;
-
-         return m*S + b;
-      }
-
-    }
-
-    return 0;
-  }
-
-  function getHueRange (colorInput) {
-
-    if (typeof parseInt(colorInput) === 'number') {
-
-      var number = parseInt(colorInput);
-
-      if (number < 360 && number > 0) {
-        return [number, number];
-      }
-
-    }
-
-    if (typeof colorInput === 'string') {
-
-      if (colorDictionary[colorInput]) {
-        var color = colorDictionary[colorInput];
-        if (color.hueRange) {return color.hueRange;}
-      } else if (colorInput.match(/^#?([0-9A-F]{3}|[0-9A-F]{6})$/i)) {
-        var hue = HexToHSB(colorInput)[0];
-        return [ hue, hue ];
-      }
-    }
-
-    return [0,360];
-
-  }
-
-  function getSaturationRange (hue) {
-    return getColorInfo(hue).saturationRange;
-  }
-
-  function getColorInfo (hue) {
-
-    // Maps red colors to make picking hue easier
-    if (hue >= 334 && hue <= 360) {
-      hue-= 360;
-    }
-
-    for (var colorName in colorDictionary) {
-       var color = colorDictionary[colorName];
-       if (color.hueRange &&
-           hue >= color.hueRange[0] &&
-           hue <= color.hueRange[1]) {
-          return colorDictionary[colorName];
-       }
-    } return 'Color not found';
-  }
-
-  function randomWithin (range) {
-    if (seed === null) {
-      //generate random evenly destinct number from : https://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
-      var golden_ratio = 0.618033988749895;
-      var r=Math.random();
-      r += golden_ratio;
-      r %= 1;
-      return Math.floor(range[0] + r*(range[1] + 1 - range[0]));
-    } else {
-      //Seeded random algorithm from http://indiegamr.com/generate-repeatable-random-numbers-in-js/
-      var max = range[1] || 1;
-      var min = range[0] || 0;
-      seed = (seed * 9301 + 49297) % 233280;
-      var rnd = seed / 233280.0;
-      return Math.floor(min + rnd * (max - min));
-}
-  }
-
-  function HSVtoHex (hsv){
-
-    var rgb = HSVtoRGB(hsv);
-
-    function componentToHex(c) {
-        var hex = c.toString(16);
-        return hex.length == 1 ? '0' + hex : hex;
-    }
-
-    var hex = '#' + componentToHex(rgb[0]) + componentToHex(rgb[1]) + componentToHex(rgb[2]);
-
-    return hex;
-
-  }
-
-  function defineColor (name, hueRange, lowerBounds) {
-
-    var sMin = lowerBounds[0][0],
-        sMax = lowerBounds[lowerBounds.length - 1][0],
-
-        bMin = lowerBounds[lowerBounds.length - 1][1],
-        bMax = lowerBounds[0][1];
-
-    colorDictionary[name] = {
-      hueRange: hueRange,
-      lowerBounds: lowerBounds,
-      saturationRange: [sMin, sMax],
-      brightnessRange: [bMin, bMax]
-    };
-
-  }
-
-  function loadColorBounds () {
-
-    defineColor(
-      'monochrome',
-      null,
-      [[0,0],[100,0]]
-    );
-
-    defineColor(
-      'red',
-      [-26,18],
-      [[20,100],[30,92],[40,89],[50,85],[60,78],[70,70],[80,60],[90,55],[100,50]]
-    );
-
-    defineColor(
-      'orange',
-      [18,46],
-      [[20,100],[30,93],[40,88],[50,86],[60,85],[70,70],[100,70]]
-    );
-
-    defineColor(
-      'yellow',
-      [46,62],
-      [[25,100],[40,94],[50,89],[60,86],[70,84],[80,82],[90,80],[100,75]]
-    );
-
-    defineColor(
-      'green',
-      [62,178],
-      [[30,100],[40,90],[50,85],[60,81],[70,74],[80,64],[90,50],[100,40]]
-    );
-
-    defineColor(
-      'blue',
-      [178, 257],
-      [[20,100],[30,86],[40,80],[50,74],[60,60],[70,52],[80,44],[90,39],[100,35]]
-    );
-
-    defineColor(
-      'purple',
-      [257, 282],
-      [[20,100],[30,87],[40,79],[50,70],[60,65],[70,59],[80,52],[90,45],[100,42]]
-    );
-
-    defineColor(
-      'pink',
-      [282, 334],
-      [[20,100],[30,90],[40,86],[60,84],[80,80],[90,75],[100,73]]
-    );
-
-  }
-
-  function HSVtoRGB (hsv) {
-
-    // this doesn't work for the values of 0 and 360
-    // here's the hacky fix
-    var h = hsv[0];
-    if (h === 0) {h = 1;}
-    if (h === 360) {h = 359;}
-
-    // Rebase the h,s,v values
-    h = h/360;
-    var s = hsv[1]/100,
-        v = hsv[2]/100;
-
-    var h_i = Math.floor(h*6),
-      f = h * 6 - h_i,
-      p = v * (1 - s),
-      q = v * (1 - f*s),
-      t = v * (1 - (1 - f)*s),
-      r = 256,
-      g = 256,
-      b = 256;
-
-    switch(h_i) {
-      case 0: r = v; g = t; b = p;  break;
-      case 1: r = q; g = v; b = p;  break;
-      case 2: r = p; g = v; b = t;  break;
-      case 3: r = p; g = q; b = v;  break;
-      case 4: r = t; g = p; b = v;  break;
-      case 5: r = v; g = p; b = q;  break;
-    }
-
-    var result = [Math.floor(r*255), Math.floor(g*255), Math.floor(b*255)];
-    return result;
-  }
-
-  function HexToHSB (hex) {
-    hex = hex.replace(/^#/, '');
-    hex = hex.length === 3 ? hex.replace(/(.)/g, '$1$1') : hex;
-
-    var red = parseInt(hex.substr(0, 2), 16) / 255,
-          green = parseInt(hex.substr(2, 2), 16) / 255,
-          blue = parseInt(hex.substr(4, 2), 16) / 255;
-
-    var cMax = Math.max(red, green, blue),
-          delta = cMax - Math.min(red, green, blue),
-          saturation = cMax ? (delta / cMax) : 0;
-
-    switch (cMax) {
-      case red: return [ 60 * (((green - blue) / delta) % 6) || 0, saturation, cMax ];
-      case green: return [ 60 * (((blue - red) / delta) + 2) || 0, saturation, cMax ];
-      case blue: return [ 60 * (((red - green) / delta) + 4) || 0, saturation, cMax ];
-    }
-  }
-
-  function HSVtoHSL (hsv) {
-    var h = hsv[0],
-      s = hsv[1]/100,
-      v = hsv[2]/100,
-      k = (2-s)*v;
-
-    return [
-      h,
-      Math.round(s*v / (k<1 ? k : 2-k) * 10000) / 100,
-      k/2 * 100
-    ];
-  }
-
-  function stringToInteger (string) {
-    var total = 0;
-    for (var i = 0; i !== string.length; i++) {
-      if (total >= Number.MAX_SAFE_INTEGER) break;
-      total += string.charCodeAt(i);
-    }
-    return total
-  }
-
-  // get The range of given hue when options.count!=0
-  function getRealHueRange(colorHue)
-  { if (!isNaN(colorHue)) {
-    var number = parseInt(colorHue);
-
-    if (number < 360 && number > 0) {
-      return getColorInfo(colorHue).hueRange
-    }
-  }
-    else if (typeof colorHue === 'string') {
-
-      if (colorDictionary[colorHue]) {
-        var color = colorDictionary[colorHue];
-
-        if (color.hueRange) {
-          return color.hueRange
-       }
-    } else if (colorHue.match(/^#?([0-9A-F]{3}|[0-9A-F]{6})$/i)) {
-        var hue = HexToHSB(colorHue)[0];
-        return getColorInfo(hue).hueRange
-    }
-  }
-
-    return [0,360]
-}
-  return randomColor;
-}));
-});
-
 class Layout {
     constructor(node, direct, colors) {
         this.layoutName = 'mindmap';
@@ -2852,10 +2353,8 @@ class Layout {
                 var childPos = child.getPosition();
                 var childBox = Object.assign({}, child.getBox());
                 childBox.height = childBox.height + lineWidth;
-                let _stroke = node.stroke ? node.stroke : (child.stroke ? child.stroke : randomColor());
-                if (!child.stroke) {
-                    child.stroke = _stroke;
-                }
+                let _stroke = node.stroke || child.stroke || me.colors[0] || '#2563EB';
+                child.stroke = _stroke;
                 child._barDom.style.backgroundColor = _stroke;
                 child._barDom.style.borderColor = _stroke;
                 if (level == rootLevel) {
@@ -3000,10 +2499,21 @@ class Layout {
         }
         //Set Node link Color
         this.root.children.forEach((c, i) => {
-            c.stroke = this.colors[i] || randomColor();
+            c.stroke = this.colors[i % this.colors.length] || '#2563EB';
         });
         createLine(root);
     }
+}
+
+var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+function createCommonjsModule(fn) {
+  var module = { exports: {} };
+	return fn(module, module.exports), module.exports;
+}
+
+function commonjsRequire (path) {
+	throw new Error('Could not dynamically require "' + path + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
 }
 
 /*!
@@ -10744,7 +10254,6 @@ class MindMap {
         this.isComposing = false;
         this.isFocused = true;
         this.setting = Object.assign({
-            theme: 'default',
             //canvasSize: 8000,
             canvasSize: 36000,
             fontSize: 16,
@@ -10758,7 +10267,6 @@ class MindMap {
         this.data = data;
         this.appEl = document.createElement('div');
         this.appEl.classList.add('mm-mindmap');
-        this.appEl.classList.add(`mm-theme-${this.setting.theme}`);
         this.appEl.style.overflow = "auto";
         this.contentEL = document.createElement('div');
         this.contentEL.style.position = "relative";
@@ -40088,6 +39596,290 @@ class NodeInsertController {
     }
 }
 
+const DEFAULT_MINDMAP_STYLE_TEMPLATE_ID = 'classic-blue';
+const MINDMAP_STYLE_TEMPLATES = [
+    {
+        id: 'classic-blue',
+        labelKey: 'Classic blue',
+        branchPalette: ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'],
+        canvas: { background: 'var(--background-primary)', color: 'var(--text-normal)' },
+        root: { background: '#2563EB', color: '#FFFFFF', borderColor: '#2563EB', borderRadius: '0.25rem' },
+        primaryNode: { background: '#EFF6FF', color: '#1E3A8A', borderColor: '#93C5FD', borderRadius: '0.25rem' },
+        branch: { lineWidth: 2 },
+    },
+    {
+        id: 'mint-fresh',
+        labelKey: 'Mint fresh',
+        branchPalette: ['#14B8A6', '#22C55E', '#38BDF8', '#A3E635', '#FACC15', '#FB7185'],
+        canvas: { background: '#F7FEFC', color: '#134E4A' },
+        root: { background: '#0F766E', color: '#FFFFFF', borderColor: '#0F766E', borderRadius: '0.5rem' },
+        primaryNode: { background: '#ECFDF5', color: '#065F46', borderColor: '#99F6E4', borderRadius: '0.5rem' },
+        branch: { lineWidth: 2 },
+    },
+    {
+        id: 'coral-energy',
+        labelKey: 'Coral energy',
+        branchPalette: ['#F97316', '#FB7185', '#EAB308', '#EF4444', '#A855F7', '#0EA5E9'],
+        canvas: { background: '#FFF9F5', color: '#431407' },
+        root: { background: '#EA580C', color: '#FFFFFF', borderColor: '#EA580C', borderRadius: '0.5rem' },
+        primaryNode: { background: '#FFF1E8', color: '#9A3412', borderColor: '#FDBA74', borderRadius: '0.5rem' },
+        branch: { lineWidth: 3 },
+    },
+    {
+        id: 'violet-night',
+        labelKey: 'Violet night',
+        branchPalette: ['#818CF8', '#22D3EE', '#34D399', '#FBBF24', '#F472B6', '#A78BFA'],
+        canvas: { background: '#161B2E', color: '#F8FAFC' },
+        root: { background: '#4F46E5', color: '#FFFFFF', borderColor: '#818CF8', borderRadius: '0.5rem' },
+        primaryNode: { background: '#252B47', color: '#E0E7FF', borderColor: '#6366F1', borderRadius: '0.5rem' },
+        branch: { lineWidth: 2 },
+    },
+    {
+        id: 'mono-ink',
+        labelKey: 'Mono ink',
+        branchPalette: ['#2563EB'],
+        canvas: { background: 'var(--background-primary)', color: 'var(--text-normal)' },
+        root: { background: '#111827', color: '#FFFFFF', borderColor: '#111827', borderRadius: '0.25rem' },
+        primaryNode: { background: 'var(--background-primary)', color: 'var(--text-normal)', borderColor: '#1F2937', borderRadius: '0.25rem' },
+        branch: { lineWidth: 2 },
+    },
+    {
+        id: 'forest-notes',
+        labelKey: 'Forest notes',
+        branchPalette: ['#15803D', '#65A30D', '#0F766E', '#CA8A04', '#B45309', '#047857'],
+        canvas: { background: '#FAFDF7', color: '#1C2A1B' },
+        root: { background: '#166534', color: '#FFFFFF', borderColor: '#166534', borderRadius: '0.375rem' },
+        primaryNode: { background: '#F0FDF4', color: '#14532D', borderColor: '#86EFAC', borderRadius: '0.375rem' },
+        branch: { lineWidth: 2 },
+    },
+];
+function isMindMapStyleTemplateId(value) {
+    return typeof value === 'string' && MINDMAP_STYLE_TEMPLATES.some((template) => template.id === value);
+}
+function resolveMindMapStyleTemplate(value) {
+    const template = MINDMAP_STYLE_TEMPLATES.find((item) => item.id === value);
+    return template || getDefaultMindMapStyleTemplate();
+}
+function getDefaultMindMapStyleTemplate() {
+    return MINDMAP_STYLE_TEMPLATES.find((template) => template.id === DEFAULT_MINDMAP_STYLE_TEMPLATE_ID)
+        || MINDMAP_STYLE_TEMPLATES[0];
+}
+function getMindMapStyleBranchPalette(template) {
+    return template.branchPalette.length > 0 ? [...template.branchPalette] : ['#2563EB'];
+}
+function applyMindMapStyleTemplate(mindmap, templateOrId) {
+    let template;
+    if (typeof templateOrId === 'string' || templateOrId == null) {
+        template = resolveMindMapStyleTemplate(templateOrId);
+    }
+    else {
+        template = templateOrId;
+    }
+    applyTemplateCssVariables(mindmap, template);
+    if (!mindmap.root)
+        return template;
+    const colors = getMindMapStyleBranchPalette(template);
+    const needsInitialLayout = !mindmap.mmLayout;
+    mindmap.colors = colors;
+    if (mindmap.mmLayout) {
+        mindmap.mmLayout.colors = colors;
+        mindmap.mmLayout.lineWidth = template.branch.lineWidth;
+    }
+    clearNodeStrokes(mindmap);
+    mindmap.root.children.forEach((node, index) => {
+        setBranchStroke(node, colors[index % colors.length]);
+    });
+    mindmap.refresh();
+    if (needsInitialLayout && mindmap.mmLayout) {
+        mindmap.mmLayout.colors = colors;
+        mindmap.mmLayout.lineWidth = template.branch.lineWidth;
+        mindmap.refresh();
+    }
+    return template;
+}
+function applyTemplateCssVariables(mindmap, template) {
+    const style = mindmap.appEl.style;
+    mindmap.appEl.setAttribute('data-mm-style-template', template.id);
+    style.setProperty('--mm-style-canvas-background', template.canvas.background);
+    style.setProperty('--mm-style-canvas-color', template.canvas.color);
+    style.setProperty('--mm-style-root-background', template.root.background);
+    style.setProperty('--mm-style-root-color', template.root.color);
+    style.setProperty('--mm-style-root-border-color', template.root.borderColor);
+    style.setProperty('--mm-style-root-border-radius', template.root.borderRadius);
+    style.setProperty('--mm-style-primary-background', template.primaryNode.background);
+    style.setProperty('--mm-style-primary-color', template.primaryNode.color);
+    style.setProperty('--mm-style-primary-border-color', template.primaryNode.borderColor);
+    style.setProperty('--mm-style-primary-border-radius', template.primaryNode.borderRadius);
+    style.setProperty('--mm-style-branch-line-width', `${template.branch.lineWidth}px`);
+    mindmap.appEl.style.color = 'var(--mm-style-canvas-color)';
+    mindmap.contentEL.style.background = 'var(--mm-style-canvas-background)';
+}
+function clearNodeStrokes(mindmap) {
+    mindmap.traverseDF((node) => {
+        node.stroke = undefined;
+        node._barDom.style.removeProperty('background-color');
+        node._barDom.style.removeProperty('border-color');
+        node.boundingRect = null;
+        node.refreshBox();
+    });
+}
+function setBranchStroke(node, color) {
+    node.stroke = color;
+    node._barDom.style.backgroundColor = color;
+    node._barDom.style.borderColor = color;
+    node.children.forEach((child) => setBranchStroke(child, color));
+}
+
+class MindMapStyleInspector {
+    constructor(options) {
+        this.previewTemplateId = null;
+        this.inspectorEl = null;
+        this.cards = new Map();
+        this.isSelecting = false;
+        this.parentEl = options.parentEl;
+        this.savedTemplateId = options.currentTemplateId;
+        this.onPreviewTemplate = options.onPreviewTemplate;
+        this.onRestorePreview = options.onRestorePreview;
+        this.onSelectTemplate = options.onSelectTemplate;
+        this.onClose = options.onClose;
+    }
+    open() {
+        if (this.inspectorEl)
+            return;
+        const inspectorEl = this.parentEl.createDiv({
+            cls: 'mm-mindmap-style-inspector',
+            attr: {
+                role: 'complementary',
+                'aria-label': t('Mindmap styles'),
+            },
+        });
+        this.inspectorEl = inspectorEl;
+        const header = inspectorEl.createDiv({ cls: 'mm-mindmap-style-inspector-header' });
+        header.createEl('h3', { text: t('Mindmap styles') });
+        const closeButton = header.createEl('button', {
+            cls: 'clickable-icon mm-mindmap-style-inspector-close',
+            attr: {
+                type: 'button',
+                'aria-label': t('Close mindmap style inspector'),
+            },
+        });
+        obsidian.setIcon(closeButton, 'x');
+        closeButton.addEventListener('click', () => this.onClose());
+        inspectorEl.createEl('p', {
+            text: t('Choose mindmap style'),
+            cls: 'setting-item-description mm-mindmap-style-inspector-description',
+        });
+        const cardsEl = inspectorEl.createDiv({ cls: 'mm-mindmap-style-inspector-cards' });
+        MINDMAP_STYLE_TEMPLATES.forEach((template) => {
+            const card = this.createTemplateCard(cardsEl, template);
+            this.cards.set(template.id, card);
+        });
+        cardsEl.addEventListener('pointerleave', () => this.restorePreview());
+        cardsEl.addEventListener('focusout', (event) => {
+            if (!cardsEl.contains(event.relatedTarget))
+                this.restorePreview();
+        });
+        this.refreshSelection();
+    }
+    destroy() {
+        var _a;
+        this.restorePreview();
+        (_a = this.inspectorEl) === null || _a === void 0 ? void 0 : _a.remove();
+        this.inspectorEl = null;
+        this.cards.clear();
+    }
+    createTemplateCard(parent, template) {
+        const label = t(template.labelKey);
+        const card = parent.createEl('button', {
+            cls: 'mm-mindmap-style-inspector-card',
+            attr: {
+                type: 'button',
+                'aria-label': label,
+            },
+        });
+        const preview = card.createDiv({ cls: 'mm-mindmap-style-inspector-preview' });
+        preview.setAttribute('aria-hidden', 'true');
+        preview.style.background = template.canvas.background;
+        const root = preview.createDiv({ cls: 'mm-mindmap-style-inspector-root' });
+        root.style.background = template.root.background;
+        root.style.borderColor = template.root.borderColor;
+        root.style.borderRadius = template.root.borderRadius;
+        const branches = preview.createDiv({ cls: 'mm-mindmap-style-inspector-branches' });
+        template.branchPalette.slice(0, 3).forEach((color) => {
+            const branch = branches.createDiv({ cls: 'mm-mindmap-style-inspector-branch' });
+            const line = branch.createDiv({ cls: 'mm-mindmap-style-inspector-branch-line' });
+            line.style.background = color;
+            line.style.height = `${template.branch.lineWidth}px`;
+            const node = branch.createDiv({ cls: 'mm-mindmap-style-inspector-node' });
+            node.style.background = template.primaryNode.background;
+            node.style.borderColor = template.primaryNode.borderColor;
+            node.style.borderRadius = template.primaryNode.borderRadius;
+        });
+        const palette = preview.createDiv({ cls: 'mm-mindmap-style-inspector-palette' });
+        template.branchPalette.forEach((color) => {
+            const swatch = palette.createDiv({ cls: 'mm-mindmap-style-inspector-swatch' });
+            swatch.style.background = color;
+        });
+        card.createDiv({
+            text: label,
+            cls: 'mm-mindmap-style-inspector-label',
+        });
+        card.addEventListener('click', () => {
+            void this.selectTemplate(template);
+        });
+        card.addEventListener('pointerenter', () => this.previewTemplate(template));
+        card.addEventListener('focus', () => this.previewTemplate(template));
+        return card;
+    }
+    refreshSelection() {
+        this.cards.forEach((card, templateId) => {
+            const isSelected = templateId === this.savedTemplateId;
+            card.classList.toggle('is-selected', isSelected);
+            card.classList.toggle('is-previewing', templateId === this.previewTemplateId);
+            card.setAttribute('aria-pressed', String(isSelected));
+        });
+    }
+    previewTemplate(template) {
+        if (this.isSelecting || template.id === this.previewTemplateId)
+            return;
+        this.previewTemplateId = template.id;
+        this.onPreviewTemplate(template);
+        this.refreshSelection();
+    }
+    restorePreview() {
+        if (this.previewTemplateId == null)
+            return;
+        this.previewTemplateId = null;
+        this.onRestorePreview();
+        this.refreshSelection();
+    }
+    selectTemplate(template) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.isSelecting)
+                return;
+            this.isSelecting = true;
+            this.cards.forEach((card) => {
+                card.disabled = true;
+            });
+            try {
+                yield this.onSelectTemplate(template);
+                this.savedTemplateId = template.id;
+                this.previewTemplateId = null;
+                this.refreshSelection();
+            }
+            catch (error) {
+                console.error('Unable to apply mind map style template', error);
+            }
+            finally {
+                this.isSelecting = false;
+                this.cards.forEach((card) => {
+                    card.disabled = false;
+                });
+            }
+        });
+    }
+}
+
 var domToImageMore = createCommonjsModule(function (module, exports) {
 (function (global) {
 
@@ -41640,22 +41432,6 @@ class MindMapView extends obsidian.TextFileView {
         var _a;
         return ((_a = this.file) === null || _a === void 0 ? void 0 : _a.basename) || "mindmap";
     }
-    setColors() {
-        var colors = [];
-        try {
-            if (this.plugin.settings.strokeArray) {
-                //colors = this.plugin.settings.strokeArray.split(',')
-                colors = this.plugin.settings.strokeArray;
-            }
-        }
-        catch (err) {
-            console.log(err, 'stroke array is error');
-        }
-        this.colors = this.colors.concat(colors);
-        for (var i = 0; i < 50; i++) {
-            this.colors.push(randomColor());
-        }
-    }
     exportToSvg() {
         if (!this.mindmap) {
             return;
@@ -41862,13 +41638,15 @@ class MindMapView extends obsidian.TextFileView {
     constructor(leaf, plugin) {
         super(leaf);
         this.id = this.leaf.id;
-        this.colors = [];
+        this.currentStyleTemplateId = DEFAULT_MINDMAP_STYLE_TEMPLATE_ID;
+        this.styleInspector = null;
+        this.isStyleInspectorOpen = false;
+        this.isApplyingStyleTemplate = false;
         this.timeOut = null;
         this.firstInit = true;
         this.yamlString = '';
         this.plugin = plugin;
         this.insertController = new NodeInsertController(this.app);
-        this.setColors();
         this.fileCache = {
             'frontmatter': {
                 'mindmap-plugin': 'basic'
@@ -41880,6 +41658,8 @@ class MindMapView extends obsidian.TextFileView {
             // Remove draggables from render, as the DOM has already detached
             //this.plugin.removeView(this);
             this.insertController.destroy();
+            this.isStyleInspectorOpen = false;
+            this.destroyStyleInspector();
             if (this.mindmap) {
                 this.mindmap.clear();
                 this.contentEl.innerHTML = '';
@@ -41894,10 +41674,11 @@ class MindMapView extends obsidian.TextFileView {
     }
     setViewData(data) {
         this.insertController.endEdit();
+        this.destroyStyleInspector();
         if (this.mindmap) {
             this.mindmap.clear();
-            this.contentEl.innerHTML = '';
         }
+        this.contentEl.innerHTML = '';
         this.data = data;
         var mdText = this.getMdText(this.data);
         var mindData = this.mdToData(mdText);
@@ -41912,8 +41693,9 @@ class MindMapView extends obsidian.TextFileView {
         //     }
         //   });
         // }
-        this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings);
-        this.mindmap.colors = this.colors;
+        this.contentEl.addClass('mm-mindmap-view');
+        const mindmapContainerEl = this.contentEl.createDiv({ cls: 'mm-mindmap-canvas' });
+        this.mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
         if (this.firstInit) {
             setTimeout(() => {
                 var leaf = this.leaf;
@@ -41926,8 +41708,10 @@ class MindMapView extends obsidian.TextFileView {
                     }
                 }
                 this.mindmap.view = this;
+                const styleTemplate = this.prepareMindmapStyle();
                 this.mindmap.init();
-                this.mindmap.refresh();
+                applyMindMapStyleTemplate(this.mindmap, styleTemplate);
+                this.restoreStyleInspector();
                 this.firstInit = false;
             }, 100);
         }
@@ -41937,14 +41721,18 @@ class MindMapView extends obsidian.TextFileView {
             this.yamlString = this.getFrontMatter();
             this.mindmap.path = view === null || view === void 0 ? void 0 : view.file.path;
             this.mindmap.view = this;
+            const styleTemplate = this.prepareMindmapStyle();
             this.mindmap.init();
-            this.mindmap.refresh();
+            applyMindMapStyleTemplate(this.mindmap, styleTemplate);
+            this.restoreStyleInspector();
         }
     }
     onunload() {
         this.app.workspace.offref("quick-preview");
         this.app.workspace.offref("resize");
         this.insertController.destroy();
+        this.isStyleInspectorOpen = false;
+        this.destroyStyleInspector();
         if (this.mindmap) {
             this.mindmap.clear();
             this.contentEl.innerHTML = '';
@@ -41954,15 +41742,119 @@ class MindMapView extends obsidian.TextFileView {
     }
     onload() {
         super.onload();
+        this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
         this.registerEvent(this.app.workspace.on("quick-preview", () => this.onQuickPreview, this));
         //    this.registerEvent(
         //      this.app.workspace.on('resize', () => this.updateMindMap(), this)
         //    );
     }
+    prepareMindmapStyle() {
+        const template = resolveMindMapStyleTemplate(this.getCurrentStyleTemplateId());
+        this.currentStyleTemplateId = template.id;
+        if (this.mindmap) {
+            this.mindmap.colors = template.branchPalette;
+        }
+        return template;
+    }
+    getCurrentStyleTemplateId() {
+        var _a, _b;
+        const storedStyleTemplate = this.getStyleTemplateIdFromData(this.data)
+            || ((_b = (_a = this.fileCache) === null || _a === void 0 ? void 0 : _a.frontmatter) === null || _b === void 0 ? void 0 : _b[mindmapStyleTemplateFrontMatterKey]);
+        if (isMindMapStyleTemplateId(storedStyleTemplate))
+            return storedStyleTemplate;
+        return resolveMindMapStyleTemplate(this.plugin.settings.defaultStyleTemplate).id;
+    }
+    getStyleTemplateIdFromData(data) {
+        var _a;
+        const frontMatter = (_a = /^---\r?\n([\s\S]*?)\r?\n---/.exec(data)) === null || _a === void 0 ? void 0 : _a[1];
+        if (!frontMatter)
+            return undefined;
+        const match = /^mindmap-style-template:\s*(?:["']([^"']+)["']|([^\s#]+))\s*$/m.exec(frontMatter);
+        return (match === null || match === void 0 ? void 0 : match[1]) || (match === null || match === void 0 ? void 0 : match[2]);
+    }
+    toggleStyleInspector() {
+        if (!this.mindmap)
+            return;
+        if (this.styleInspector) {
+            this.isStyleInspectorOpen = false;
+            this.destroyStyleInspector();
+            return;
+        }
+        this.isStyleInspectorOpen = true;
+        this.restoreStyleInspector();
+    }
+    restoreStyleInspector() {
+        if (!this.isStyleInspectorOpen || !this.mindmap || this.styleInspector)
+            return;
+        this.styleInspector = new MindMapStyleInspector({
+            parentEl: this.contentEl,
+            currentTemplateId: this.currentStyleTemplateId,
+            onPreviewTemplate: (styleTemplate) => this.previewStyleTemplate(styleTemplate.id),
+            onRestorePreview: () => this.previewStyleTemplate(this.currentStyleTemplateId),
+            onSelectTemplate: (styleTemplate) => this.applyStyleTemplate(styleTemplate.id),
+            onClose: () => {
+                this.isStyleInspectorOpen = false;
+                this.destroyStyleInspector();
+            },
+        });
+        this.styleInspector.open();
+    }
+    destroyStyleInspector() {
+        var _a;
+        (_a = this.styleInspector) === null || _a === void 0 ? void 0 : _a.destroy();
+        this.styleInspector = null;
+    }
+    previewStyleTemplate(styleTemplateId) {
+        if (!this.mindmap)
+            return;
+        applyMindMapStyleTemplate(this.mindmap, styleTemplateId);
+    }
+    applyStyleTemplate(styleTemplateId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const mindmap = this.mindmap;
+            if (!mindmap)
+                return;
+            const previousStyleTemplateId = this.currentStyleTemplateId;
+            const styleTemplate = applyMindMapStyleTemplate(mindmap, styleTemplateId);
+            const file = this.file;
+            if (!file) {
+                applyMindMapStyleTemplate(mindmap, previousStyleTemplateId);
+                throw new Error('Mindmap file is unavailable');
+            }
+            this.isApplyingStyleTemplate = true;
+            try {
+                yield this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+                    frontmatter[mindmapStyleTemplateFrontMatterKey] = styleTemplate.id;
+                });
+                if (this.file !== file)
+                    return;
+                this.currentStyleTemplateId = styleTemplate.id;
+                this.fileCache = this.app.metadataCache.getFileCache(file);
+                this.data = yield this.app.vault.read(file);
+                this.yamlString = this.getFrontMatterFromData(this.data);
+            }
+            catch (error) {
+                if (this.mindmap === mindmap) {
+                    applyMindMapStyleTemplate(mindmap, previousStyleTemplateId);
+                }
+                throw error;
+            }
+            finally {
+                this.isApplyingStyleTemplate = false;
+            }
+        });
+    }
+    getFrontMatterFromData(data) {
+        var _a;
+        const frontMatter = (_a = /^---\r?\n[\s\S]*?\r?\n---/.exec(data)) === null || _a === void 0 ? void 0 : _a[0];
+        return frontMatter ? `${frontMatter}\n\n` : '';
+    }
     onQuickPreview(file, data) {
+        if (file === this.file && this.isApplyingStyleTemplate)
+            return;
         if (file === this.file && data !== this.data) {
-            this.setViewData(data);
             this.fileCache = this.app.metadataCache.getFileCache(file);
+            this.setViewData(data);
         }
     }
     updateMindMap() {
@@ -42148,6 +42040,20 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         });
         new obsidian.Setting(containerEl)
+            .setName(`${t('Default mindmap style')}`)
+            .setDesc(`${t('Default mindmap style desc')}`)
+            .addDropdown(dropDown => {
+            MINDMAP_STYLE_TEMPLATES.forEach((styleTemplate) => {
+                dropDown.addOption(styleTemplate.id, t(styleTemplate.labelKey));
+            });
+            dropDown
+                .setValue(resolveMindMapStyleTemplate(this.plugin.settings.defaultStyleTemplate).id)
+                .onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                this.plugin.settings.defaultStyleTemplate = resolveMindMapStyleTemplate(value).id;
+                yield this.plugin.saveSettings();
+            }));
+        });
+        new obsidian.Setting(containerEl)
             .setName(`${t('Mind map layout direct')}`)
             .setDesc(`${t('Mind map layout direct desc')}`)
             .addDropdown(dropDown => dropDown
@@ -42166,34 +42072,6 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                 v.mindmap.refresh();
             });
         }));
-        new obsidian.Setting(containerEl)
-            .setName(`${t('Stroke Array')}`)
-            .setDesc(`${t('Stroke Array Desc')}`)
-            .addText(text => {
-            var _a;
-            return text
-                .setValue(((_a = this.plugin.settings.strokeArray) === null || _a === void 0 ? void 0 : _a.toString()) || '')
-                .setPlaceholder('Example: red,orange,blue ...')
-                .onChange((value) => {
-                //this.plugin.settings.strokeArray = value
-                this.plugin.settings.strokeArray = value.split(',');
-                this.plugin.saveData(this.plugin.settings);
-                const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
-                mindmapLeaves.forEach((leaf) => {
-                    var v = leaf.view;
-                    //v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray.split(',');
-                    v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray;
-                    if (v.mindmap.mmLayout) {
-                        v.mindmap.mmLayout.colors = v.mindmap.setting.strokeArray;
-                    }
-                    v.mindmap.traverseBF((n) => {
-                        n.boundingRect = null;
-                        n.refreshBox();
-                    });
-                    v.mindmap.refresh();
-                });
-            });
-        });
         new obsidian.Setting(containerEl)
             .setName('Display moved on current node')
             .setDesc('If enabled, the mindmap view is centered on the current node when moving it')
@@ -43199,7 +43077,8 @@ class MindMapPlugin extends obsidian.Plugin {
             try {
                 // @ts-ignore
                 const mindmap = yield this.app.fileManager.createNewMarkdownFile(targetFolder, `${t('Untitled mindmap')}`);
-                yield this.app.vault.modify(mindmap, basicFrontmatter);
+                const styleTemplate = resolveMindMapStyleTemplate(this.settings.defaultStyleTemplate).id;
+                yield this.app.vault.modify(mindmap, createMindmapFrontmatter(styleTemplate));
                 setTimeout(() => __awaiter(this, void 0, void 0, function* () {
                     yield this.app.workspace.getLeaf().setViewState({
                         type: mindmapViewType,
@@ -43221,6 +43100,7 @@ class MindMapPlugin extends obsidian.Plugin {
                 background: 'transparent',
                 layout: 'mindmap',
                 layoutDirect: 'mindmap',
+                defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
                 showLinkTitle: false
             }, yield this.loadData());
         });

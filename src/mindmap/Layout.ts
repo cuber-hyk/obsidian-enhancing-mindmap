@@ -1,6 +1,5 @@
 import Node from './INode'
 import MindMap from './mindmap';
-import randomColor  from 'randomcolor';
 
 export default class Layout {
     layoutName='mindmap';
@@ -428,11 +427,9 @@ export default class Layout {
 
 				childBox.height = childBox.height + lineWidth;
 
-				let _stroke =  node.stroke?node.stroke:(child.stroke?child.stroke:randomColor());
+                let _stroke = node.stroke || child.stroke || me.colors[0] || '#2563EB';
 
-                if(!child.stroke){
-                    child.stroke = _stroke;
-                }
+                child.stroke = _stroke;
 
                 child._barDom.style.backgroundColor = _stroke;
                 child._barDom.style.borderColor = _stroke;
@@ -592,7 +589,7 @@ export default class Layout {
 
         //Set Node link Color
         this.root.children.forEach((c:Node,i:number)=>{
-            c.stroke=this.colors[i]||randomColor();
+            c.stroke=this.colors[i % this.colors.length] || '#2563EB';
         });
 
 		createLine(root);

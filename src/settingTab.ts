@@ -7,6 +7,7 @@ import MindMap from './main';
 import { t } from './lang/helpers'
 import { MindMapView, mindmapViewType } from './MindMapView';
 import MyNode from './mindmap/INode';
+import { MINDMAP_STYLE_TEMPLATES, resolveMindMapStyleTemplate } from './mindmap/style/MindMapStyle';
 
 export class MindMapSettingsTab extends PluginSettingTab {
     plugin: MindMap;
@@ -118,6 +119,21 @@ export class MindMapSettingsTab extends PluginSettingTab {
                     }));
 
         new Setting(containerEl)
+            .setName(`${t('Default mindmap style')}`)
+            .setDesc(`${t('Default mindmap style desc')}`)
+            .addDropdown(dropDown => {
+                MINDMAP_STYLE_TEMPLATES.forEach((styleTemplate) => {
+                    dropDown.addOption(styleTemplate.id, t(styleTemplate.labelKey));
+                });
+                dropDown
+                    .setValue(resolveMindMapStyleTemplate(this.plugin.settings.defaultStyleTemplate).id)
+                    .onChange(async (value: string) => {
+                        this.plugin.settings.defaultStyleTemplate = resolveMindMapStyleTemplate(value).id;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
             .setName(`${t('Mind map layout direct')}`)
             .setDesc(`${t('Mind map layout direct desc')}`)
             .addDropdown(dropDown =>
@@ -134,35 +150,6 @@ export class MindMapSettingsTab extends PluginSettingTab {
                         mindmapLeaves.forEach((leaf) => {
                             var v = leaf.view as MindMapView;
                             v.mindmap.setting.layoutDirect = this.plugin.settings.layoutDirect;
-                            v.mindmap.refresh();
-                        });
-                    }));
-
-        new Setting(containerEl)
-            .setName(`${t('Stroke Array')}`)
-            .setDesc(`${t('Stroke Array Desc')}`)
-            .addText(text =>
-                text
-                    .setValue(this.plugin.settings.strokeArray?.toString() || '')
-                    .setPlaceholder('Example: red,orange,blue ...')
-                    .onChange((value: string) => {
-                        //this.plugin.settings.strokeArray = value
-                        this.plugin.settings.strokeArray = value.split(',');
-                        this.plugin.saveData(this.plugin.settings);
-                        const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
-
-                        mindmapLeaves.forEach((leaf) => {
-                            var v = leaf.view as MindMapView;
-                            //v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray.split(',');
-                            v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray;
-                            if( v.mindmap.mmLayout){
-                                v.mindmap.mmLayout.colors=v.mindmap.setting.strokeArray;
-                            }
-
-                            v.mindmap.traverseBF((n: MyNode) => {
-                                n.boundingRect = null;
-                                n.refreshBox();
-                            })
                             v.mindmap.refresh();
                         });
                     }));

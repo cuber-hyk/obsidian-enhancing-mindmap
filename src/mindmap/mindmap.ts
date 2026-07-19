@@ -3,7 +3,7 @@ import Layout from './Layout'
 import { Notice, Platform } from 'obsidian'
 import SVG from 'svg.js'
 import { MindMapView } from '../MindMapView'
-import { frontMatterKey, basicFrontmatter } from '../constants';
+import { frontMatterKey } from '../constants';
 import Exec from './Execute'
 import {uuid} from '../MindMapView'
 
@@ -19,7 +19,6 @@ import MindMapNavigatorController from './navigation/MindMapNavigatorController'
 let tempDispLevel = 0;
 
 interface Setting {
-    theme?: string;
     canvasSize?: number;
     background?: string;
     fontSize?: number;
@@ -27,7 +26,6 @@ interface Setting {
     exportMdModel?: string,
     headLevel: number,
     layoutDirect: string,
-    strokeArray?:any[],
     focusOnMove?: boolean,
     showLinkTitle?: boolean
 }
@@ -78,7 +76,6 @@ export default class MindMap {
 
     constructor(data: INodeData, containerEL: HTMLElement, setting?: Setting) {
         this.setting = Object.assign({
-            theme: 'default',
             //canvasSize: 8000,
             canvasSize: 36000,
             fontSize: 16,
@@ -95,7 +92,6 @@ export default class MindMap {
         this.appEl = document.createElement('div');
 
         this.appEl.classList.add('mm-mindmap');
-        this.appEl.classList.add(`mm-theme-${this.setting.theme}`);
         this.appEl.style.overflow = "auto";
 
 
