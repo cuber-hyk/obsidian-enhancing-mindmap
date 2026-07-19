@@ -1,7 +1,7 @@
 ---
 artifact_type: design_system
 status: current
-updated: 2026-07-14
+updated: 2026-07-19
 token_source: design-tokens.json
 ---
 
@@ -29,7 +29,7 @@ token_source: design-tokens.json
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
-- 脑图样式检查器：`src/mindmap/style/`、`src/MindMapView.ts`、`styles.css`
+- 脑图样式与快捷键检查器：`src/mindmap/style/`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/MindMapView.ts`、`styles.css`
 - 已确认视觉示例：`docs/assets/node-insert-toolbar-concept.png`
 
 ## 设计原则
@@ -64,6 +64,7 @@ token_source: design-tokens.json
 - 右下角导航控件提供小视图、视口框、缩放滑动条、加减按钮、百分比显示、可见/总节点数、隐藏/恢复按钮和 hover 四角拖拽缩放点；控件属于画布级 UI，不属于节点编辑工具栏。
 - 脑图视图的样式模板入口使用标题栏调色板操作；该操作切换当前脑图视图内的右侧样式检查器，不创建 Obsidian 全局侧栏。
 - 样式检查器使用单列模板卡片，卡片以自然内容高度完整展示可换行的模板名称、根节点、分支线和调色板缩略效果；模板的具体色值由集中模板目录维护，不散落在 CSS 规则中。
+- 脑图标题栏的键盘操作打开当前视图内的右侧快捷键检查器；快捷键与样式检查器共用同一右侧空间，显式切换入口时只保留目标检查器。常规桌面宽度下快捷键检查器为约 280px 的稳定侧栏，避免动作名称和键帽在画布可用时被压缩截断。
 - 优先使用 Obsidian 提供的图标、弹窗和搜索选择器。
 
 ## 交互模式
@@ -77,7 +78,8 @@ token_source: design-tokens.json
 - 单击链接图标执行跳转；右键菜单提供编辑和删除，悬停与右键不得改变当前节点选择。
 - 编辑或删除链接只影响目标链接，并通过节点文本命令历史支持撤销和重做。
 - 链接图标不参与节点正文宽度计算，避免改变分支线位置。
-- 节点新增和删除只使用画布键盘状态机：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点，`Enter` 结束编辑或新增同级，根节点使用 `Enter` 新增一级子节点，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 新增子节点。
+- 节点新增和删除只使用画布键盘状态机：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点，`Enter` 默认在下方新增同级，`Shift+Enter` 默认在上方新增同级；根节点的下方新增快捷键仍新增一级子节点，上方新增不执行操作。编辑态 `Enter` 结束编辑，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 新增子节点。
+- 快捷键检查器仅允许修改新增上方/下方同级节点的全局绑定；这两项以纵向录制卡展示完整动作名和全宽键帽，恢复默认作为区块级低强调操作。固定节点操作使用轻量只读列表与键帽，不与可编辑项竞争视觉权重。录制须拒绝固定节点操作或两个可配置操作之间的冲突，保存后立即作用于所有已打开脑图。
 - 编辑态图片显示为可选中的图片控件，不显示原始图片 Markdown；点击图片选中，拖拽手柄调整宽度，`Backspace` 或 `Delete` 删除选中图片。
 - 编辑态双击图片打开只读大图预览；双击不得冒泡为节点编辑手势，关闭预览后仅在原编辑会话仍有效时恢复图片焦点。预览不修改节点 Markdown、图片宽度或撤销历史。
 - 节点只保存 Markdown 源文本，渲染后的 HTML 不得成为第二数据源。
@@ -107,6 +109,7 @@ token_source: design-tokens.json
 ## 可访问性
 
 - 每个工具栏操作必须提供可访问名称和可见提示。
+- 快捷键检查器的打开、关闭、录制和恢复默认控件必须可键盘聚焦；录制状态和冲突提示必须被辅助技术识别。
 - 链接图标必须可聚焦并提供链接标题作为可访问名称；上下文菜单使用宿主键盘导航。
 - 图片预览 Modal 必须提供可访问标题和图片替代文本，关闭后将焦点恢复到仍有效的原编辑图片。
 - 导航控件的缩放按钮和滑动条必须提供可访问名称，百分比文本必须反映当前缩放状态，节点数统计必须反映当前可见节点数与总节点数。

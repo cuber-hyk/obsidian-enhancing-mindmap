@@ -143,6 +143,25 @@ var en = {
     "Mindmap styles": "Mindmap styles",
     "Choose mindmap style": "Choose mindmap style",
     "Close mindmap style inspector": "Close mindmap style inspector",
+    "Mindmap shortcuts": "Mindmap shortcuts",
+    "Manage mindmap shortcuts": "Manage mindmap shortcuts",
+    "Close mindmap shortcut inspector": "Close mindmap shortcut inspector",
+    "Mindmap shortcuts description": "Applies to all mindmaps",
+    "Custom shortcuts": "Custom shortcuts",
+    "Other node shortcuts": "Other node shortcuts",
+    "Add sibling below": "Add sibling below",
+    "Add sibling above": "Add sibling above",
+    "Add child node": "Add child node",
+    "Enter edit mode": "Enter edit mode",
+    "Delete selected node": "Delete selected node",
+    "Finish editing": "Finish editing",
+    "Insert line break": "Insert line break",
+    "Press a shortcut": "Press a shortcut",
+    "Reset shortcut defaults": "Reset defaults",
+    "Shortcut must include a non-modifier key": "Shortcut must include a non-modifier key",
+    "Shortcut conflicts with a fixed mindmap action": "Shortcut conflicts with a fixed mindmap action",
+    "Shortcut is already assigned": "Shortcut is already assigned",
+    "Shortcut settings could not be saved": "Shortcut settings could not be saved",
     "Classic blue": "Classic blue",
     "Mint fresh": "Mint fresh",
     "Coral energy": "Coral energy",
@@ -391,6 +410,24 @@ var zhCN = {
     "Mindmap styles": "思维导图样式",
     "Choose mindmap style": "选择思维导图样式",
     "Close mindmap style inspector": "关闭思维导图样式面板",
+    "Mindmap shortcuts": "思维导图快捷键",
+    "Manage mindmap shortcuts": "管理思维导图快捷键",
+    "Close mindmap shortcut inspector": "关闭思维导图快捷键面板",
+    "Mindmap shortcuts description": "适用于全部思维导图",
+    "Custom shortcuts": "可自定义快捷键",
+    "Other node shortcuts": "其他节点快捷键",
+    "Add sibling below": "在下方新增同级节点",
+    "Add sibling above": "在上方新增同级节点",
+    "Enter edit mode": "进入编辑",
+    "Delete selected node": "删除选中节点",
+    "Finish editing": "完成编辑",
+    "Insert line break": "插入换行",
+    "Press a shortcut": "请按下快捷键",
+    "Reset shortcut defaults": "恢复默认值",
+    "Shortcut must include a non-modifier key": "快捷键必须包含非修饰键",
+    "Shortcut conflicts with a fixed mindmap action": "快捷键与固定节点操作冲突",
+    "Shortcut is already assigned": "快捷键已分配给另一项操作",
+    "Shortcut settings could not be saved": "快捷键设置无法保存",
     "Classic blue": "经典蓝",
     "Mint fresh": "薄荷清新",
     "Coral energy": "珊瑚活力",
@@ -9138,6 +9175,137 @@ class NodeClipboardController {
     }
 }
 
+const DEFAULT_NODE_KEYBOARD_SHORTCUTS = {
+    addSiblingAfter: {
+        key: 'Enter',
+        shiftKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+    },
+    addSiblingBefore: {
+        key: 'Enter',
+        shiftKey: true,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+    },
+};
+const modifierKeys = new Set(['Alt', 'Control', 'Meta', 'Shift']);
+const invalidKeys = new Set(['Dead', 'Process', 'Unidentified']);
+function normalizeKey(key) {
+    if (key === ' ')
+        return 'Space';
+    return key.length === 1 ? key.toLowerCase() : key;
+}
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object';
+}
+function isShortcut(value) {
+    return isRecord(value);
+}
+function normalizeShortcut(value, fallback) {
+    if (!isShortcut(value) || typeof value.key !== 'string')
+        return Object.assign({}, fallback);
+    const key = normalizeKey(value.key);
+    if (!key || modifierKeys.has(key) || invalidKeys.has(key))
+        return Object.assign({}, fallback);
+    return {
+        key,
+        shiftKey: Boolean(value.shiftKey),
+        ctrlKey: Boolean(value.ctrlKey),
+        metaKey: Boolean(value.metaKey),
+        altKey: Boolean(value.altKey),
+    };
+}
+function createDefaultNodeKeyboardShortcuts() {
+    return {
+        addSiblingAfter: Object.assign({}, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingAfter),
+        addSiblingBefore: Object.assign({}, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingBefore),
+    };
+}
+function normalizeNodeKeyboardShortcuts(value) {
+    const shortcuts = isRecord(value)
+        ? value
+        : {};
+    return {
+        addSiblingAfter: normalizeShortcut(shortcuts.addSiblingAfter, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingAfter),
+        addSiblingBefore: normalizeShortcut(shortcuts.addSiblingBefore, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingBefore),
+    };
+}
+function shortcutFromKeyboardEvent(event) {
+    const key = normalizeKey(event.key);
+    if (!key || modifierKeys.has(key) || invalidKeys.has(key) || event.isComposing)
+        return null;
+    return {
+        key,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        altKey: event.altKey,
+    };
+}
+function matchesNodeKeyboardShortcut(shortcut, event) {
+    return shortcut.key === normalizeKey(event.key)
+        && shortcut.shiftKey === event.shiftKey
+        && shortcut.ctrlKey === event.ctrlKey
+        && shortcut.metaKey === event.metaKey
+        && shortcut.altKey === event.altKey;
+}
+function formatNodeKeyboardShortcut(shortcut) {
+    const parts = [];
+    if (shortcut.ctrlKey)
+        parts.push('Ctrl');
+    if (shortcut.metaKey)
+        parts.push('Cmd');
+    if (shortcut.altKey)
+        parts.push('Alt');
+    if (shortcut.shiftKey)
+        parts.push('Shift');
+    const keyNames = {
+        Space: 'Space',
+        ArrowDown: '↓',
+        ArrowLeft: '←',
+        ArrowRight: '→',
+        ArrowUp: '↑',
+    };
+    parts.push(keyNames[shortcut.key] || (shortcut.key.length === 1
+        ? shortcut.key.toUpperCase()
+        : shortcut.key));
+    return parts.join(' + ');
+}
+function shortcutsEqual(left, right) {
+    return left.key === right.key
+        && left.shiftKey === right.shiftKey
+        && left.ctrlKey === right.ctrlKey
+        && left.metaKey === right.metaKey
+        && left.altKey === right.altKey;
+}
+function isFixedNodeKeyboardShortcut(shortcut) {
+    if ((shortcut.ctrlKey || shortcut.metaKey) && !shortcut.shiftKey && !shortcut.altKey && shortcut.key === 'z') {
+        return true;
+    }
+    if (shortcut.ctrlKey || shortcut.metaKey || shortcut.altKey)
+        return false;
+    if (!shortcut.shiftKey && ['Backspace', 'Space', 'Tab'].includes(shortcut.key)) {
+        return true;
+    }
+    return false;
+}
+function validateNodeKeyboardShortcut(id, shortcut, shortcuts) {
+    if (!shortcut)
+        return 'Shortcut must include a non-modifier key';
+    if (isFixedNodeKeyboardShortcut(shortcut)) {
+        return 'Shortcut conflicts with a fixed mindmap action';
+    }
+    const otherId = id === 'addSiblingAfter'
+        ? 'addSiblingBefore'
+        : 'addSiblingAfter';
+    if (shortcutsEqual(shortcut, shortcuts[otherId]))
+        return 'Shortcut is already assigned';
+    return null;
+}
+
 class NodeKeyboardController {
     constructor(mindmap) {
         this.mindmap = mindmap;
@@ -9147,32 +9315,31 @@ class NodeKeyboardController {
             return true;
         if (event.defaultPrevented ||
             event.isComposing ||
-            this.mindmap.isComposing ||
-            event.ctrlKey ||
-            event.metaKey ||
-            event.altKey) {
+            this.mindmap.isComposing) {
             return false;
         }
         const node = this.mindmap.selectNode;
         if (!node || !this.isNodeKeyboardTarget(event, node))
             return false;
+        if (!node.data.isEdit && this.handleSiblingShortcut(event, node))
+            return true;
         if (node.data.isEdit &&
             (event.key === 'Backspace' || event.key === 'Delete') &&
             node.deleteEditImageByKeyboard(event.key)) {
             this.consume(event);
             return true;
         }
-        if (event.key === 'Backspace' && !node.data.isEdit && !node.data.isRoot) {
+        if (event.key === 'Backspace' && !node.data.isEdit && !node.data.isRoot && this.hasNoModifiers(event)) {
             this.consume(event);
             node.mindmap.execute('deleteNodeAndChild', { node });
             return true;
         }
-        if (event.key === ' ' && !node.data.isEdit) {
+        if (event.key === ' ' && !node.data.isEdit && this.hasNoModifiers(event)) {
             this.consume(event);
             node.edit();
             return true;
         }
-        if (event.key === 'Tab' && !event.shiftKey) {
+        if (event.key === 'Tab' && this.hasNoModifiers(event)) {
             this.consume(event);
             if (node.data.isEdit)
                 this.finishEdit(node);
@@ -9182,12 +9349,14 @@ class NodeKeyboardController {
         if (event.key !== 'Enter')
             return false;
         if (event.shiftKey) {
-            if (!node.data.isEdit)
+            if (!node.data.isEdit || event.ctrlKey || event.metaKey || event.altKey)
                 return false;
             this.consume(event);
             node.setSelectedText('<br>', '<br>', false, false, false);
             return true;
         }
+        if (!this.hasNoModifiers(event))
+            return false;
         this.consume(event);
         if (node.data.isEdit) {
             this.finishEdit(node);
@@ -9248,6 +9417,36 @@ class NodeKeyboardController {
         });
         if (newNode)
             node.mindmap.moveNode(newNode, node, 'down', false);
+    }
+    addSiblingBefore(node) {
+        const newNode = node.mindmap.execute('addSiblingNode', {
+            parent: node.parent,
+        });
+        if (newNode)
+            node.mindmap.moveNode(newNode, node, 'top', false);
+    }
+    handleSiblingShortcut(event, node) {
+        const shortcuts = normalizeNodeKeyboardShortcuts(this.mindmap.setting.nodeKeyboardShortcuts);
+        if (matchesNodeKeyboardShortcut(shortcuts.addSiblingAfter, event)) {
+            this.consume(event);
+            if (node.data.isRoot || !node.parent) {
+                this.addChild(node);
+            }
+            else {
+                this.addSiblingAfter(node);
+            }
+            return true;
+        }
+        if (matchesNodeKeyboardShortcut(shortcuts.addSiblingBefore, event)) {
+            this.consume(event);
+            if (!node.data.isRoot && node.parent)
+                this.addSiblingBefore(node);
+            return true;
+        }
+        return false;
+    }
+    hasNoModifiers(event) {
+        return !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
     }
     consume(event) {
         event.preventDefault();
@@ -39880,6 +40079,196 @@ class MindMapStyleInspector {
     }
 }
 
+const fixedShortcuts = [
+    {
+        label: 'Enter edit mode',
+        shortcut: { key: 'Space', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Add child node',
+        shortcut: { key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Delete selected node',
+        shortcut: { key: 'Backspace', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Finish editing',
+        shortcut: { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Insert line break',
+        shortcut: { key: 'Enter', shiftKey: true, ctrlKey: false, metaKey: false, altKey: false },
+    },
+];
+class MindMapShortcutInspector {
+    constructor(options) {
+        this.inspectorEl = null;
+        this.contentEl = null;
+        this.recordingShortcutId = null;
+        this.validationError = null;
+        this.isSaving = false;
+        this.parentEl = options.parentEl;
+        this.shortcuts = normalizeNodeKeyboardShortcuts(options.shortcuts);
+        this.onChange = options.onChange;
+        this.onClose = options.onClose;
+    }
+    open() {
+        if (this.inspectorEl)
+            return;
+        const inspectorEl = this.parentEl.createDiv({
+            cls: 'mm-mindmap-shortcut-inspector',
+            attr: {
+                role: 'complementary',
+                'aria-label': t('Mindmap shortcuts'),
+            },
+        });
+        this.inspectorEl = inspectorEl;
+        const header = inspectorEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-header' });
+        header.createEl('h3', { text: t('Mindmap shortcuts') });
+        const closeButton = header.createEl('button', {
+            cls: 'clickable-icon mm-mindmap-shortcut-inspector-close',
+            attr: {
+                type: 'button',
+                'aria-label': t('Close mindmap shortcut inspector'),
+            },
+        });
+        obsidian.setIcon(closeButton, 'x');
+        closeButton.addEventListener('click', () => this.onClose());
+        inspectorEl.createEl('p', {
+            text: t('Mindmap shortcuts description'),
+            cls: 'setting-item-description mm-mindmap-shortcut-inspector-description',
+        });
+        this.contentEl = inspectorEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-content' });
+        this.renderContent();
+    }
+    destroy() {
+        var _a;
+        (_a = this.inspectorEl) === null || _a === void 0 ? void 0 : _a.remove();
+        this.inspectorEl = null;
+        this.contentEl = null;
+        this.recordingShortcutId = null;
+    }
+    renderContent() {
+        const contentEl = this.contentEl;
+        if (!contentEl)
+            return;
+        contentEl.empty();
+        const customSection = contentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section' });
+        const customHeader = customSection.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section-header' });
+        customHeader.createEl('h4', { text: t('Custom shortcuts') });
+        const resetButton = customHeader.createEl('button', {
+            text: t('Reset shortcut defaults'),
+            cls: 'mm-mindmap-shortcut-inspector-reset',
+            attr: { type: 'button' },
+        });
+        resetButton.disabled = this.isSaving;
+        resetButton.addEventListener('click', () => {
+            void this.saveShortcuts(createDefaultNodeKeyboardShortcuts());
+        });
+        this.createEditableShortcutCard(customSection, 'addSiblingAfter', t('Add sibling below'));
+        this.createEditableShortcutCard(customSection, 'addSiblingBefore', t('Add sibling above'));
+        if (this.validationError) {
+            customSection.createDiv({
+                text: t(this.validationError),
+                cls: 'mm-mindmap-shortcut-inspector-error',
+                attr: { role: 'alert' },
+            });
+        }
+        this.createSection(contentEl, t('Other node shortcuts'), (section) => {
+            fixedShortcuts.forEach(({ label, shortcut }) => {
+                this.createFixedShortcutRow(section, t(label), formatNodeKeyboardShortcut(shortcut));
+            });
+        });
+        if (this.recordingShortcutId) {
+            const button = contentEl.querySelector(`[data-shortcut-id="${this.recordingShortcutId}"]`);
+            button === null || button === void 0 ? void 0 : button.focus();
+        }
+    }
+    createSection(parentEl, title, content) {
+        const section = parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section' });
+        section.createEl('h4', { text: title });
+        content(section);
+    }
+    createEditableShortcutCard(parentEl, id, label) {
+        const card = parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-card' });
+        card.createDiv({ text: label, cls: 'mm-mindmap-shortcut-inspector-card-label' });
+        const isRecording = this.recordingShortcutId === id;
+        const button = card.createEl('button', {
+            text: isRecording ? t('Press a shortcut') : formatNodeKeyboardShortcut(this.shortcuts[id]),
+            cls: 'mm-mindmap-shortcut-inspector-binding mm-mindmap-shortcut-inspector-card-binding',
+            attr: {
+                type: 'button',
+                'data-shortcut-id': id,
+                'aria-label': isRecording ? t('Press a shortcut') : `${label}: ${formatNodeKeyboardShortcut(this.shortcuts[id])}`,
+            },
+        });
+        button.classList.toggle('is-recording', isRecording);
+        button.disabled = this.isSaving;
+        button.addEventListener('click', () => this.startRecording(id));
+        button.addEventListener('keydown', (event) => {
+            if (this.recordingShortcutId !== id)
+                return;
+            void this.recordShortcut(id, event);
+        });
+    }
+    createFixedShortcutRow(parentEl, label, shortcut) {
+        const row = parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-row is-fixed' });
+        row.createSpan({ text: label, cls: 'mm-mindmap-shortcut-inspector-label' });
+        row.createSpan({ text: shortcut, cls: 'mm-mindmap-shortcut-inspector-fixed-binding' });
+    }
+    startRecording(id) {
+        if (this.isSaving)
+            return;
+        this.recordingShortcutId = id;
+        this.validationError = null;
+        this.renderContent();
+    }
+    recordShortcut(id, event) {
+        return __awaiter(this, void 0, void 0, function* () {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === 'Escape') {
+                this.recordingShortcutId = null;
+                this.validationError = null;
+                this.renderContent();
+                return;
+            }
+            const shortcut = shortcutFromKeyboardEvent(event);
+            const validationError = validateNodeKeyboardShortcut(id, shortcut, this.shortcuts);
+            if (validationError || !shortcut) {
+                this.validationError = validationError || 'Shortcut must include a non-modifier key';
+                this.renderContent();
+                return;
+            }
+            yield this.saveShortcuts(Object.assign(Object.assign({}, this.shortcuts), { [id]: shortcut }));
+        });
+    }
+    saveShortcuts(shortcuts) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.isSaving)
+                return;
+            this.isSaving = true;
+            this.validationError = null;
+            this.renderContent();
+            try {
+                const normalizedShortcuts = normalizeNodeKeyboardShortcuts(shortcuts);
+                yield this.onChange(normalizedShortcuts);
+                this.shortcuts = normalizedShortcuts;
+                this.recordingShortcutId = null;
+            }
+            catch (error) {
+                console.error('Unable to save mindmap shortcuts', error);
+                this.validationError = 'Shortcut settings could not be saved';
+            }
+            finally {
+                this.isSaving = false;
+                this.renderContent();
+            }
+        });
+    }
+}
+
 var domToImageMore = createCommonjsModule(function (module, exports) {
 (function (global) {
 
@@ -41641,6 +42030,8 @@ class MindMapView extends obsidian.TextFileView {
         this.currentStyleTemplateId = DEFAULT_MINDMAP_STYLE_TEMPLATE_ID;
         this.styleInspector = null;
         this.isStyleInspectorOpen = false;
+        this.shortcutInspector = null;
+        this.isShortcutInspectorOpen = false;
         this.isApplyingStyleTemplate = false;
         this.timeOut = null;
         this.firstInit = true;
@@ -41660,6 +42051,8 @@ class MindMapView extends obsidian.TextFileView {
             this.insertController.destroy();
             this.isStyleInspectorOpen = false;
             this.destroyStyleInspector();
+            this.isShortcutInspectorOpen = false;
+            this.destroyShortcutInspector();
             if (this.mindmap) {
                 this.mindmap.clear();
                 this.contentEl.innerHTML = '';
@@ -41675,6 +42068,7 @@ class MindMapView extends obsidian.TextFileView {
     setViewData(data) {
         this.insertController.endEdit();
         this.destroyStyleInspector();
+        this.destroyShortcutInspector();
         if (this.mindmap) {
             this.mindmap.clear();
         }
@@ -41712,6 +42106,7 @@ class MindMapView extends obsidian.TextFileView {
                 this.mindmap.init();
                 applyMindMapStyleTemplate(this.mindmap, styleTemplate);
                 this.restoreStyleInspector();
+                this.restoreShortcutInspector();
                 this.firstInit = false;
             }, 100);
         }
@@ -41725,6 +42120,7 @@ class MindMapView extends obsidian.TextFileView {
             this.mindmap.init();
             applyMindMapStyleTemplate(this.mindmap, styleTemplate);
             this.restoreStyleInspector();
+            this.restoreShortcutInspector();
         }
     }
     onunload() {
@@ -41733,6 +42129,8 @@ class MindMapView extends obsidian.TextFileView {
         this.insertController.destroy();
         this.isStyleInspectorOpen = false;
         this.destroyStyleInspector();
+        this.isShortcutInspectorOpen = false;
+        this.destroyShortcutInspector();
         if (this.mindmap) {
             this.mindmap.clear();
             this.contentEl.innerHTML = '';
@@ -41743,6 +42141,7 @@ class MindMapView extends obsidian.TextFileView {
     onload() {
         super.onload();
         this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
+        this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
         this.registerEvent(this.app.workspace.on("quick-preview", () => this.onQuickPreview, this));
         //    this.registerEvent(
         //      this.app.workspace.on('resize', () => this.updateMindMap(), this)
@@ -41780,6 +42179,8 @@ class MindMapView extends obsidian.TextFileView {
             this.destroyStyleInspector();
             return;
         }
+        this.isShortcutInspectorOpen = false;
+        this.destroyShortcutInspector();
         this.isStyleInspectorOpen = true;
         this.restoreStyleInspector();
     }
@@ -41803,6 +42204,43 @@ class MindMapView extends obsidian.TextFileView {
         var _a;
         (_a = this.styleInspector) === null || _a === void 0 ? void 0 : _a.destroy();
         this.styleInspector = null;
+    }
+    toggleShortcutInspector() {
+        if (!this.mindmap)
+            return;
+        if (this.shortcutInspector) {
+            this.isShortcutInspectorOpen = false;
+            this.destroyShortcutInspector();
+            return;
+        }
+        this.isStyleInspectorOpen = false;
+        this.destroyStyleInspector();
+        this.isShortcutInspectorOpen = true;
+        this.restoreShortcutInspector();
+    }
+    restoreShortcutInspector() {
+        if (!this.isShortcutInspectorOpen || !this.mindmap || this.shortcutInspector)
+            return;
+        this.shortcutInspector = new MindMapShortcutInspector({
+            parentEl: this.contentEl,
+            shortcuts: this.plugin.settings.nodeKeyboardShortcuts,
+            onChange: (shortcuts) => this.updateNodeKeyboardShortcuts(shortcuts),
+            onClose: () => {
+                this.isShortcutInspectorOpen = false;
+                this.destroyShortcutInspector();
+            },
+        });
+        this.shortcutInspector.open();
+    }
+    destroyShortcutInspector() {
+        var _a;
+        (_a = this.shortcutInspector) === null || _a === void 0 ? void 0 : _a.destroy();
+        this.shortcutInspector = null;
+    }
+    updateNodeKeyboardShortcuts(shortcuts) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.plugin.updateNodeKeyboardShortcuts(shortcuts);
+        });
     }
     previewStyleTemplate(styleTemplateId) {
         if (!this.mindmap)
@@ -43101,13 +43539,27 @@ class MindMapPlugin extends obsidian.Plugin {
                 layout: 'mindmap',
                 layoutDirect: 'mindmap',
                 defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
-                showLinkTitle: false
+                showLinkTitle: false,
+                nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts(),
             }, yield this.loadData());
+            this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(this.settings.nodeKeyboardShortcuts);
         });
     }
     saveSettings() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.saveData(this.settings);
+        });
+    }
+    updateNodeKeyboardShortcuts(shortcuts) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const normalizedShortcuts = normalizeNodeKeyboardShortcuts(shortcuts);
+            this.settings.nodeKeyboardShortcuts = normalizedShortcuts;
+            yield this.saveSettings();
+            this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
+                const view = leaf.view;
+                if (view.mindmap)
+                    view.mindmap.setting.nodeKeyboardShortcuts = normalizedShortcuts;
+            });
         });
     }
     setMarkdownView(leaf) {

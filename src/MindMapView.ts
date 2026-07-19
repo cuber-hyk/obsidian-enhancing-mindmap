@@ -24,6 +24,8 @@ import {
   resolveMindMapStyleTemplate,
 } from './mindmap/style/MindMapStyle';
 import MindMapStyleInspector from './mindmap/style/MindMapStyleInspector';
+import MindMapShortcutInspector from './mindmap/interaction/MindMapShortcutInspector';
+import { NodeKeyboardShortcuts } from './mindmap/interaction/NodeKeyboardShortcuts';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
@@ -49,6 +51,8 @@ export class MindMapView extends TextFileView implements HoverParent {
   currentStyleTemplateId: string = DEFAULT_MINDMAP_STYLE_TEMPLATE_ID;
   styleInspector: MindMapStyleInspector | null = null;
   isStyleInspectorOpen: boolean = false;
+  shortcutInspector: MindMapShortcutInspector | null = null;
+  isShortcutInspectorOpen: boolean = false;
   isApplyingStyleTemplate: boolean = false;
   timeOut: any = null;
   fileCache: any;
@@ -331,6 +335,8 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.insertController.destroy();
     this.isStyleInspectorOpen = false;
     this.destroyStyleInspector();
+    this.isShortcutInspectorOpen = false;
+    this.destroyShortcutInspector();
     if (this.mindmap) {
       this.mindmap.clear();
       this.contentEl.innerHTML = '';
@@ -352,6 +358,7 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     this.insertController.endEdit();
     this.destroyStyleInspector();
+    this.destroyShortcutInspector();
     if (this.mindmap) {
       this.mindmap.clear();
     }
@@ -396,6 +403,7 @@ export class MindMapView extends TextFileView implements HoverParent {
         this.mindmap.init();
         applyMindMapStyleTemplate(this.mindmap, styleTemplate);
         this.restoreStyleInspector();
+        this.restoreShortcutInspector();
         this.firstInit = false;
       }, 100);
     } else {
@@ -409,6 +417,7 @@ export class MindMapView extends TextFileView implements HoverParent {
       this.mindmap.init();
       applyMindMapStyleTemplate(this.mindmap, styleTemplate);
       this.restoreStyleInspector();
+      this.restoreShortcutInspector();
     }
   }
 
@@ -418,6 +427,8 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.insertController.destroy();
     this.isStyleInspectorOpen = false;
     this.destroyStyleInspector();
+    this.isShortcutInspectorOpen = false;
+    this.destroyShortcutInspector();
 
     if (this.mindmap) {
       this.mindmap.clear();
@@ -433,6 +444,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   onload() {
     super.onload();
     this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
+    this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
     this.registerEvent(
       this.app.workspace.on("quick-preview", () => this.onQuickPreview, this)
     );
@@ -473,6 +485,8 @@ export class MindMapView extends TextFileView implements HoverParent {
       return;
     }
 
+    this.isShortcutInspectorOpen = false;
+    this.destroyShortcutInspector();
     this.isStyleInspectorOpen = true;
     this.restoreStyleInspector();
   }
@@ -497,6 +511,44 @@ export class MindMapView extends TextFileView implements HoverParent {
   private destroyStyleInspector() {
     this.styleInspector?.destroy();
     this.styleInspector = null;
+  }
+
+  private toggleShortcutInspector() {
+    if (!this.mindmap) return;
+    if (this.shortcutInspector) {
+      this.isShortcutInspectorOpen = false;
+      this.destroyShortcutInspector();
+      return;
+    }
+
+    this.isStyleInspectorOpen = false;
+    this.destroyStyleInspector();
+    this.isShortcutInspectorOpen = true;
+    this.restoreShortcutInspector();
+  }
+
+  private restoreShortcutInspector() {
+    if (!this.isShortcutInspectorOpen || !this.mindmap || this.shortcutInspector) return;
+
+    this.shortcutInspector = new MindMapShortcutInspector({
+      parentEl: this.contentEl,
+      shortcuts: this.plugin.settings.nodeKeyboardShortcuts,
+      onChange: (shortcuts) => this.updateNodeKeyboardShortcuts(shortcuts),
+      onClose: () => {
+        this.isShortcutInspectorOpen = false;
+        this.destroyShortcutInspector();
+      },
+    });
+    this.shortcutInspector.open();
+  }
+
+  private destroyShortcutInspector() {
+    this.shortcutInspector?.destroy();
+    this.shortcutInspector = null;
+  }
+
+  private async updateNodeKeyboardShortcuts(shortcuts: NodeKeyboardShortcuts) {
+    await this.plugin.updateNodeKeyboardShortcuts(shortcuts);
   }
 
   private previewStyleTemplate(styleTemplateId: string) {

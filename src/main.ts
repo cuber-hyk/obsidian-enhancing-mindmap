@@ -15,6 +15,11 @@ import { MindMapView, mindmapViewType } from "./MindMapView";
 import { frontMatterKey, createMindmapFrontmatter } from './constants';
 import { t } from './lang/helpers'
 import { DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, resolveMindMapStyleTemplate } from './mindmap/style/MindMapStyle';
+import {
+  createDefaultNodeKeyboardShortcuts,
+  NodeKeyboardShortcuts,
+  normalizeNodeKeyboardShortcuts,
+} from './mindmap/interaction/NodeKeyboardShortcuts';
 
 
 export default class MindMapPlugin extends Plugin {
@@ -1119,12 +1124,27 @@ export default class MindMapPlugin extends Plugin {
       layout: 'mindmap',
       layoutDirect: 'mindmap',
       defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
-      showLinkTitle: false
+      showLinkTitle: false,
+      nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts(),
     }, await this.loadData());
+    this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(
+      this.settings.nodeKeyboardShortcuts,
+    );
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  async updateNodeKeyboardShortcuts(shortcuts: NodeKeyboardShortcuts) {
+    const normalizedShortcuts = normalizeNodeKeyboardShortcuts(shortcuts);
+    this.settings.nodeKeyboardShortcuts = normalizedShortcuts;
+    await this.saveSettings();
+
+    this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
+      const view = leaf.view as MindMapView;
+      if (view.mindmap) view.mindmap.setting.nodeKeyboardShortcuts = normalizedShortcuts;
+    });
   }
 
   async setMarkdownView(leaf: WorkspaceLeaf) {

@@ -542,7 +542,8 @@
   overflow: auto;
 }
 
-.mm-mindmap-style-inspector {
+.mm-mindmap-style-inspector,
+.mm-mindmap-shortcut-inspector {
   position: relative;
   z-index: 1;
   flex: 0 1 320px;
@@ -560,29 +561,42 @@
   color: var(--text-normal);
 }
 
+.mm-mindmap-shortcut-inspector {
+  flex: 0 0 280px;
+  width: 280px;
+  min-width: 240px;
+}
+
 .mm-mindmap-style-inspector *,
 .mm-mindmap-style-inspector *::before,
-.mm-mindmap-style-inspector *::after {
+.mm-mindmap-style-inspector *::after,
+.mm-mindmap-shortcut-inspector *,
+.mm-mindmap-shortcut-inspector *::before,
+.mm-mindmap-shortcut-inspector *::after {
   box-sizing: border-box;
 }
 
-.mm-mindmap-style-inspector-header {
+.mm-mindmap-style-inspector-header,
+.mm-mindmap-shortcut-inspector-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.mm-mindmap-style-inspector-header h3 {
+.mm-mindmap-style-inspector-header h3,
+.mm-mindmap-shortcut-inspector-header h3 {
   margin: 0;
   font-size: var(--font-ui-medium);
 }
 
-.mm-mindmap-style-inspector-close {
+.mm-mindmap-style-inspector-close,
+.mm-mindmap-shortcut-inspector-close {
   flex: 0 0 auto;
 }
 
-.mm-mindmap-style-inspector-description {
+.mm-mindmap-style-inspector-description,
+.mm-mindmap-shortcut-inspector-description {
   margin: 6px 0 12px;
 }
 
@@ -703,10 +717,154 @@
   overflow-wrap: anywhere;
 }
 
+.mm-mindmap-shortcut-inspector-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.mm-mindmap-shortcut-inspector-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-mindmap-shortcut-inspector-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mm-mindmap-shortcut-inspector-section h4 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+}
+
+.mm-mindmap-shortcut-inspector-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mm-mindmap-shortcut-inspector-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mm-mindmap-shortcut-inspector-binding,
+.mm-mindmap-shortcut-inspector-fixed-binding {
+  flex: 0 0 auto;
+  max-width: none;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-mindmap-shortcut-inspector-binding {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  cursor: pointer;
+}
+
+.mm-mindmap-shortcut-inspector-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+
+.mm-mindmap-shortcut-inspector-card-label {
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.mm-mindmap-shortcut-inspector-card-binding {
+  width: 100%;
+  min-height: 34px;
+  text-align: left;
+}
+
+.mm-mindmap-shortcut-inspector-binding:hover,
+.mm-mindmap-shortcut-inspector-binding:focus-visible,
+.mm-mindmap-shortcut-inspector-binding.is-recording {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.mm-mindmap-shortcut-inspector-binding.is-recording {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.mm-mindmap-shortcut-inspector-row.is-fixed {
+  color: var(--text-muted);
+}
+
+.mm-mindmap-shortcut-inspector-row.is-fixed:last-child {
+  border-bottom: 0;
+}
+
+.mm-mindmap-shortcut-inspector-fixed-binding {
+  padding: 3px 6px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.mm-mindmap-shortcut-inspector-reset {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+}
+
+.mm-mindmap-shortcut-inspector-reset:hover,
+.mm-mindmap-shortcut-inspector-reset:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.mm-mindmap-shortcut-inspector-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+}
+
 @media (max-width: 480px) {
-  .mm-mindmap-style-inspector {
+  .mm-mindmap-style-inspector,
+  .mm-mindmap-shortcut-inspector {
     min-width: 160px;
     padding: 8px;
+  }
+
+  .mm-mindmap-shortcut-inspector {
+    flex-basis: min(280px, calc(100% - 24px));
+    width: min(280px, calc(100% - 24px));
+    min-width: 0;
   }
 }
 

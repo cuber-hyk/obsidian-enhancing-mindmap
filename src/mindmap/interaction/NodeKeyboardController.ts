@@ -1,5 +1,9 @@
 import type Node from '../INode';
 import type MindMap from '../mindmap';
+import {
+  matchesNodeKeyboardShortcut,
+  normalizeNodeKeyboardShortcuts,
+} from './NodeKeyboardShortcuts';
 
 export default class NodeKeyboardController {
   private mindmap: MindMap;
@@ -14,16 +18,15 @@ export default class NodeKeyboardController {
     if (
       event.defaultPrevented ||
       event.isComposing ||
-      this.mindmap.isComposing ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
+      this.mindmap.isComposing
     ) {
       return false;
     }
 
     const node = this.mindmap.selectNode;
     if (!node || !this.isNodeKeyboardTarget(event, node)) return false;
+
+    if (!node.data.isEdit && this.handleSiblingShortcut(event, node)) return true;
 
     if (
       node.data.isEdit &&
@@ -34,19 +37,19 @@ export default class NodeKeyboardController {
       return true;
     }
 
-    if (event.key === 'Backspace' && !node.data.isEdit && !node.data.isRoot) {
+    if (event.key === 'Backspace' && !node.data.isEdit && !node.data.isRoot && this.hasNoModifiers(event)) {
       this.consume(event);
       node.mindmap.execute('deleteNodeAndChild', { node });
       return true;
     }
 
-    if (event.key === ' ' && !node.data.isEdit) {
+    if (event.key === ' ' && !node.data.isEdit && this.hasNoModifiers(event)) {
       this.consume(event);
       node.edit();
       return true;
     }
 
-    if (event.key === 'Tab' && !event.shiftKey) {
+    if (event.key === 'Tab' && this.hasNoModifiers(event)) {
       this.consume(event);
       if (node.data.isEdit) this.finishEdit(node);
       this.addChild(node);
@@ -55,11 +58,13 @@ export default class NodeKeyboardController {
 
     if (event.key !== 'Enter') return false;
     if (event.shiftKey) {
-      if (!node.data.isEdit) return false;
+      if (!node.data.isEdit || event.ctrlKey || event.metaKey || event.altKey) return false;
       this.consume(event);
       node.setSelectedText('<br>', '<br>', false, false, false);
       return true;
     }
+
+    if (!this.hasNoModifiers(event)) return false;
 
     this.consume(event);
     if (node.data.isEdit) {
@@ -129,6 +134,38 @@ export default class NodeKeyboardController {
       parent: node.parent,
     }) as Node;
     if (newNode) node.mindmap.moveNode(newNode, node, 'down', false);
+  }
+
+  private addSiblingBefore(node: Node): void {
+    const newNode = node.mindmap.execute('addSiblingNode', {
+      parent: node.parent,
+    }) as Node;
+    if (newNode) node.mindmap.moveNode(newNode, node, 'top', false);
+  }
+
+  private handleSiblingShortcut(event: KeyboardEvent, node: Node): boolean {
+    const shortcuts = normalizeNodeKeyboardShortcuts(this.mindmap.setting.nodeKeyboardShortcuts);
+    if (matchesNodeKeyboardShortcut(shortcuts.addSiblingAfter, event)) {
+      this.consume(event);
+      if (node.data.isRoot || !node.parent) {
+        this.addChild(node);
+      } else {
+        this.addSiblingAfter(node);
+      }
+      return true;
+    }
+
+    if (matchesNodeKeyboardShortcut(shortcuts.addSiblingBefore, event)) {
+      this.consume(event);
+      if (!node.data.isRoot && node.parent) this.addSiblingBefore(node);
+      return true;
+    }
+
+    return false;
+  }
+
+  private hasNoModifiers(event: KeyboardEvent): boolean {
+    return !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
   }
 
   private consume(event: KeyboardEvent): void {

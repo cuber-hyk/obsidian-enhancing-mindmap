@@ -15,6 +15,7 @@ import NodeKeyboardController from './interaction/NodeKeyboardController'
 import NodeSelectionController from './interaction/NodeSelectionController'
 import NodeLinkController from './link/NodeLinkController'
 import MindMapNavigatorController from './navigation/MindMapNavigatorController'
+import { NodeKeyboardShortcuts } from './interaction/NodeKeyboardShortcuts'
 
 let tempDispLevel = 0;
 
@@ -27,7 +28,8 @@ interface Setting {
     headLevel: number,
     layoutDirect: string,
     focusOnMove?: boolean,
-    showLinkTitle?: boolean
+    showLinkTitle?: boolean,
+    nodeKeyboardShortcuts?: NodeKeyboardShortcuts
 }
 
 export default class MindMap {

@@ -1,3 +1,8 @@
+import {
+    createDefaultNodeKeyboardShortcuts,
+    NodeKeyboardShortcuts,
+} from './mindmap/interaction/NodeKeyboardShortcuts';
+
 export class MindMapSettings {
     canvasSize:number = 8000;
     background:string = 'transparent';
@@ -10,4 +15,5 @@ export class MindMapSettings {
     exportMdModel?:string;
     focusOnMove:boolean;
     showLinkTitle:boolean = false;
+    nodeKeyboardShortcuts: NodeKeyboardShortcuts = createDefaultNodeKeyboardShortcuts();
 }
