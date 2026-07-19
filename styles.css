@@ -324,19 +324,24 @@
   color: var(--text-accent);
 }
 
+.mm-node-content .image-embed,
+.mm-node-image-attachment {
+  display: inline-block;
+  max-width: 100%;
+  margin: 2px 0;
+  line-height: 0;
+  vertical-align: baseline;
+}
+
 .mm-node-content .image-embed img,
 .mm-node-content > img {
+  display: block;
   max-width: 100%;
   height: auto;
 }
 
 .mm-node-image-attachment {
   position: relative;
-  display: inline-block;
-  max-width: 100%;
-  margin: 2px 0;
-  line-height: 0;
-  vertical-align: middle;
 }
 
 .mm-node-image-attachment img {

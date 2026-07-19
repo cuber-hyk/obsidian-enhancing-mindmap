@@ -219,12 +219,12 @@ export default class NodeInsertController {
     this.refreshNode(node);
   }
 
-  private insertVaultFile(
+  private async insertVaultFile(
     node: INode,
     insertion: NodeMarkdownInsertion,
     file: TFile,
     embed: boolean,
-  ): void {
+  ): Promise<void> {
     if (!this.isActiveSession(node, insertion)) return;
 
     const alias = embed ? '' : insertion.getSelectedText().trim();
@@ -236,11 +236,11 @@ export default class NodeInsertController {
     );
     const markdown = embed ? createVaultImageMarkdown(file.path) : link;
     if (embed) {
-      insertion.insert(markdown);
+      await this.insertImage(node, insertion, markdown, () => this.isActiveSession(node, insertion));
     } else {
       insertion.append(markdown);
+      this.refreshNode(node);
     }
-    this.refreshNode(node);
   }
 
   private async importImage(node: INode, insertion: NodeMarkdownInsertion): Promise<void> {
@@ -257,7 +257,7 @@ export default class NodeInsertController {
         new Notice(`${t('Image insertion failed')}: ${attachment.path}`);
         return;
       }
-      this.insertVaultFile(node, insertion, attachment, true);
+      await this.insertVaultFile(node, insertion, attachment, true);
     } catch (error) {
       const message = error instanceof Error && error.message === 'unsupported-image-type'
         ? t('Unsupported image type')
@@ -309,10 +309,13 @@ export default class NodeInsertController {
 
     try {
       const markdown = createVaultImageMarkdown(attachment.path);
-      const imageData = parseNodeImages(markdown)[0];
-      const insertedText = pasteInsertion.insert(markdown);
-      insertedText.replaceWith(node.createEditableImage(imageData));
-      this.refreshNodeLayout(node);
+      const inserted = await this.insertImage(
+        node,
+        pasteInsertion,
+        markdown,
+        () => this.isActiveSession(node, sessionInsertion) && pasteInsertion.hasUsableRange(),
+      );
+      if (!inserted && this.isActiveSession(node, sessionInsertion)) pasteInsertion.restore();
     } catch (error) {
       new Notice(`${t('Image insertion failed')}: ${attachment.path}`);
       if (this.isActiveSession(node, sessionInsertion)) pasteInsertion.restore();
@@ -368,6 +371,22 @@ export default class NodeInsertController {
   private refreshNode(node: INode): void {
     node.refreshEditText();
     this.refreshNodeLayout(node);
+  }
+
+  private async insertImage(
+    node: INode,
+    insertion: NodeMarkdownInsertion,
+    markdown: string,
+    isSessionActive: () => boolean,
+  ): Promise<boolean> {
+    const imageData = parseNodeImages(markdown)[0];
+    if (!imageData) throw new Error('invalid-image-markdown');
+
+    const imageEl = await node.createPreparedEditableImage(imageData);
+    if (!isSessionActive()) return false;
+    insertion.insertNode(imageEl);
+    this.refreshNodeLayout(node);
+    return true;
   }
 
   private refreshNodeLayout(node: INode): void {

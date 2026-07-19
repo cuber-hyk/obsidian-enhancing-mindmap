@@ -916,6 +916,7 @@ class Node$1 {
         this.isSelect = false;
         this._editLinks = [];
         this._editStructureChanged = false;
+        this._renderVersion = 0;
         this._linkCount = 0;
         //isRoot?:boolean;
         this.children = [];
@@ -960,10 +961,21 @@ class Node$1 {
         this.containEl.appendChild(this._barDom);
     }
     parseText() {
-        if (this.data.text.length === 0) {
-            this.data.text = "Sub title";
-        }
-        return obsidian.MarkdownRenderer.renderMarkdown(this.data.text, this.contentEl, this.mindmap.path || "", this.mindmap.view).then(() => {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.data.text.length === 0) {
+                this.data.text = "Sub title";
+            }
+            const text = this.data.text;
+            const renderVersion = ++this._renderVersion;
+            const stagedContent = this.contentEl.ownerDocument.createElement('div');
+            yield obsidian.MarkdownRenderer.renderMarkdown(text, stagedContent, this.mindmap.path || "", this.mindmap.view);
+            if (parseNodeImages(text).length > 0) {
+                yield new Promise((resolve) => setTimeout(resolve, 120));
+            }
+            yield this.stabilizeRenderedImages(stagedContent);
+            if (renderVersion !== this._renderVersion)
+                return;
+            this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
             this.data.mdText = this.contentEl.innerHTML;
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', {});
@@ -1048,49 +1060,82 @@ class Node$1 {
             }
         }));
         //parse image
-        setTimeout(() => {
-            this.contentEl.findAll(".internal-embed").forEach((el) => {
-                var _a;
-                const src = el.getAttribute("src");
-                const target = typeof src === "string" &&
-                    this.mindmap && ((_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.app.metadataCache.getFirstLinkpathDest(src, this.mindmap.path));
-                if (target instanceof obsidian.TFile && target.extension !== "md" && this.mindmap) {
-                    el.innerText = "";
-                    el.createEl("img", { attr: { src: this.mindmap.view.app.vault.getResourcePath(target) } }, (img) => {
-                        if (el.hasAttribute("width"))
-                            img.setAttribute("width", el.getAttribute("width"));
-                        else
-                            img.setAttribute("width", `${DEFAULT_NODE_IMAGE_WIDTH}`);
-                        if (el.hasAttribute("alt"))
-                            img.setAttribute("alt", el.getAttribute("alt"));
-                    });
-                    el.addClasses(["image-embed", "is-loaded"]);
-                }
-            });
-            //Possible causes of delay,code mathjax
-            var dom = this.contentEl.querySelector('code') || this.contentEl.querySelector('.MathJax');
-            if (dom) {
-                setTimeout(() => {
-                    this.clearCacheData();
-                    this.refreshBox();
-                    this.mindmap && this.mindmap.emit('renderEditNode', {});
-                }, 100);
+        this.renderEmbeddedImages();
+        //Possible causes of delay,code mathjax
+        var dom = this.contentEl.querySelector('code') || this.contentEl.querySelector('.MathJax');
+        if (dom) {
+            setTimeout(() => {
+                this.clearCacheData();
+                this.refreshBox();
+                this.mindmap && this.mindmap.emit('renderEditNode', {});
+            }, 100);
+        }
+        //image
+        this.contentEl.querySelectorAll('img').forEach(element => {
+            this.bindRenderedImage(element);
+        });
+    }
+    renderEmbeddedImages(container = this.contentEl) {
+        container.querySelectorAll(".internal-embed").forEach((el) => {
+            var _a;
+            if (el.classList.contains('image-embed'))
+                return;
+            const src = el.getAttribute("src");
+            const target = typeof src === "string" &&
+                this.mindmap && ((_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.app.metadataCache.getFirstLinkpathDest(src, this.mindmap.path));
+            if (target instanceof obsidian.TFile && target.extension !== "md" && this.mindmap) {
+                el.innerText = "";
+                el.createEl("img", { attr: { src: this.mindmap.view.app.vault.getResourcePath(target) } }, (img) => {
+                    if (el.hasAttribute("width"))
+                        img.setAttribute("width", el.getAttribute("width"));
+                    else
+                        img.setAttribute("width", `${DEFAULT_NODE_IMAGE_WIDTH}`);
+                    if (el.hasAttribute("alt"))
+                        img.setAttribute("alt", el.getAttribute("alt"));
+                    this.bindRenderedImage(img);
+                });
+                el.addClasses(["image-embed", "is-loaded"]);
             }
-            //image
-            this.contentEl.querySelectorAll('img').forEach(element => {
-                element.onload = () => {
-                    this.clearCacheData();
-                    this.refreshBox();
-                    this.mindmap && this.mindmap.emit('renderEditNode', {});
-                };
-                element.onerror = () => {
-                    this.clearCacheData();
-                    this.refreshBox();
-                    this.mindmap && this.mindmap.emit('renderEditNode', {});
-                };
-                element.setAttribute('draggble', 'false');
-            });
-        }, 100);
+        });
+        return Array.from(container.querySelectorAll('.image-embed img'));
+    }
+    stabilizeRenderedImages(container) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const images = this.renderEmbeddedImages(container);
+            yield Promise.all(images.map((image) => this.decodeAndReserveImageSpace(image)));
+        });
+    }
+    bindRenderedImage(element) {
+        const refresh = () => {
+            this.clearCacheData();
+            this.refreshBox();
+            this.mindmap && this.mindmap.emit('renderEditNode', {});
+        };
+        element.onload = refresh;
+        element.onerror = refresh;
+        element.setAttribute('draggble', 'false');
+    }
+    decodeAndReserveImageSpace(image) {
+        return __awaiter(this, void 0, void 0, function* () {
+            image.decoding = 'sync';
+            this.reserveImageSpace(image);
+            if (image.naturalWidth > 0)
+                return;
+            try {
+                yield image.decode();
+            }
+            catch (error) {
+                return;
+            }
+            this.reserveImageSpace(image);
+        });
+    }
+    reserveImageSpace(image) {
+        if (image.naturalWidth <= 0 || image.naturalHeight <= 0)
+            return;
+        const width = Number(image.getAttribute('width')) || image.width || DEFAULT_NODE_IMAGE_WIDTH;
+        image.width = width;
+        image.height = Math.round(width * image.naturalHeight / image.naturalWidth);
     }
     decorateNodeLink(link, index, sourceLink) {
         if (link.querySelector('img') || link.closest('.markdown-embed-link')) {
@@ -1420,6 +1465,14 @@ class Node$1 {
         img.draggable = false;
         img.alt = image.alt;
         img.width = Number(wrapper.dataset.imageWidth);
+        img.decoding = 'sync';
+        const refreshLayout = () => {
+            if (this.data.isEdit && this.contentEl.contains(wrapper)) {
+                this.refreshEditingLayout();
+            }
+        };
+        img.onload = refreshLayout;
+        img.onerror = refreshLayout;
         img.src = this.resolveNodeImageSrc(image);
         wrapper.appendChild(img);
         const handle = this.contentEl.ownerDocument.createElement('span');
@@ -1451,6 +1504,16 @@ class Node$1 {
             this.startImageResize(event, wrapper);
         });
         return wrapper;
+    }
+    createPreparedEditableImage(image) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const wrapper = this.createEditableImage(image);
+            const imageEl = wrapper.querySelector('img');
+            if (imageEl instanceof HTMLImageElement) {
+                yield this.decodeAndReserveImageSpace(imageEl);
+            }
+            return wrapper;
+        });
     }
     resolveNodeImageSrc(image) {
         var _a;
@@ -1591,6 +1654,7 @@ class Node$1 {
             const img = imageEl.querySelector('img');
             if (img instanceof HTMLImageElement) {
                 img.width = width;
+                this.reserveImageSpace(img);
             }
             this._editStructureChanged = true;
         };
@@ -1961,7 +2025,6 @@ class Node$1 {
     }
     setText(text) {
         this.data.text = text;
-        this.contentEl.innerHTML = '';
         return this.parseText();
     }
     removeLineBreak() {
@@ -39481,6 +39544,15 @@ class NodeMarkdownInsertion {
         this.restore();
         return textNode;
     }
+    insertNode(node) {
+        const range = this.getUsableRange();
+        range.deleteContents();
+        range.insertNode(node);
+        range.setStartAfter(node);
+        range.collapse(true);
+        this.range = range.cloneRange();
+        this.restore();
+    }
     append(markdown) {
         const range = this.createRangeAtEnd();
         const textNode = this.editorEl.ownerDocument.createTextNode(markdown);
@@ -39668,18 +39740,20 @@ class NodeInsertController {
         this.refreshNode(node);
     }
     insertVaultFile(node, insertion, file, embed) {
-        if (!this.isActiveSession(node, insertion))
-            return;
-        const alias = embed ? '' : insertion.getSelectedText().trim();
-        const link = this.app.fileManager.generateMarkdownLink(file, this.getSourcePath(node), '', alias);
-        const markdown = embed ? createVaultImageMarkdown(file.path) : link;
-        if (embed) {
-            insertion.insert(markdown);
-        }
-        else {
-            insertion.append(markdown);
-        }
-        this.refreshNode(node);
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.isActiveSession(node, insertion))
+                return;
+            const alias = embed ? '' : insertion.getSelectedText().trim();
+            const link = this.app.fileManager.generateMarkdownLink(file, this.getSourcePath(node), '', alias);
+            const markdown = embed ? createVaultImageMarkdown(file.path) : link;
+            if (embed) {
+                yield this.insertImage(node, insertion, markdown, () => this.isActiveSession(node, insertion));
+            }
+            else {
+                insertion.append(markdown);
+                this.refreshNode(node);
+            }
+        });
     }
     importImage(node, insertion) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -39696,7 +39770,7 @@ class NodeInsertController {
                     new obsidian.Notice(`${t('Image insertion failed')}: ${attachment.path}`);
                     return;
                 }
-                this.insertVaultFile(node, insertion, attachment, true);
+                yield this.insertVaultFile(node, insertion, attachment, true);
             }
             catch (error) {
                 const message = error instanceof Error && error.message === 'unsupported-image-type'
@@ -39728,10 +39802,9 @@ class NodeInsertController {
             }
             try {
                 const markdown = createVaultImageMarkdown(attachment.path);
-                const imageData = parseNodeImages(markdown)[0];
-                const insertedText = pasteInsertion.insert(markdown);
-                insertedText.replaceWith(node.createEditableImage(imageData));
-                this.refreshNodeLayout(node);
+                const inserted = yield this.insertImage(node, pasteInsertion, markdown, () => this.isActiveSession(node, sessionInsertion) && pasteInsertion.hasUsableRange());
+                if (!inserted && this.isActiveSession(node, sessionInsertion))
+                    pasteInsertion.restore();
             }
             catch (error) {
                 new obsidian.Notice(`${t('Image insertion failed')}: ${attachment.path}`);
@@ -39786,6 +39859,19 @@ class NodeInsertController {
     refreshNode(node) {
         node.refreshEditText();
         this.refreshNodeLayout(node);
+    }
+    insertImage(node, insertion, markdown, isSessionActive) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const imageData = parseNodeImages(markdown)[0];
+            if (!imageData)
+                throw new Error('invalid-image-markdown');
+            const imageEl = yield node.createPreparedEditableImage(imageData);
+            if (!isSessionActive())
+                return false;
+            insertion.insertNode(imageEl);
+            this.refreshNodeLayout(node);
+            return true;
+        });
     }
     refreshNodeLayout(node) {
         node.clearCacheData();

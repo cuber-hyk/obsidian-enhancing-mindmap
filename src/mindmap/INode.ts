@@ -80,6 +80,7 @@ export default class Node {
     _editLinks:NodeLinkData[]=[];
     _editStructureChanged:boolean=false;
     _selectedEditImageEl?:HTMLElement;
+    _renderVersion:number=0;
     _linkCount:number=0;
     parent?:Node;
     //isRoot?:boolean;
@@ -135,16 +136,30 @@ export default class Node {
         this.containEl.appendChild(this._barDom);
     }
 
-    parseText(): Promise<void>{
+    async parseText(): Promise<void>{
         if (this.data.text.length === 0){
             this.data.text = "Sub title";
         }
-        return MarkdownRenderer.renderMarkdown( this.data.text ,this.contentEl,this.mindmap.path||"",this.mindmap.view).then(()=>{
-            this.data.mdText = this.contentEl.innerHTML;
-            this.refreshBox();
-            this.mindmap&&this.mindmap.emit('initNode',{});
-            this._delay();
-        });
+        const text = this.data.text;
+        const renderVersion = ++this._renderVersion;
+        const stagedContent = this.contentEl.ownerDocument.createElement('div');
+        await MarkdownRenderer.renderMarkdown(
+            text,
+            stagedContent,
+            this.mindmap.path || "",
+            this.mindmap.view,
+        );
+        if (parseNodeImages(text).length > 0) {
+            await new Promise<void>((resolve) => setTimeout(resolve, 120));
+        }
+        await this.stabilizeRenderedImages(stagedContent);
+        if (renderVersion !== this._renderVersion) return;
+
+        this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
+        this.data.mdText = this.contentEl.innerHTML;
+        this.refreshBox();
+        this.mindmap&&this.mindmap.emit('initNode',{});
+        this._delay();
 
     }
 
@@ -228,8 +243,26 @@ export default class Node {
             }
           });
          //parse image
-         setTimeout(()=>{
-             this.contentEl.findAll(".internal-embed").forEach((el) => {
+         this.renderEmbeddedImages();
+
+            //Possible causes of delay,code mathjax
+            var dom =this.contentEl.querySelector('code')|| this.contentEl.querySelector('.MathJax');
+            if(dom){
+                setTimeout(()=>{
+                    this.clearCacheData();
+                    this.refreshBox();
+                    this.mindmap&&this.mindmap.emit('renderEditNode',{});
+                },100);
+            }
+            //image
+            this.contentEl.querySelectorAll('img').forEach(element => {
+                this.bindRenderedImage(element);
+            });
+    }
+
+    renderEmbeddedImages(container: HTMLElement = this.contentEl): HTMLImageElement[] {
+        container.querySelectorAll<HTMLElement>(".internal-embed").forEach((el) => {
+                if (el.classList.contains('image-embed')) return;
                 const src = el.getAttribute("src");
                 const target =
                   typeof src === "string" &&
@@ -246,38 +279,48 @@ export default class Node {
                         img.setAttribute("width", `${DEFAULT_NODE_IMAGE_WIDTH}`);
                       if (el.hasAttribute("alt"))
                         img.setAttribute("alt", el.getAttribute("alt"));
+                      this.bindRenderedImage(img);
                     }
                   );
                   el.addClasses(["image-embed", "is-loaded"]);
                 }
               });
+        return Array.from(container.querySelectorAll<HTMLImageElement>('.image-embed img'));
+    }
 
-            //Possible causes of delay,code mathjax
-            var dom =this.contentEl.querySelector('code')|| this.contentEl.querySelector('.MathJax');
-            if(dom){
-                setTimeout(()=>{
-                    this.clearCacheData();
-                    this.refreshBox();
-                    this.mindmap&&this.mindmap.emit('renderEditNode',{});
-                },100);
-            }
-            //image
-            this.contentEl.querySelectorAll('img').forEach(element => {
-                element.onload = () => {
-                        this.clearCacheData();
-                        this.refreshBox();
-                        this.mindmap&&this.mindmap.emit('renderEditNode',{});
-                }
-                element.onerror = () => {
-                        this.clearCacheData();
-                        this.refreshBox();
-                        this.mindmap&&this.mindmap.emit('renderEditNode',{});
-                }
+    async stabilizeRenderedImages(container: HTMLElement): Promise<void> {
+        const images = this.renderEmbeddedImages(container);
+        await Promise.all(images.map((image) => this.decodeAndReserveImageSpace(image)));
+    }
 
-                element.setAttribute('draggble','false');
-            });
+    bindRenderedImage(element: HTMLImageElement) {
+        const refresh = () => {
+            this.clearCacheData();
+            this.refreshBox();
+            this.mindmap&&this.mindmap.emit('renderEditNode',{});
+        };
+        element.onload = refresh;
+        element.onerror = refresh;
+        element.setAttribute('draggble','false');
+    }
 
-         },100)
+    async decodeAndReserveImageSpace(image: HTMLImageElement): Promise<void> {
+        image.decoding = 'sync';
+        this.reserveImageSpace(image);
+        if (image.naturalWidth > 0) return;
+        try {
+            await image.decode();
+        } catch (error) {
+            return;
+        }
+        this.reserveImageSpace(image);
+    }
+
+    reserveImageSpace(image: HTMLImageElement) {
+        if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
+        const width = Number(image.getAttribute('width')) || image.width || DEFAULT_NODE_IMAGE_WIDTH;
+        image.width = width;
+        image.height = Math.round(width * image.naturalHeight / image.naturalWidth);
     }
 
     decorateNodeLink(link: HTMLAnchorElement, index: number, sourceLink?: NodeLinkData) {
@@ -664,6 +707,14 @@ export default class Node {
         img.draggable = false;
         img.alt = image.alt;
         img.width = Number(wrapper.dataset.imageWidth);
+        img.decoding = 'sync';
+        const refreshLayout = () => {
+            if (this.data.isEdit && this.contentEl.contains(wrapper)) {
+                this.refreshEditingLayout();
+            }
+        };
+        img.onload = refreshLayout;
+        img.onerror = refreshLayout;
         img.src = this.resolveNodeImageSrc(image);
         wrapper.appendChild(img);
 
@@ -700,6 +751,15 @@ export default class Node {
             this.startImageResize(event, wrapper);
         });
 
+        return wrapper;
+    }
+
+    async createPreparedEditableImage(image: NodeImageData): Promise<HTMLElement> {
+        const wrapper = this.createEditableImage(image);
+        const imageEl = wrapper.querySelector('img');
+        if (imageEl instanceof HTMLImageElement) {
+            await this.decodeAndReserveImageSpace(imageEl);
+        }
         return wrapper;
     }
 
@@ -851,6 +911,7 @@ export default class Node {
             const img = imageEl.querySelector('img');
             if (img instanceof HTMLImageElement) {
                 img.width = width;
+                this.reserveImageSpace(img);
             }
             this._editStructureChanged = true;
         };
@@ -1271,7 +1332,6 @@ export default class Node {
 
     setText(text:string): Promise<void> {
         this.data.text = text;
-        this.contentEl.innerHTML='';
         return this.parseText();
     }
 
