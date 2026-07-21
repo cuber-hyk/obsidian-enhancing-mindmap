@@ -1,4 +1,4 @@
-import { Menu, parseLinktext, TFile } from 'obsidian';
+import { Menu, Notice, parseLinktext, TFile } from 'obsidian';
 import { t } from '../../lang/helpers';
 import VaultFileSuggestModal from '../insert/VaultFileSuggestModal';
 import type Node from '../INode';
@@ -51,6 +51,13 @@ export default class NodeLinkController {
     let actionChosen = false;
     const menu = new Menu();
     menu.addItem((item) => item
+      .setTitle(t('Copy link'))
+      .setIcon('copy')
+      .onClick(() => {
+        actionChosen = true;
+        void this.copyLink(context);
+      }));
+    menu.addItem((item) => item
       .setTitle(t('Edit link'))
       .setIcon('pencil')
       .onClick(() => {
@@ -75,6 +82,21 @@ export default class NodeLinkController {
     });
     menu.showAtMouseEvent(event);
     return true;
+  }
+
+  private async copyLink(context: NodeLinkContext): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(context.link.markdown);
+      new Notice(t('Link copied'));
+    } catch (error) {
+      console.error('Failed to copy link', error);
+      new Notice(t('Failed to copy link'));
+    }
+    (
+      context.node.data.isEdit
+        ? context.node.contentEl
+        : context.node.containEl
+    ).focus();
   }
 
   private editLink(context: NodeLinkContext): void {

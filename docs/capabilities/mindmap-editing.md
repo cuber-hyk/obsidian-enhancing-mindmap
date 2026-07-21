@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-07-19
+updated: 2026-07-21
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -26,7 +26,7 @@ adr_reviewed: not_required
 - 外部链接和 Vault 文件链接作为节点附件追加，不替换当前选区或节点正文；链接标题只用于悬停提示和编辑界面。
 - 节点将外部链接和 Vault 链接显示为绝对定位的链接图标；编辑态隐藏原始 Markdown 链接地址，保存时保留链接 Markdown。
 - 链接标题显示由全局设置 `showLinkTitle` 控制，默认关闭；开启后在链接图标右侧显示轻量标题文本，标题为空时回退显示目标。
-- 链接图标单击后按链接类型跳转；右键使用 Obsidian 原生菜单编辑标题/目标或删除链接。删除无需确认，只影响目标链接，并进入节点文本撤销历史。
+- 链接图标单击后按链接类型跳转；右键使用 Obsidian 原生菜单复制链接、编辑标题/目标或删除链接。复制外部链接或 Vault 链接时写入完整 Markdown，使其粘贴到节点编辑态后可恢复为链接图标；复制失败会显示 Notice。删除无需确认，只影响目标链接，并进入节点文本撤销历史。
 - Vault 链接编辑时通过 Vault 文件选择器更换目标；外部链接目标仍限制为 `http` 或 `https`。
 - 节点通过 `.mm-node-has-link` 为链接图标或链接标题预留宽度，布局刷新必须保留该状态类，避免分支和子节点使用旧宽度。
 - 每张脑图的样式模板由 frontmatter `mindmap-style-template` 保存；缺失或未知模板时回退为插件的“新建导图默认样式”。

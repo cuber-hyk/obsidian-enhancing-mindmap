@@ -235,6 +235,9 @@ var en = {
     "Unsupported image type": "Unsupported image type",
     "Image import failed": "Image import failed",
     "Image preview": "Image preview",
+    "Copy link": "Copy link",
+    "Link copied": "Link copied",
+    "Failed to copy link": "Failed to copy link",
     "Edit link": "Edit link",
     "Delete link": "Delete link",
     "Link target": "Link target",
@@ -458,6 +461,9 @@ var zhCN = {
     "Unsupported image type": "不支持的图片类型",
     "Image import failed": "图片导入失败",
     "Image preview": "图片预览",
+    "Copy link": "复制链接",
+    "Link copied": "链接已复制",
+    "Failed to copy link": "复制链接失败",
     "Edit link": "编辑链接",
     "Delete link": "删除链接",
     "Link target": "链接目标",
@@ -469,6 +475,9 @@ var zhCN = {
 var zhTW = {
     "Show link title": "顯示連結標題",
     "Show link title desc": "在連結圖示旁顯示連結標題",
+    "Copy link": "複製連結",
+    "Link copied": "已複製連結",
+    "Failed to copy link": "複製連結失敗",
     "Edit link": "編輯連結",
     "Delete link": "刪除連結",
     "Link target": "連結目標",
@@ -10039,6 +10048,13 @@ class NodeLinkController {
         let actionChosen = false;
         const menu = new obsidian.Menu();
         menu.addItem((item) => item
+            .setTitle(t('Copy link'))
+            .setIcon('copy')
+            .onClick(() => {
+            actionChosen = true;
+            void this.copyLink(context);
+        }));
+        menu.addItem((item) => item
             .setTitle(t('Edit link'))
             .setIcon('pencil')
             .onClick(() => {
@@ -10061,6 +10077,21 @@ class NodeLinkController {
         });
         menu.showAtMouseEvent(event);
         return true;
+    }
+    copyLink(context) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield navigator.clipboard.writeText(context.link.markdown);
+                new obsidian.Notice(t('Link copied'));
+            }
+            catch (error) {
+                console.error('Failed to copy link', error);
+                new obsidian.Notice(t('Failed to copy link'));
+            }
+            (context.node.data.isEdit
+                ? context.node.contentEl
+                : context.node.containEl).focus();
+        });
     }
     editLink(context) {
         const modal = new EditNodeLinkModal(this.mindmap.view.app, context.link.kind, context.link.label, context.link.href, () => this.chooseVaultTarget(), (value) => this.applyEdit(context, value), () => (context.node.data.isEdit
