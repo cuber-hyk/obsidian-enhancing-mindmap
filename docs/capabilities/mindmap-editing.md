@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-07-21
+updated: 2026-07-25
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -17,6 +17,7 @@ adr_reviewed: not_required
 - `INode.data.text` 保存节点 Markdown 源文本。
 - `INode.edit()` 将节点内容切换为 `contentEditable` 编辑状态；节点正文以文本编辑，图片附件以可选中的图片控件编辑。
 - `INode.cancelEdit()` 从 `innerText` 生成 Markdown，通过现有命令历史记录变更；节点文本更新只走 `setText()` 的单一阅读态渲染链路。
+- 节点可包含标题后的标准 Markdown 表格；编辑态保留表格源码，阅读态渲染为原生表格。加载脑图前会保护表格块，使其不会被 Markmap 拆成节点树；保存时恢复为原 Markdown 表格。宽表在节点内容区域横向滚动，不改变分支布局。
 - `NodeKeyboardController` 是单节点键盘新增和删除的入口：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点；编辑态 `Enter` 保存并回到选中态，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 保存并新增子节点；选中态默认 `Enter` 在下方新增同级节点，`Shift+Enter` 在上方新增同级节点，根节点的下方新增快捷键例外为新增一级子节点，上方新增不执行操作，选中态 `Tab` 新增子节点。脑图获得焦点且节点非编辑时，`Ctrl`/`Cmd+Z` 通过同一控制器撤销上一条脑图 History 命令；编辑态与其他视图保留原生文字撤销。
 - 旧节点右侧新增按钮及 `Alt+Shift+Enter`、`Shift+Insert` 新增命令已移除。
 - 删除节点后优先选中同级节点：先选下一个同级节点，没有下一个时选上一个同级节点；没有同级节点时才回退到父节点。
@@ -74,6 +75,7 @@ adr_reviewed: not_required
 - 节点剪贴板状态与快捷键：`src/mindmap/interaction/NodeClipboardController.ts`
 - 节点结构 History 命令：`src/mindmap/Cmds.ts`、`src/mindmap/Execute.ts`
 - 链接解析与交互：`src/mindmap/link/*.ts`
+- 节点表格 Markdown：`src/mindmap/table/NodeTableMarkdown.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
@@ -88,6 +90,7 @@ adr_reviewed: not_required
 - 使用 `npm run build` 验证 TypeScript 与 Rollup 打包。
 - 最低支持 Obsidian 1.5.7；不保留旧版附件路径兼容分支。
 - 交互变更需在测试 Vault 中验证 Markdown/脑图往返、撤销/重做和链接打开行为。
+- 表格变更需在测试 Vault 中验证标题节点与列表节点、列对齐、宽表滚动、编辑保存、Markdown/脑图往返、关闭重开及撤销/重做。
 - 新插入功能不得把渲染 HTML 保存为节点数据。
 - IME 组合输入、弹窗输入和脑图失焦状态不得触发节点新增。
 

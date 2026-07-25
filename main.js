@@ -10551,6 +10551,104 @@ class MindMapNavigatorController {
     }
 }
 
+const TABLE_MARKER_PREFIX = '__MM_NODE_TABLE_';
+const TABLE_MARKER_SUFFIX = '__';
+const COLLAPSED_NODE_ID = /\s\^[a-z0-9-]+$/i;
+function protectMindMapTables(markdown) {
+    const lines = markdown.split(/\r?\n/);
+    const tables = new Map();
+    let inFence = false;
+    for (let index = 0; index < lines.length; index++) {
+        if (/^\s*```/.test(lines[index])) {
+            inFence = !inFence;
+            continue;
+        }
+        if (inFence || !isTableStart(lines, index))
+            continue;
+        const ownerIndex = findTableOwner(lines, index);
+        if (ownerIndex === null)
+            continue;
+        const end = findTableEnd(lines, index);
+        const marker = `${TABLE_MARKER_PREFIX}${tables.size}${TABLE_MARKER_SUFFIX}`;
+        tables.set(marker, removeSharedIndent(lines.slice(index, end)).join('\n').trim());
+        lines[ownerIndex] = appendMarker(lines[ownerIndex], marker);
+        lines.splice(index, end - index);
+        index--;
+    }
+    return { markdown: lines.join('\n'), tables };
+}
+function restoreProtectedMindMapTables(text, tables) {
+    let restored = text;
+    tables.forEach((table, marker) => {
+        restored = restored.replace(new RegExp(`[ \\t]*${escapeRegExp(marker)}[ \\t]*`), `\n\n${table}`);
+    });
+    return restored.trim();
+}
+function getNodeTableMarkdown(markdown) {
+    const lines = markdown.trim().split(/\r?\n/);
+    for (let index = 0; index < lines.length; index++) {
+        if (!isTableStart(lines, index))
+            continue;
+        const end = findTableEnd(lines, index);
+        const title = lines.slice(0, index).join('\n').trim();
+        const trailing = lines.slice(end).join('\n').trim();
+        if (!title || trailing)
+            return null;
+        return {
+            title,
+            markdown: removeSharedIndent(lines.slice(index, end)).join('\n').trim(),
+        };
+    }
+    return null;
+}
+function isTableStart(lines, index) {
+    var _a;
+    return Boolean(((_a = lines[index]) === null || _a === void 0 ? void 0 : _a.includes('|')) &&
+        lines[index + 1] &&
+        isTableDivider(lines[index + 1]));
+}
+function isTableDivider(line) {
+    const cells = trimTableEdges(line.trim()).split('|').map((cell) => cell.trim());
+    return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+function findTableEnd(lines, start) {
+    let end = start + 2;
+    while (end < lines.length && lines[end].trim() && lines[end].includes('|')) {
+        end++;
+    }
+    return end;
+}
+function findTableOwner(lines, tableStart) {
+    for (let index = tableStart - 1; index >= 0; index--) {
+        if (!lines[index].trim())
+            continue;
+        return isNodeLine(lines[index]) ? index : null;
+    }
+    return null;
+}
+function isNodeLine(line) {
+    return /^\s{0,3}#{1,6}\s+/.test(line) || /^\s*(?:[-+*]|\d+[.)])\s+/.test(line);
+}
+function appendMarker(line, marker) {
+    var _a;
+    const collapsedId = ((_a = line.match(COLLAPSED_NODE_ID)) === null || _a === void 0 ? void 0 : _a[0]) || '';
+    const content = collapsedId ? line.slice(0, -collapsedId.length) : line;
+    return `${content} ${marker}${collapsedId}`;
+}
+function removeSharedIndent(lines) {
+    const indents = lines
+        .filter((line) => line.trim())
+        .map((line) => { var _a; return ((_a = line.match(/^\s*/)) === null || _a === void 0 ? void 0 : _a[0].length) || 0; });
+    const indent = indents.length ? Math.min(...indents) : 0;
+    return lines.map((line) => line.slice(indent));
+}
+function trimTableEdges(value) {
+    return value.replace(/^\|/, '').replace(/\|$/, '');
+}
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 let tempDispLevel = 0;
 class MindMap {
     constructor(data, containerEL, setting) {
@@ -12202,18 +12300,32 @@ class MindMap {
                 hPrefix = '\n';
             }
             const ending = n.isExpand ? '' : ` ^${n.getId()}`;
+            const table = getNodeTableMarkdown(n.getData().text);
             if (n.getLevel() < level) {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
                 }
                 md += (hPrefix + ' ');
-                md += n.getData().text.trim() + ending + '\n';
+                if (table) {
+                    md += table.title + ending + '\n\n';
+                    md += table.markdown + '\n';
+                }
+                else {
+                    md += n.getData().text.trim() + ending + '\n';
+                }
             }
             else {
                 for (var i = 0; i < n.getLevel() - level; i++) {
                     space += '\t';
                 }
                 var text = n.getData().text.trim();
+                if (table) {
+                    md += `${space}- ${table.title}${ending}\n`;
+                    table.markdown.split('\n').forEach((line) => {
+                        md += `${space}  ${line}\n`;
+                    });
+                    return;
+                }
                 if (text) {
                     var textArr = text.split('\n');
                     var lineLength = textArr.length;
@@ -42449,6 +42561,7 @@ class MindMapView extends obsidian.TextFileView {
     }
     mdToData(str) {
         var _a;
+        const protectedTables = protectMindMapTables(str);
         function transformData(mapData) {
             var flag = true;
             if (mapData.t == 'blockquote') {
@@ -42459,9 +42572,10 @@ class MindMapView extends obsidian.TextFileView {
             const regexResult = /^.+ \^([a-z0-9\-]+)$/gim.exec(mapData.v);
             const id = regexResult != null ? regexResult[1] : null;
             // console.log(id);
+            const text = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
             var map = {
                 id: id || uuid(),
-                text: id ? mapData.v.replace(` ^${id}`, '') : mapData.v,
+                text: restoreProtectedMindMapTables(text, protectedTables.tables),
                 children: [],
                 expanded: id ? false : true
             };
@@ -42473,7 +42587,7 @@ class MindMapView extends obsidian.TextFileView {
             return map;
         }
         if (str) {
-            const { root } = transformer.transform(str);
+            const { root } = transformer.transform(protectedTables.markdown);
             const data = transformData(root);
             return data;
         }

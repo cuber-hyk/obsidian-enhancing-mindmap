@@ -26,6 +26,10 @@ import {
 import MindMapStyleInspector from './mindmap/style/MindMapStyleInspector';
 import MindMapShortcutInspector from './mindmap/interaction/MindMapShortcutInspector';
 import { NodeKeyboardShortcuts } from './mindmap/interaction/NodeKeyboardShortcuts';
+import {
+  protectMindMapTables,
+  restoreProtectedMindMapTables,
+} from './mindmap/table/NodeTableMarkdown';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
@@ -621,6 +625,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   mdToData(str: string) {
+    const protectedTables = protectMindMapTables(str);
     function transformData(mapData: any) {
       var flag = true;
       if (mapData.t == 'blockquote') {
@@ -633,9 +638,10 @@ export class MindMapView extends TextFileView implements HoverParent {
 
      // console.log(id);
 
+      const text = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
       var map: INodeData = {
         id: id || uuid(),
-        text: id ? mapData.v.replace(` ^${id}`, '') : mapData.v,
+        text: restoreProtectedMindMapTables(text, protectedTables.tables),
         children: [],
         expanded: id ? false:true
       };
@@ -650,7 +656,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     }
 
     if (str) {
-      const { root } = transformer.transform(str);
+      const { root } = transformer.transform(protectedTables.markdown);
       const data = transformData(root);
       return data;
 

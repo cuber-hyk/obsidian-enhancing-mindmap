@@ -16,6 +16,7 @@ import NodeSelectionController from './interaction/NodeSelectionController'
 import NodeLinkController from './link/NodeLinkController'
 import MindMapNavigatorController from './navigation/MindMapNavigatorController'
 import { NodeKeyboardShortcuts } from './interaction/NodeKeyboardShortcuts'
+import { getNodeTableMarkdown } from './table/NodeTableMarkdown'
 
 let tempDispLevel = 0;
 
@@ -2173,18 +2174,31 @@ export default class MindMap {
                 hPrefix = '\n';
             }
             const ending = n.isExpand ? '' : ` ^${n.getId()}`
+            const table = getNodeTableMarkdown(n.getData().text);
             if (n.getLevel() < level) {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
                 }
                 md += (hPrefix + ' ');
-                md += n.getData().text.trim() + ending + '\n';
+                if (table) {
+                    md += table.title + ending + '\n\n';
+                    md += table.markdown + '\n';
+                } else {
+                    md += n.getData().text.trim() + ending + '\n';
+                }
 
             } else {
                 for (var i = 0; i < n.getLevel() - level; i++) {
                     space += '\t';
                 }
                 var text = n.getData().text.trim();
+                if (table) {
+                    md += `${space}- ${table.title}${ending}\n`;
+                    table.markdown.split('\n').forEach((line: string) => {
+                        md += `${space}  ${line}\n`;
+                    });
+                    return;
+                }
                 if (text) {
                     var textArr = text.split('\n');
                     var lineLength = textArr.length;
