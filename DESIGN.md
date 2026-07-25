@@ -27,7 +27,7 @@ token_source: design-tokens.json
 - 节点键盘交互：`src/mindmap/interaction/NodeKeyboardController.ts`
 - 链接操作 UI：`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/link/EditNodeLinkModal.ts`
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
-- 节点表格 Markdown：`src/mindmap/table/NodeTableMarkdown.ts`、`src/mindmap/INode.ts`、`styles.css`
+- 节点表格：`src/mindmap/table/NodeTableMarkdown.ts`、`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`、`src/mindmap/INode.ts`、`styles.css`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
 - 脑图样式与快捷键检查器：`src/mindmap/style/`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/MindMapView.ts`、`styles.css`
@@ -84,7 +84,7 @@ token_source: design-tokens.json
 - 编辑态图片显示为可选中的图片控件，不显示原始图片 Markdown；点击图片选中，拖拽手柄调整宽度，`Backspace` 或 `Delete` 删除选中图片。
 - 编辑态双击图片打开只读大图预览；双击不得冒泡为节点编辑手势，关闭预览后仅在原编辑会话仍有效时恢复图片焦点。预览不修改节点 Markdown、图片宽度或撤销历史。
 - 节点只保存 Markdown 源文本，渲染后的 HTML 不得成为第二数据源。
-- 节点内表格使用标准 Markdown 源码编辑；阅读态以原生表格渲染，宽表只在节点内容区域横向滚动，不改变脑图分支布局。
+- 节点内表格以内容优先：标题仅作为 Markdown 结构锚点保留，不在脑图表格节点或网格编辑器中显示；阅读态默认自动适应最大约 760px 的受限预览框，静止时不显示操作控件；悬停、选中或工具条获得焦点时，右上角浮现带提示的图标工具条，提供缩放、适应、重置、展开和编辑。展开预览使用最大约 90vw × 85vh 的 Modal，表格自动撑满可用宽度。表格节点默认进入 Modal 网格编辑，源码编辑仅作为兜底入口。
 - 右下角导航控件固定在脑图视图容器内，不随画布缩放；滑动条、加减按钮和 Ctrl/Meta 滚轮缩放共享同一个 `mindScale` 状态。
 - 小视图点击定位主画布视口；拖拽视口框不得触发节点拖拽、文本编辑或画布平移。
 - 点击标题栏调色板操作后打开或关闭当前导图的右侧样式检查器；除用户显式切换入口或点击关闭按钮外，检查器在模板应用与视图同步后保持打开，画布始终可见。
@@ -106,7 +106,7 @@ token_source: design-tokens.json
 - 画布导航和缩放控件放入 `src/mindmap/navigation/`，`src/mindmap/mindmap.ts` 只保留生命周期、缩放状态和刷新通知接线。
 - 节点多选集合、框选几何、选择视觉和多选手势放入 `src/mindmap/interaction/NodeSelectionController.ts`；`src/mindmap/mindmap.ts` 只保留事件委托和生命周期接线。
 - `src/mindmap/mindmap.ts` 和 `src/mindmap/INode.ts` 仅保留生命周期与编辑接线。
-- 节点表格的识别、保护和 Markdown 序列化放入 `src/mindmap/table/NodeTableMarkdown.ts`；视图、节点和脑图模块不得重复实现表格语法解析。
+- 节点表格的识别、保护和 Markdown 序列化放入 `src/mindmap/table/NodeTableMarkdown.ts`；预览交互和编辑 Modal 分别由 `src/mindmap/table/NodeTablePreviewController.ts` 和 `src/mindmap/table/NodeTableEditorModal.ts` 负责，视图、节点和脑图模块不得重复实现表格语法解析或表格 UI。
 - 验证 Obsidian 深色、浅色主题以及活动节点的焦点和选区行为。
 
 ## 可访问性

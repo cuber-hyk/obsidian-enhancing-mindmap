@@ -10,5 +10,21 @@ export default {
   "Delete link":"刪除連結",
   "Link target":"連結目標",
   "Save":"儲存",
-  "Save link":"儲存連結"
+  "Save link":"儲存連結",
+  "Table controls":"表格操作",
+  "Zoom out table":"縮小表格",
+  "Fit table":"適應寬度",
+  "Reset table zoom":"重設表格縮放",
+  "Zoom in table":"放大表格",
+  "Expand table":"展開表格",
+  "Edit table":"編輯表格",
+  "Table preview":"表格預覽",
+  "Node title":"節點標題",
+  "Add row":"新增列",
+  "Remove row":"刪除列",
+  "Add column":"新增欄",
+  "Remove column":"刪除欄",
+  "Edit source":"編輯原始碼",
+  "Table header":"表頭儲存格",
+  "Table cell":"表格儲存格"
 };

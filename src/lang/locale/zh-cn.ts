@@ -104,6 +104,22 @@ export default {
   "Delete link":"删除链接",
   "Link target":"链接目标",
   "Save":"保存",
-  "Save link":"保存链接"
+  "Save link":"保存链接",
+  "Table controls":"表格操作",
+  "Zoom out table":"缩小表格",
+  "Fit table":"适应宽度",
+  "Reset table zoom":"重置表格缩放",
+  "Zoom in table":"放大表格",
+  "Expand table":"展开表格",
+  "Edit table":"编辑表格",
+  "Table preview":"表格预览",
+  "Node title":"节点标题",
+  "Add row":"添加行",
+  "Remove row":"删除行",
+  "Add column":"添加列",
+  "Remove column":"删除列",
+  "Edit source":"编辑源码",
+  "Table header":"表头单元格",
+  "Table cell":"表格单元格"
 
 };

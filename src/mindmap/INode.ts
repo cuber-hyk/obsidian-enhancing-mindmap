@@ -14,6 +14,11 @@ import {
     parseNodeImages,
 } from './image/NodeImageMarkdown'
 import NodeImagePreviewModal from './image/NodeImagePreviewModal'
+import {
+    getNodeTableDocument,
+} from './table/NodeTableMarkdown'
+import NodeTableEditorModal from './table/NodeTableEditorModal'
+import NodeTablePreviewController from './table/NodeTablePreviewController'
 
 
 export function keepLastIndex(dom:HTMLElement) {
@@ -82,6 +87,7 @@ export default class Node {
     _selectedEditImageEl?:HTMLElement;
     _renderVersion:number=0;
     _linkCount:number=0;
+    tablePreview?:NodeTablePreviewController;
     parent?:Node;
     //isRoot?:boolean;
     children:Node[]=[];
@@ -155,8 +161,10 @@ export default class Node {
         await this.stabilizeRenderedImages(stagedContent);
         if (renderVersion !== this._renderVersion) return;
 
+        this.tablePreview?.destroy();
         this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
         this.data.mdText = this.contentEl.innerHTML;
+        this.attachTablePreview();
         this.refreshBox();
         this.mindmap&&this.mindmap.emit('initNode',{});
         this._delay();
@@ -374,6 +382,14 @@ export default class Node {
     }
 
     edit(){
+        if (getNodeTableDocument(this.data.text)) {
+            this.openTableEditor();
+            return;
+        }
+        this.beginSourceEdit();
+    }
+
+    private beginSourceEdit(){
         this.contentEl.innerText='';
         this._oldText = this.data.text;
         var editData = parseNodeMarkdown(this.data.text);
@@ -399,6 +415,39 @@ export default class Node {
             this.selectText();
         }
         this.mindmap.view?.insertController.beginEdit(this);
+    }
+
+    private attachTablePreview(): void {
+        const app = (this.mindmap.view as any)?.app;
+        if (!app || !getNodeTableDocument(this.data.text)) return;
+        const preview = new NodeTablePreviewController({
+            app,
+            contentEl: this.contentEl,
+            onEdit: () => this.openTableEditor(),
+            onLayoutChange: () => {
+                this.refreshBox();
+                this.clearCacheData();
+                this.mindmap.emit('initNode', {});
+            },
+        });
+        if (preview.attach()) this.tablePreview = preview;
+    }
+
+    private openTableEditor(): void {
+        const app = (this.mindmap.view as any)?.app;
+        const table = getNodeTableDocument(this.data.text);
+        if (!app || !table) return;
+        const oldText = this.data.text;
+        new NodeTableEditorModal(
+            app,
+            table,
+            (text) => {
+                if (text !== oldText) {
+                    this.mindmap.execute('changeNodeText', { node: this, text, oldText });
+                }
+            },
+            () => this.beginSourceEdit(),
+        ).open();
     }
 
     applyEditSurfaceStyle() {

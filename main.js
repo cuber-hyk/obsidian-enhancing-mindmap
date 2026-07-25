@@ -243,6 +243,22 @@ var en = {
     "Link target": "Link target",
     "Save": "Save",
     "Save link": "Save link",
+    "Table controls": "Table controls",
+    "Zoom out table": "Zoom out table",
+    "Fit table": "Fit table",
+    "Reset table zoom": "Reset table zoom",
+    "Zoom in table": "Zoom in table",
+    "Expand table": "Expand table",
+    "Edit table": "Edit table",
+    "Table preview": "Table preview",
+    "Node title": "Node title",
+    "Add row": "Add row",
+    "Remove row": "Remove row",
+    "Add column": "Add column",
+    "Remove column": "Remove column",
+    "Edit source": "Edit source",
+    "Table header": "Table header",
+    "Table cell": "Table cell",
 };
 
 // British English
@@ -468,7 +484,23 @@ var zhCN = {
     "Delete link": "删除链接",
     "Link target": "链接目标",
     "Save": "保存",
-    "Save link": "保存链接"
+    "Save link": "保存链接",
+    "Table controls": "表格操作",
+    "Zoom out table": "缩小表格",
+    "Fit table": "适应宽度",
+    "Reset table zoom": "重置表格缩放",
+    "Zoom in table": "放大表格",
+    "Expand table": "展开表格",
+    "Edit table": "编辑表格",
+    "Table preview": "表格预览",
+    "Node title": "节点标题",
+    "Add row": "添加行",
+    "Remove row": "删除行",
+    "Add column": "添加列",
+    "Remove column": "删除列",
+    "Edit source": "编辑源码",
+    "Table header": "表头单元格",
+    "Table cell": "表格单元格"
 };
 
 // 繁體中文
@@ -482,7 +514,23 @@ var zhTW = {
     "Delete link": "刪除連結",
     "Link target": "連結目標",
     "Save": "儲存",
-    "Save link": "儲存連結"
+    "Save link": "儲存連結",
+    "Table controls": "表格操作",
+    "Zoom out table": "縮小表格",
+    "Fit table": "適應寬度",
+    "Reset table zoom": "重設表格縮放",
+    "Zoom in table": "放大表格",
+    "Expand table": "展開表格",
+    "Edit table": "編輯表格",
+    "Table preview": "表格預覽",
+    "Node title": "節點標題",
+    "Add row": "新增列",
+    "Remove row": "刪除列",
+    "Add column": "新增欄",
+    "Remove column": "刪除欄",
+    "Edit source": "編輯原始碼",
+    "Table header": "表頭儲存格",
+    "Table cell": "表格儲存格"
 };
 
 const localeMap = {
@@ -899,6 +947,403 @@ class NodeImagePreviewModal extends obsidian.Modal {
     }
 }
 
+const TABLE_MARKER_PREFIX = '__MM_NODE_TABLE_';
+const TABLE_MARKER_SUFFIX = '__';
+const COLLAPSED_NODE_ID = /\s\^[a-z0-9-]+$/i;
+function protectMindMapTables(markdown) {
+    const lines = markdown.split(/\r?\n/);
+    const tables = new Map();
+    let inFence = false;
+    for (let index = 0; index < lines.length; index++) {
+        if (/^\s*```/.test(lines[index])) {
+            inFence = !inFence;
+            continue;
+        }
+        if (inFence || !isTableStart(lines, index))
+            continue;
+        const ownerIndex = findTableOwner(lines, index);
+        if (ownerIndex === null)
+            continue;
+        const end = findTableEnd(lines, index);
+        const marker = `${TABLE_MARKER_PREFIX}${tables.size}${TABLE_MARKER_SUFFIX}`;
+        tables.set(marker, removeSharedIndent(lines.slice(index, end)).join('\n').trim());
+        lines[ownerIndex] = appendMarker(lines[ownerIndex], marker);
+        lines.splice(index, end - index);
+        index--;
+    }
+    return { markdown: lines.join('\n'), tables };
+}
+function restoreProtectedMindMapTables(text, tables) {
+    let restored = text;
+    tables.forEach((table, marker) => {
+        restored = restored.replace(new RegExp(`[ \\t]*${escapeRegExp(marker)}[ \\t]*`), `\n\n${table}`);
+    });
+    return restored.trim();
+}
+function getNodeTableMarkdown(markdown) {
+    const lines = markdown.trim().split(/\r?\n/);
+    for (let index = 0; index < lines.length; index++) {
+        if (!isTableStart(lines, index))
+            continue;
+        const end = findTableEnd(lines, index);
+        const title = lines.slice(0, index).join('\n').trim();
+        const trailing = lines.slice(end).join('\n').trim();
+        if (!title || trailing)
+            return null;
+        return {
+            title,
+            markdown: removeSharedIndent(lines.slice(index, end)).join('\n').trim(),
+        };
+    }
+    return null;
+}
+function getNodeTableDocument(markdown) {
+    const nodeTable = getNodeTableMarkdown(markdown);
+    if (!nodeTable)
+        return null;
+    const lines = nodeTable.markdown.split(/\r?\n/);
+    const headers = parseTableRow(lines[0]);
+    const alignments = parseTableRow(lines[1]).map((cell) => {
+        const value = cell.trim();
+        if (/^:-{3,}:$/.test(value))
+            return 'center';
+        if (/^-{3,}:$/.test(value))
+            return 'right';
+        if (/^:-{3,}$/.test(value))
+            return 'left';
+        return null;
+    });
+    const width = headers.length;
+    return {
+        title: nodeTable.title,
+        headers: normalizeRow(headers, width),
+        alignments: normalizeRow(alignments, width),
+        rows: lines.slice(2).map((line) => normalizeRow(parseTableRow(line), width)),
+    };
+}
+function serializeNodeTableDocument(table) {
+    const width = Math.max(1, table.headers.length, ...table.rows.map((row) => row.length));
+    const headers = normalizeRow(table.headers, width);
+    const alignments = normalizeRow(table.alignments, width);
+    const rows = table.rows.map((row) => normalizeRow(row, width));
+    const markdown = [
+        serializeTableRow(headers),
+        serializeTableRow(alignments.map(serializeAlignment)),
+        ...rows.map(serializeTableRow),
+    ].join('\n');
+    return `${table.title.trim()}\n\n${markdown}`.trim();
+}
+function isTableStart(lines, index) {
+    var _a;
+    return Boolean(((_a = lines[index]) === null || _a === void 0 ? void 0 : _a.includes('|')) &&
+        lines[index + 1] &&
+        isTableDivider(lines[index + 1]));
+}
+function isTableDivider(line) {
+    const cells = trimTableEdges(line.trim()).split('|').map((cell) => cell.trim());
+    return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+function findTableEnd(lines, start) {
+    let end = start + 2;
+    while (end < lines.length && lines[end].trim() && lines[end].includes('|')) {
+        end++;
+    }
+    return end;
+}
+function findTableOwner(lines, tableStart) {
+    for (let index = tableStart - 1; index >= 0; index--) {
+        if (!lines[index].trim())
+            continue;
+        return isNodeLine(lines[index]) ? index : null;
+    }
+    return null;
+}
+function isNodeLine(line) {
+    return /^\s{0,3}#{1,6}\s+/.test(line) || /^\s*(?:[-+*]|\d+[.)])\s+/.test(line);
+}
+function appendMarker(line, marker) {
+    var _a;
+    const collapsedId = ((_a = line.match(COLLAPSED_NODE_ID)) === null || _a === void 0 ? void 0 : _a[0]) || '';
+    const content = collapsedId ? line.slice(0, -collapsedId.length) : line;
+    return `${content} ${marker}${collapsedId}`;
+}
+function removeSharedIndent(lines) {
+    const indents = lines
+        .filter((line) => line.trim())
+        .map((line) => { var _a; return ((_a = line.match(/^\s*/)) === null || _a === void 0 ? void 0 : _a[0].length) || 0; });
+    const indent = indents.length ? Math.min(...indents) : 0;
+    return lines.map((line) => line.slice(indent));
+}
+function trimTableEdges(value) {
+    return value.replace(/^\|/, '').replace(/\|$/, '');
+}
+function parseTableRow(line) {
+    const source = trimTableEdges(line.trim());
+    const cells = [];
+    let cell = '';
+    let escaped = false;
+    for (const character of source) {
+        if (escaped) {
+            cell += character;
+            escaped = false;
+        }
+        else if (character === '\\') {
+            escaped = true;
+        }
+        else if (character === '|') {
+            cells.push(cell.trim());
+            cell = '';
+        }
+        else {
+            cell += character;
+        }
+    }
+    cells.push(cell.trim());
+    return cells;
+}
+function serializeTableRow(cells) {
+    return `| ${cells.map((cell) => escapeTableCell(cell || '')).join(' | ')} |`;
+}
+function escapeTableCell(value) {
+    return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+}
+function serializeAlignment(alignment) {
+    if (alignment === 'left')
+        return ':---';
+    if (alignment === 'center')
+        return ':---:';
+    if (alignment === 'right')
+        return '---:';
+    return '---';
+}
+function normalizeRow(row, width) {
+    return Array.from({ length: width }, (_, index) => { var _a; return (_a = row[index]) !== null && _a !== void 0 ? _a : ''; });
+}
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+class NodeTableEditorModal extends obsidian.Modal {
+    constructor(app, table, onSubmit, onSource) {
+        super(app);
+        this.shouldRestoreSelection = false;
+        this.table = {
+            title: table.title,
+            headers: [...table.headers],
+            alignments: [...table.alignments],
+            rows: table.rows.map((row) => [...row]),
+        };
+        this.onSubmit = onSubmit;
+        this.onSource = onSource;
+    }
+    onOpen() {
+        this.setTitle(t('Edit table'));
+        this.modalEl.classList.add('mm-node-table-editor-modal');
+        this.render();
+    }
+    onClose() {
+        this.contentEl.empty();
+    }
+    render() {
+        this.contentEl.empty();
+        const grid = this.contentEl.createEl('table', { cls: 'mm-node-table-editor-grid' });
+        this.renderRow(grid, this.table.headers, -1, true);
+        this.table.rows.forEach((row, rowIndex) => this.renderRow(grid, row, rowIndex, false));
+        const controls = this.contentEl.createDiv({ cls: 'mm-node-table-editor-controls' });
+        this.createButton(controls, t('Add row'), () => {
+            this.table.rows.push(Array(this.table.headers.length).fill(''));
+            this.render();
+        });
+        this.createButton(controls, t('Remove row'), () => {
+            if (this.table.rows.length > 1)
+                this.table.rows.pop();
+            this.render();
+        });
+        this.createButton(controls, t('Add column'), () => {
+            this.table.headers.push('');
+            this.table.alignments.push(null);
+            this.table.rows.forEach((row) => row.push(''));
+            this.render();
+        });
+        this.createButton(controls, t('Remove column'), () => {
+            if (this.table.headers.length > 1) {
+                this.table.headers.pop();
+                this.table.alignments.pop();
+                this.table.rows.forEach((row) => row.pop());
+            }
+            this.render();
+        });
+        const actions = this.contentEl.createDiv({ cls: 'mm-insert-actions' });
+        this.createButton(actions, t('Edit source'), () => {
+            this.onSource();
+            this.close();
+        });
+        this.createButton(actions, t('Cancel'), () => this.close());
+        const save = this.createButton(actions, t('Save'), () => {
+            this.onSubmit(serializeNodeTableDocument(this.table));
+            this.close();
+        });
+        save.classList.add('mod-cta');
+    }
+    renderRow(grid, values, row, header) {
+        const tr = grid.createEl('tr');
+        values.forEach((value, column) => {
+            const cell = tr.createEl(header ? 'th' : 'td');
+            const input = cell.createEl('input', { type: 'text', value });
+            input.setAttribute('aria-label', header ? t('Table header') : t('Table cell'));
+            input.addEventListener('input', () => {
+                if (header)
+                    this.table.headers[column] = input.value;
+                else
+                    this.table.rows[row][column] = input.value;
+            });
+            input.addEventListener('paste', (event) => this.pasteTsv(event, row, column));
+        });
+    }
+    pasteTsv(event, startRow, startColumn) {
+        var _a, _b;
+        const text = (_a = event.clipboardData) === null || _a === void 0 ? void 0 : _a.getData('text/plain');
+        if (!text || !text.includes('\t'))
+            return;
+        event.preventDefault();
+        const values = text.replace(/\r/g, '').split('\n').filter((line) => line.length > 0).map((line) => line.split('\t'));
+        const requiredColumns = startColumn + Math.max(...values.map((row) => row.length));
+        while (this.table.headers.length < requiredColumns) {
+            this.table.headers.push('');
+            this.table.alignments.push(null);
+            this.table.rows.forEach((row) => row.push(''));
+        }
+        if (startRow < 0) {
+            (_b = values.shift()) === null || _b === void 0 ? void 0 : _b.forEach((value, columnOffset) => {
+                this.table.headers[startColumn + columnOffset] = value;
+            });
+        }
+        const firstRow = startRow < 0 ? 0 : startRow;
+        while (this.table.rows.length < firstRow + values.length) {
+            this.table.rows.push(Array(this.table.headers.length).fill(''));
+        }
+        values.forEach((row, rowOffset) => row.forEach((value, columnOffset) => {
+            this.table.rows[firstRow + rowOffset][startColumn + columnOffset] = value;
+        }));
+        this.render();
+    }
+    createButton(parent, text, onClick) {
+        const button = parent.createEl('button', { text, type: 'button' });
+        button.addEventListener('click', onClick);
+        return button;
+    }
+}
+
+class NodeTablePreviewController {
+    constructor(options) {
+        this.viewportEl = null;
+        this.controlsEl = null;
+        this.tableEl = null;
+        this.titleAnchorEl = null;
+        this.scale = 1;
+        this.app = options.app;
+        this.contentEl = options.contentEl;
+        this.onEdit = options.onEdit;
+        this.onLayoutChange = options.onLayoutChange;
+    }
+    attach() {
+        const table = this.contentEl.querySelector('table');
+        if (!(table instanceof HTMLTableElement))
+            return false;
+        this.tableEl = table;
+        this.contentEl.classList.add('mm-node-content-has-table');
+        const previous = table.previousElementSibling;
+        if (previous instanceof HTMLElement) {
+            previous.classList.add('mm-node-table-title-anchor');
+            this.titleAnchorEl = previous;
+        }
+        const viewport = this.contentEl.ownerDocument.createElement('div');
+        viewport.classList.add('mm-node-table-viewport');
+        table.before(viewport);
+        viewport.appendChild(table);
+        this.viewportEl = viewport;
+        const controls = this.createControls();
+        viewport.before(controls);
+        this.controlsEl = controls;
+        requestAnimationFrame(() => this.fit());
+        return true;
+    }
+    destroy() {
+        var _a, _b;
+        (_a = this.controlsEl) === null || _a === void 0 ? void 0 : _a.remove();
+        this.contentEl.classList.remove('mm-node-content-has-table');
+        (_b = this.titleAnchorEl) === null || _b === void 0 ? void 0 : _b.classList.remove('mm-node-table-title-anchor');
+        if (this.viewportEl && this.tableEl && this.viewportEl.parentElement) {
+            this.viewportEl.before(this.tableEl);
+            this.viewportEl.remove();
+        }
+        this.controlsEl = null;
+        this.viewportEl = null;
+        this.tableEl = null;
+        this.titleAnchorEl = null;
+    }
+    createControls() {
+        const controls = this.contentEl.ownerDocument.createElement('div');
+        controls.classList.add('mm-node-table-controls');
+        controls.setAttribute('aria-label', t('Table controls'));
+        controls.append(this.createButton('minus', t('Zoom out table'), () => this.setScale(this.scale - 0.1)), this.createButton('maximize-2', t('Fit table'), () => this.fit()), this.createButton('rotate-ccw', t('Reset table zoom'), () => this.setScale(1)), this.createButton('plus', t('Zoom in table'), () => this.setScale(this.scale + 0.1)), this.createButton('expand', t('Expand table'), () => this.openExpanded()), this.createButton('pencil', t('Edit table'), this.onEdit));
+        return controls;
+    }
+    createButton(icon, label, onClick) {
+        const button = this.contentEl.ownerDocument.createElement('button');
+        button.type = 'button';
+        button.setAttribute('aria-label', label);
+        obsidian.setIcon(button, icon);
+        obsidian.setTooltip(button, label);
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onClick();
+        });
+        return button;
+    }
+    fit() {
+        if (!this.viewportEl || !this.tableEl)
+            return;
+        this.tableEl.style.removeProperty('zoom');
+        const availableWidth = this.viewportEl.clientWidth;
+        const naturalWidth = this.tableEl.scrollWidth;
+        const nextScale = naturalWidth > availableWidth
+            ? Math.max(0.5, Math.min(1, availableWidth / naturalWidth))
+            : 1;
+        this.setScale(nextScale);
+    }
+    setScale(nextScale) {
+        if (!this.tableEl)
+            return;
+        this.scale = Math.max(0.5, Math.min(1.5, Math.round(nextScale * 10) / 10));
+        this.tableEl.style.setProperty('zoom', String(this.scale));
+        this.onLayoutChange();
+    }
+    openExpanded() {
+        if (!this.tableEl)
+            return;
+        const table = this.tableEl.cloneNode(true);
+        table.style.removeProperty('zoom');
+        new NodeTableExpandedModal(this.app, table.outerHTML).open();
+    }
+}
+class NodeTableExpandedModal extends obsidian.Modal {
+    constructor(app, tableHtml) {
+        super(app);
+        this.shouldRestoreSelection = false;
+        this.tableHtml = tableHtml;
+    }
+    onOpen() {
+        this.setTitle(t('Table preview'));
+        this.modalEl.classList.add('mm-node-table-expanded-modal');
+        this.contentEl.innerHTML = this.tableHtml;
+    }
+    onClose() {
+        this.contentEl.empty();
+    }
+}
+
 function keepLastIndex(dom) {
     if (window.getSelection) { //ie11 10 9 ff safari
         dom.focus(); //ff
@@ -970,6 +1415,7 @@ class Node$1 {
         this.containEl.appendChild(this._barDom);
     }
     parseText() {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             if (this.data.text.length === 0) {
                 this.data.text = "Sub title";
@@ -984,8 +1430,10 @@ class Node$1 {
             yield this.stabilizeRenderedImages(stagedContent);
             if (renderVersion !== this._renderVersion)
                 return;
+            (_a = this.tablePreview) === null || _a === void 0 ? void 0 : _a.destroy();
             this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
             this.data.mdText = this.contentEl.innerHTML;
+            this.attachTablePreview();
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', {});
             this._delay();
@@ -1189,6 +1637,13 @@ class Node$1 {
         }
     }
     edit() {
+        if (getNodeTableDocument(this.data.text)) {
+            this.openTableEditor();
+            return;
+        }
+        this.beginSourceEdit();
+    }
+    beginSourceEdit() {
         var _a;
         this.contentEl.innerText = '';
         this._oldText = this.data.text;
@@ -1214,6 +1669,37 @@ class Node$1 {
             this.selectText();
         }
         (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.insertController.beginEdit(this);
+    }
+    attachTablePreview() {
+        var _a;
+        const app = (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.app;
+        if (!app || !getNodeTableDocument(this.data.text))
+            return;
+        const preview = new NodeTablePreviewController({
+            app,
+            contentEl: this.contentEl,
+            onEdit: () => this.openTableEditor(),
+            onLayoutChange: () => {
+                this.refreshBox();
+                this.clearCacheData();
+                this.mindmap.emit('initNode', {});
+            },
+        });
+        if (preview.attach())
+            this.tablePreview = preview;
+    }
+    openTableEditor() {
+        var _a;
+        const app = (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.app;
+        const table = getNodeTableDocument(this.data.text);
+        if (!app || !table)
+            return;
+        const oldText = this.data.text;
+        new NodeTableEditorModal(app, table, (text) => {
+            if (text !== oldText) {
+                this.mindmap.execute('changeNodeText', { node: this, text, oldText });
+            }
+        }, () => this.beginSourceEdit()).open();
     }
     applyEditSurfaceStyle() {
         const tokenPrefix = this.data.isRoot ? '--mm-style-root' : '--mm-style-primary';
@@ -10549,104 +11035,6 @@ class MindMapNavigatorController {
     clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
     }
-}
-
-const TABLE_MARKER_PREFIX = '__MM_NODE_TABLE_';
-const TABLE_MARKER_SUFFIX = '__';
-const COLLAPSED_NODE_ID = /\s\^[a-z0-9-]+$/i;
-function protectMindMapTables(markdown) {
-    const lines = markdown.split(/\r?\n/);
-    const tables = new Map();
-    let inFence = false;
-    for (let index = 0; index < lines.length; index++) {
-        if (/^\s*```/.test(lines[index])) {
-            inFence = !inFence;
-            continue;
-        }
-        if (inFence || !isTableStart(lines, index))
-            continue;
-        const ownerIndex = findTableOwner(lines, index);
-        if (ownerIndex === null)
-            continue;
-        const end = findTableEnd(lines, index);
-        const marker = `${TABLE_MARKER_PREFIX}${tables.size}${TABLE_MARKER_SUFFIX}`;
-        tables.set(marker, removeSharedIndent(lines.slice(index, end)).join('\n').trim());
-        lines[ownerIndex] = appendMarker(lines[ownerIndex], marker);
-        lines.splice(index, end - index);
-        index--;
-    }
-    return { markdown: lines.join('\n'), tables };
-}
-function restoreProtectedMindMapTables(text, tables) {
-    let restored = text;
-    tables.forEach((table, marker) => {
-        restored = restored.replace(new RegExp(`[ \\t]*${escapeRegExp(marker)}[ \\t]*`), `\n\n${table}`);
-    });
-    return restored.trim();
-}
-function getNodeTableMarkdown(markdown) {
-    const lines = markdown.trim().split(/\r?\n/);
-    for (let index = 0; index < lines.length; index++) {
-        if (!isTableStart(lines, index))
-            continue;
-        const end = findTableEnd(lines, index);
-        const title = lines.slice(0, index).join('\n').trim();
-        const trailing = lines.slice(end).join('\n').trim();
-        if (!title || trailing)
-            return null;
-        return {
-            title,
-            markdown: removeSharedIndent(lines.slice(index, end)).join('\n').trim(),
-        };
-    }
-    return null;
-}
-function isTableStart(lines, index) {
-    var _a;
-    return Boolean(((_a = lines[index]) === null || _a === void 0 ? void 0 : _a.includes('|')) &&
-        lines[index + 1] &&
-        isTableDivider(lines[index + 1]));
-}
-function isTableDivider(line) {
-    const cells = trimTableEdges(line.trim()).split('|').map((cell) => cell.trim());
-    return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
-}
-function findTableEnd(lines, start) {
-    let end = start + 2;
-    while (end < lines.length && lines[end].trim() && lines[end].includes('|')) {
-        end++;
-    }
-    return end;
-}
-function findTableOwner(lines, tableStart) {
-    for (let index = tableStart - 1; index >= 0; index--) {
-        if (!lines[index].trim())
-            continue;
-        return isNodeLine(lines[index]) ? index : null;
-    }
-    return null;
-}
-function isNodeLine(line) {
-    return /^\s{0,3}#{1,6}\s+/.test(line) || /^\s*(?:[-+*]|\d+[.)])\s+/.test(line);
-}
-function appendMarker(line, marker) {
-    var _a;
-    const collapsedId = ((_a = line.match(COLLAPSED_NODE_ID)) === null || _a === void 0 ? void 0 : _a[0]) || '';
-    const content = collapsedId ? line.slice(0, -collapsedId.length) : line;
-    return `${content} ${marker}${collapsedId}`;
-}
-function removeSharedIndent(lines) {
-    const indents = lines
-        .filter((line) => line.trim())
-        .map((line) => { var _a; return ((_a = line.match(/^\s*/)) === null || _a === void 0 ? void 0 : _a[0].length) || 0; });
-    const indent = indents.length ? Math.min(...indents) : 0;
-    return lines.map((line) => line.slice(indent));
-}
-function trimTableEdges(value) {
-    return value.replace(/^\|/, '').replace(/\|$/, '');
-}
-function escapeRegExp(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 let tempDispLevel = 0;

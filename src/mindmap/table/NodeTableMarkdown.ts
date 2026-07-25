@@ -8,6 +8,13 @@ export interface NodeTableMarkdown {
   markdown: string;
 }
 
+export interface NodeTableDocument {
+  title: string;
+  headers: string[];
+  alignments: Array<'left' | 'center' | 'right' | null>;
+  rows: string[][];
+}
+
 const TABLE_MARKER_PREFIX = '__MM_NODE_TABLE_';
 const TABLE_MARKER_SUFFIX = '__';
 const COLLAPSED_NODE_ID = /\s\^[a-z0-9-]+$/i;
@@ -67,6 +74,42 @@ export function getNodeTableMarkdown(markdown: string): NodeTableMarkdown | null
   return null;
 }
 
+export function getNodeTableDocument(markdown: string): NodeTableDocument | null {
+  const nodeTable = getNodeTableMarkdown(markdown);
+  if (!nodeTable) return null;
+
+  const lines = nodeTable.markdown.split(/\r?\n/);
+  const headers = parseTableRow(lines[0]);
+  const alignments = parseTableRow(lines[1]).map((cell) => {
+    const value = cell.trim();
+    if (/^:-{3,}:$/.test(value)) return 'center';
+    if (/^-{3,}:$/.test(value)) return 'right';
+    if (/^:-{3,}$/.test(value)) return 'left';
+    return null;
+  });
+  const width = headers.length;
+
+  return {
+    title: nodeTable.title,
+    headers: normalizeRow(headers, width),
+    alignments: normalizeRow(alignments, width),
+    rows: lines.slice(2).map((line) => normalizeRow(parseTableRow(line), width)),
+  };
+}
+
+export function serializeNodeTableDocument(table: NodeTableDocument): string {
+  const width = Math.max(1, table.headers.length, ...table.rows.map((row) => row.length));
+  const headers = normalizeRow(table.headers, width);
+  const alignments = normalizeRow(table.alignments, width);
+  const rows = table.rows.map((row) => normalizeRow(row, width));
+  const markdown = [
+    serializeTableRow(headers),
+    serializeTableRow(alignments.map(serializeAlignment)),
+    ...rows.map(serializeTableRow),
+  ].join('\n');
+  return `${table.title.trim()}\n\n${markdown}`.trim();
+}
+
 function isTableStart(lines: string[], index: number): boolean {
   return Boolean(
     lines[index]?.includes('|') &&
@@ -116,6 +159,47 @@ function removeSharedIndent(lines: string[]): string[] {
 
 function trimTableEdges(value: string): string {
   return value.replace(/^\|/, '').replace(/\|$/, '');
+}
+
+function parseTableRow(line: string): string[] {
+  const source = trimTableEdges(line.trim());
+  const cells: string[] = [];
+  let cell = '';
+  let escaped = false;
+  for (const character of source) {
+    if (escaped) {
+      cell += character;
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (character === '|') {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function serializeTableRow(cells: Array<string | null>): string {
+  return `| ${cells.map((cell) => escapeTableCell(cell || '')).join(' | ')} |`;
+}
+
+function escapeTableCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+}
+
+function serializeAlignment(alignment: NodeTableDocument['alignments'][number]): string {
+  if (alignment === 'left') return ':---';
+  if (alignment === 'center') return ':---:';
+  if (alignment === 'right') return '---:';
+  return '---';
+}
+
+function normalizeRow<T>(row: T[], width: number): T[] {
+  return Array.from({ length: width }, (_, index) => row[index] ?? ('' as T));
 }
 
 function escapeRegExp(value: string): string {
