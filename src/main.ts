@@ -466,11 +466,9 @@ export default class MindMapPlugin extends Plugin {
           var mindmap = mindmapView.mindmap;
           let node = mindmap.selectNode;
           if(node) {
-            if(node.data.isEdit)
-              {// A node is edited: set in bold only the selected part
-
-              }
-            node.setSelectedText('<br>', '<br>', false, false, false);
+            if(node.data.isEdit) {
+              node.insertLineBreak();
+            }
           }
           //else: no node selected
         }

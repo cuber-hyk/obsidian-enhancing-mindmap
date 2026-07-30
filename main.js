@@ -1374,6 +1374,155 @@ class NodeTableExpandedModal extends obsidian.Modal {
     }
 }
 
+const WIDTH_COMMENTS_AT_END = /(?:[ \t]*<!--\s*enhancing-mindmap:width=(\d+)\s*-->)+[ \t]*$/i;
+function canAutoWrapNodeMarkdown(markdown) {
+    const content = getNodeAutoWrapContent(markdown);
+    if (!content.trim())
+        return false;
+    if (getNodeTableDocument(content))
+        return false;
+    if (parseNodeImages(content).length > 0)
+        return false;
+    if (parseNodeMarkdown(content).links.length > 0)
+        return false;
+    if (/`/.test(content))
+        return false;
+    if (/\r?\n/.test(content))
+        return false;
+    return true;
+}
+function getNodeAutoWrapWidth(markdown) {
+    const match = markdown.match(WIDTH_COMMENTS_AT_END);
+    if (!match)
+        return undefined;
+    const width = Number(match[1]);
+    return Number.isSafeInteger(width) && width > 0 ? width : undefined;
+}
+function getNodeAutoWrapContent(markdown) {
+    const match = markdown.match(WIDTH_COMMENTS_AT_END);
+    if (!match || match.index === undefined)
+        return markdown;
+    return markdown.slice(0, match.index);
+}
+function setNodeAutoWrapWidth(markdown, width) {
+    return `${getNodeAutoWrapContent(markdown)}<!-- enhancing-mindmap:width=${Math.round(width)} -->`;
+}
+
+const MIN_NODE_WIDTH = 32;
+const MAX_NODE_WIDTH = 1600;
+class NodeAutoWrapController {
+    constructor(options) {
+        this.drag = null;
+        this.onPointerDown = (event) => {
+            var _a, _b;
+            if (!this.containEl.classList.contains('mm-node-auto-wrap-supported'))
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const scale = this.getScale();
+            const startWidth = this.contentEl.getBoundingClientRect().width / scale;
+            this.drag = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startWidth,
+                width: startWidth,
+            };
+            this.containEl.classList.add('is-auto-wrapping');
+            (_b = (_a = this.handleEl).setPointerCapture) === null || _b === void 0 ? void 0 : _b.call(_a, event.pointerId);
+        };
+        this.onPointerMove = (event) => {
+            if (!this.drag || event.pointerId !== this.drag.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const delta = (event.clientX - this.drag.startX) / this.getScale();
+            const width = clamp(this.drag.startWidth + delta, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+            this.drag.width = width;
+            this.applyWidth(width);
+            this.onLayoutChange();
+        };
+        this.onPointerUp = (event) => {
+            if (!this.drag || event.pointerId !== this.drag.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.finishDrag(true);
+        };
+        this.onPointerCancel = (event) => {
+            if (!this.drag || event.pointerId !== this.drag.pointerId)
+                return;
+            this.finishDrag(false);
+        };
+        this.containEl = options.containEl;
+        this.contentEl = options.contentEl;
+        this.getMarkdown = options.getMarkdown;
+        this.getWidth = options.getWidth;
+        this.getScale = options.getScale;
+        this.onCommit = options.onCommit;
+        this.onLayoutChange = options.onLayoutChange;
+        this.handleEl = this.containEl.ownerDocument.createElement('span');
+        this.handleEl.classList.add('mm-node-auto-wrap-handle');
+        this.handleEl.setAttribute('aria-label', 'Resize node text');
+        this.handleEl.setAttribute('role', 'presentation');
+        this.handleEl.addEventListener('pointerdown', this.onPointerDown);
+        this.handleEl.addEventListener('pointermove', this.onPointerMove);
+        this.handleEl.addEventListener('pointerup', this.onPointerUp);
+        this.handleEl.addEventListener('pointercancel', this.onPointerCancel);
+        this.containEl.appendChild(this.handleEl);
+        this.refresh();
+    }
+    refresh() {
+        const supported = canAutoWrapNodeMarkdown(this.getMarkdown());
+        this.containEl.classList.toggle('mm-node-auto-wrap-supported', supported);
+        this.applyWidth(supported ? this.getWidth() : undefined);
+    }
+    cancel() {
+        this.finishDrag(false);
+    }
+    destroy() {
+        this.cancel();
+        this.handleEl.removeEventListener('pointerdown', this.onPointerDown);
+        this.handleEl.removeEventListener('pointermove', this.onPointerMove);
+        this.handleEl.removeEventListener('pointerup', this.onPointerUp);
+        this.handleEl.removeEventListener('pointercancel', this.onPointerCancel);
+        this.handleEl.remove();
+    }
+    finishDrag(commit) {
+        const drag = this.drag;
+        if (!drag)
+            return;
+        this.drag = null;
+        this.containEl.classList.remove('is-auto-wrapping');
+        if (!commit) {
+            this.applyWidth(this.getWidth());
+            this.onLayoutChange();
+            return;
+        }
+        const width = Math.round(drag.width);
+        if (width !== this.getWidth()) {
+            this.onCommit(width);
+        }
+        else {
+            this.onLayoutChange();
+        }
+    }
+    applyWidth(width) {
+        if (!width) {
+            this.contentEl.style.removeProperty('width');
+            this.contentEl.style.removeProperty('min-width');
+            this.contentEl.style.removeProperty('max-width');
+            return;
+        }
+        const clampedWidth = clamp(width, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+        this.contentEl.style.width = `${clampedWidth}px`;
+        this.contentEl.style.minWidth = `${clampedWidth}px`;
+        this.contentEl.style.maxWidth = `${clampedWidth}px`;
+    }
+}
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
 function keepLastIndex(dom) {
     if (window.getSelection) { //ie11 10 9 ff safari
         dom.focus(); //ff
@@ -1430,6 +1579,24 @@ class Node$1 {
         this.containEl.appendChild(this.linkLayerEl);
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
+        this.autoWrapController = new NodeAutoWrapController({
+            containEl: this.containEl,
+            contentEl: this.contentEl,
+            getMarkdown: () => this.data.text,
+            getWidth: () => getNodeAutoWrapWidth(this.data.text),
+            getScale: () => { var _a; return (((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.mindScale) || 100) / 100; },
+            onCommit: (width) => {
+                const text = setNodeAutoWrapWidth(this.data.text, width);
+                if (text !== this.data.text) {
+                    this.mindmap.execute('changeNodeText', {
+                        node: this,
+                        text,
+                        oldText: this.data.text,
+                    });
+                }
+            },
+            onLayoutChange: () => this.refreshAutoWrapLayout(),
+        });
         if (this.data.isRoot) {
             this.containEl.classList.add('mm-root');
             this.data.isRoot = true;
@@ -1446,12 +1613,12 @@ class Node$1 {
         this.containEl.appendChild(this._barDom);
     }
     parseText() {
-        var _a;
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             if (this.data.text.length === 0) {
                 this.data.text = "Sub title";
             }
-            const text = this.data.text;
+            const text = getNodeAutoWrapContent(this.data.text);
             const renderVersion = ++this._renderVersion;
             const stagedContent = this.contentEl.ownerDocument.createElement('div');
             yield obsidian.MarkdownRenderer.renderMarkdown(text, stagedContent, this.mindmap.path || "", this.mindmap.view);
@@ -1465,6 +1632,7 @@ class Node$1 {
             this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
             this.data.mdText = this.contentEl.innerHTML;
             this.attachTablePreview();
+            (_b = this.autoWrapController) === null || _b === void 0 ? void 0 : _b.refresh();
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', {});
             this._delay();
@@ -1473,7 +1641,7 @@ class Node$1 {
     _delay() {
         this.linkLayerEl.innerHTML = '';
         this.setNodeLinkCount(0);
-        const sourceLinks = parseNodeMarkdown(this.data.text).links;
+        const sourceLinks = parseNodeMarkdown(getNodeAutoWrapContent(this.data.text)).links;
         var linkIndex = 0;
         this.contentEl.querySelectorAll('a').forEach((link) => {
             if (this.decorateNodeLink(link, linkIndex, sourceLinks[linkIndex])) {
@@ -1647,6 +1815,7 @@ class Node$1 {
         return true;
     }
     select() {
+        var _a;
         this.isSelect = true;
         this.containEl.setAttribute('draggable', 'true');
         //if(this.mindmap.view.plugin.settings.focusOnMove) {
@@ -1658,9 +1827,12 @@ class Node$1 {
         if (!this.containEl.classList.contains('mm-node-select')) {
             this.containEl.classList.add('mm-node-select');
         }
+        (_a = this.autoWrapController) === null || _a === void 0 ? void 0 : _a.refresh();
         this.mindmap.selectNode = this;
     }
     unSelect() {
+        var _a;
+        (_a = this.autoWrapController) === null || _a === void 0 ? void 0 : _a.cancel();
         this.isSelect = false;
         this.containEl.setAttribute('draggable', 'false');
         if (this.containEl.classList.contains('mm-node-select')) {
@@ -1674,7 +1846,7 @@ class Node$1 {
             if (renderPromise !== this._renderPromise) {
                 return this.edit(options);
             }
-            if (getNodeTableDocument(this.data.text)) {
+            if (getNodeTableDocument(getNodeAutoWrapContent(this.data.text))) {
                 this.openTableEditor();
                 return;
             }
@@ -1682,17 +1854,19 @@ class Node$1 {
         });
     }
     beginSourceEdit(options = {}) {
-        var _a;
+        var _a, _b;
+        (_a = this.autoWrapController) === null || _a === void 0 ? void 0 : _a.cancel();
         this.contentEl.innerText = '';
         this._oldText = this.data.text;
-        var editData = parseNodeMarkdown(this.data.text);
+        const markdown = getNodeAutoWrapContent(this.data.text);
+        var editData = parseNodeMarkdown(markdown);
         this._editText = editData.text;
         this._editLinks = editData.links;
         this._editStructureChanged = false;
         //var _t =  this.data.text.replace(/\r\n/g,"<br/>")
         // _t = _t.replace(/\n/g,"<br/>");
         //  console.log(_t);
-        this.renderEditableContent(this.data.text, editData.links);
+        this.renderEditableContent(markdown, editData.links);
         this.renderLinkLayer(editData.links);
         this.contentEl.setAttribute('contentEditable', 'true');
         this.mindmap.editNode = this;
@@ -1705,7 +1879,7 @@ class Node$1 {
         keepLastIndex(this.contentEl);
         if (options.selectAll)
             this.selectText();
-        (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.insertController.beginEdit(this);
+        (_b = this.mindmap.view) === null || _b === void 0 ? void 0 : _b.insertController.beginEdit(this);
         if (options.selectAll) {
             requestAnimationFrame(() => {
                 if (this.data.isEdit && this.mindmap.editNode === this) {
@@ -1718,7 +1892,7 @@ class Node$1 {
     attachTablePreview() {
         var _a;
         const app = (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.app;
-        if (!app || !getNodeTableDocument(this.data.text))
+        if (!app || !getNodeTableDocument(getNodeAutoWrapContent(this.data.text)))
             return;
         const preview = new NodeTablePreviewController({
             app,
@@ -1736,7 +1910,7 @@ class Node$1 {
     openTableEditor() {
         var _a;
         const app = (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.app;
-        const table = getNodeTableDocument(this.data.text);
+        const table = getNodeTableDocument(getNodeAutoWrapContent(this.data.text));
         if (!app || !table)
             return;
         const oldText = this.data.text;
@@ -1915,6 +2089,24 @@ class Node$1 {
             l_selection.addRange(range);
         }
     }
+    insertLineBreak() {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0)
+            return;
+        const range = selection.getRangeAt(0);
+        if (!this.contentEl.contains(range.commonAncestorContainer))
+            return;
+        range.deleteContents();
+        const breakEl = this.contentEl.ownerDocument.createElement('br');
+        const textNode = this.contentEl.ownerDocument.createTextNode('');
+        range.insertNode(textNode);
+        range.insertNode(breakEl);
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        this.refreshEditingLayout();
+    }
     setSelectedText_italic() {
         // Get selection and Create new text
         let l_selection = window.getSelection();
@@ -2008,17 +2200,23 @@ class Node$1 {
     }
     getMarkdownFromEditedText() {
         const text = this.getEditedContentMarkdown().trim();
+        const oldMarkdown = this._oldText || '';
+        const oldContent = getNodeAutoWrapContent(oldMarkdown);
         if (!this._editLinks.length) {
-            return text;
+            return text === oldContent ? oldMarkdown : this.restoreAutoWrapWidth(text);
         }
-        const oldEditData = parseNodeMarkdown(this._oldText || '');
+        const oldEditData = parseNodeMarkdown(oldContent);
         const isOriginalEditState = text === oldEditData.text &&
             this._editLinks.length === oldEditData.links.length &&
             this._editLinks.every((link, index) => link.markdown === oldEditData.links[index].markdown);
         if (isOriginalEditState) {
-            return this._oldText || text;
+            return oldMarkdown || text;
         }
-        return composeNodeMarkdown(text, this._editLinks);
+        return this.restoreAutoWrapWidth(composeNodeMarkdown(text, this._editLinks));
+    }
+    restoreAutoWrapWidth(markdown) {
+        const width = getNodeAutoWrapWidth(this._oldText || this.data.text);
+        return width ? setNodeAutoWrapWidth(markdown, width) : markdown;
     }
     renderEditableContent(markdown, links) {
         this.contentEl.innerHTML = '';
@@ -2042,7 +2240,16 @@ class Node$1 {
     appendEditableText(text) {
         if (!text)
             return;
-        this.contentEl.appendChild(this.contentEl.ownerDocument.createTextNode(text));
+        const parts = text.split(/(<br\s*\/?>)/gi);
+        parts.forEach((part) => {
+            if (!part)
+                return;
+            if (/^<br\s*\/?>$/i.test(part)) {
+                this.contentEl.appendChild(this.contentEl.ownerDocument.createElement('br'));
+                return;
+            }
+            this.contentEl.appendChild(this.contentEl.ownerDocument.createTextNode(part));
+        });
     }
     createEditableImage(image) {
         const wrapper = this.contentEl.ownerDocument.createElement('span');
@@ -2265,6 +2472,10 @@ class Node$1 {
                 parts.push(child.textContent || '');
                 return;
             }
+            if (child instanceof HTMLBRElement) {
+                parts.push('<br>');
+                return;
+            }
             if (!(child instanceof HTMLElement))
                 return;
             if (child.classList.contains('mm-node-image-attachment')) {
@@ -2297,6 +2508,15 @@ class Node$1 {
         this.clearTreeCacheData();
         this.refreshBox();
         this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
+    }
+    refreshAutoWrapLayout() {
+        this.clearTreeCacheData();
+        this.refreshBox();
+        this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
+    }
+    destroy() {
+        var _a;
+        (_a = this.autoWrapController) === null || _a === void 0 ? void 0 : _a.destroy();
     }
     renderLinkLayer(links) {
         this.linkLayerEl.innerHTML = '';
@@ -2342,7 +2562,7 @@ class Node$1 {
     getDisplayedLinks() {
         const links = this.data.isEdit
             ? this._editLinks
-            : parseNodeMarkdown(this.data.text).links;
+            : parseNodeMarkdown(getNodeAutoWrapContent(this.data.text)).links;
         return links.map((link) => (Object.assign({}, link)));
     }
     setEditedLinks(links) {
@@ -10008,7 +10228,7 @@ class NodeKeyboardController {
             if (!node.data.isEdit || event.ctrlKey || event.metaKey || event.altKey)
                 return false;
             this.consume(event);
-            node.setSelectedText('<br>', '<br>', false, false, false);
+            node.insertLineBreak();
             return true;
         }
         if (!this.hasNoModifiers(event))
@@ -12399,6 +12619,7 @@ class MindMap {
         this.nodeSelectionController.clearSelection();
         //delete node
         this.traverseBF((n) => {
+            n.destroy();
             this.contentEL.removeChild(n.containEl);
         });
         //delete line
@@ -43752,8 +43973,9 @@ class MindMapPlugin extends obsidian.Plugin {
                         var mindmap = mindmapView.mindmap;
                         let node = mindmap.selectNode;
                         if (node) {
-                            if (node.data.isEdit) ;
-                            node.setSelectedText('<br>', '<br>', false, false, false);
+                            if (node.data.isEdit) {
+                                node.insertLineBreak();
+                            }
                         }
                         //else: no node selected
                     }

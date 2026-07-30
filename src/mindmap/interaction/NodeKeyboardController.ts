@@ -59,7 +59,7 @@ export default class NodeKeyboardController {
     if (event.shiftKey) {
       if (!node.data.isEdit || event.ctrlKey || event.metaKey || event.altKey) return false;
       this.consume(event);
-      node.setSelectedText('<br>', '<br>', false, false, false);
+      node.insertLineBreak();
       return true;
     }
 
