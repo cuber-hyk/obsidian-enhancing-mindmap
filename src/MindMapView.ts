@@ -6,7 +6,8 @@ import {
   WorkspaceLeaf,
   TFile,
   Notice,
-  Platform
+  Platform,
+  Scope
 } from "obsidian";
 
 import MindMapPlugin from './main'
@@ -24,7 +25,7 @@ import {
   resolveMindMapStyleTemplate,
 } from './mindmap/style/MindMapStyle';
 import MindMapStyleInspector from './mindmap/style/MindMapStyleInspector';
-import MindMapShortcutInspector from './mindmap/interaction/MindMapShortcutInspector';
+import MindMapShortcutInspector, { PluginShortcut } from './mindmap/interaction/MindMapShortcutInspector';
 import { NodeKeyboardShortcuts } from './mindmap/interaction/NodeKeyboardShortcuts';
 import {
   protectMindMapTables,
@@ -447,6 +448,10 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   onload() {
     super.onload();
+    this.scope = new Scope(this.app.scope);
+    this.scope.register(['Mod'], 'b', () => this.formatEditingNode('**', '__'));
+    this.scope.register(['Mod'], 'i', () => this.formatEditingNode('_', '*'));
+    this.scope.register(['Mod', 'Shift'], 's', () => this.formatEditingNode('~~'));
     this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
     this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
     this.registerEvent(
@@ -537,6 +542,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.shortcutInspector = new MindMapShortcutInspector({
       parentEl: this.contentEl,
       shortcuts: this.plugin.settings.nodeKeyboardShortcuts,
+      pluginShortcuts: () => this.getPluginShortcuts(),
       onChange: (shortcuts) => this.updateNodeKeyboardShortcuts(shortcuts),
       onClose: () => {
         this.isShortcutInspectorOpen = false;
@@ -553,6 +559,29 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   private async updateNodeKeyboardShortcuts(shortcuts: NodeKeyboardShortcuts) {
     await this.plugin.updateNodeKeyboardShortcuts(shortcuts);
+  }
+
+  private formatEditingNode(primaryMarker: string, alternateMarker?: string): false | void {
+    const node = this.mindmap?.editNode;
+    if (!node?.data.isEdit) return;
+    return node.toggleMarkdownFormatting(primaryMarker, alternateMarker) ? false : undefined;
+  }
+
+  private getPluginShortcuts(): PluginShortcut[] {
+    const app = this.app as any;
+    const commands = Object.values(app.commands?.commands || {}) as Array<{ id?: string; name?: string }>;
+    const getHotkeys = app.hotkey?.getHotkeys as ((commandId: string) => Array<{ key?: string; modifiers?: string[] }>) | undefined;
+    if (!getHotkeys) return [];
+
+    const prefix = `${this.plugin.manifest.id}:`;
+    return commands
+      .filter((command) => command.id?.startsWith(prefix))
+      .map((command) => ({
+        label: command.name || command.id!.slice(prefix.length),
+        shortcuts: getHotkeys(command.id!).map((shortcut) => formatPluginHotkey(shortcut)),
+      }))
+      .filter((command) => command.shortcuts.length > 0)
+      .sort((left, right) => left.label.localeCompare(right.label));
   }
 
   private previewStyleTemplate(styleTemplateId: string) {
@@ -701,4 +730,16 @@ export class MindMapView extends TextFileView implements HoverParent {
     super.onPaneMenu(menu,'more-options');
   }
 
+}
+
+function formatPluginHotkey(shortcut: { key?: string; modifiers?: string[] }): string {
+  const modifiers = shortcut.modifiers || [];
+  const parts = modifiers.map((modifier) => {
+    if (modifier === 'Mod') return Platform.isMacOS ? 'Cmd' : 'Ctrl';
+    if (modifier === 'Meta') return 'Cmd';
+    return modifier;
+  });
+  const key = shortcut.key || '';
+  parts.push(key.length === 1 ? key.toUpperCase() : key);
+  return parts.filter(Boolean).join(' + ');
 }

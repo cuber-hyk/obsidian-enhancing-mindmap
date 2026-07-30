@@ -149,6 +149,9 @@ var en = {
     "Mindmap shortcuts description": "Applies to all mindmaps",
     "Custom shortcuts": "Custom shortcuts",
     "Other node shortcuts": "Other node shortcuts",
+    "Clipboard and history": "Clipboard and history",
+    "Markdown formatting": "Markdown formatting (editing only)",
+    "Plugin command shortcuts": "Plugin command shortcuts",
     "Add sibling below": "Add sibling below",
     "Add sibling above": "Add sibling above",
     "Add child node": "Add child node",
@@ -156,6 +159,13 @@ var en = {
     "Delete selected node": "Delete selected node",
     "Finish editing": "Finish editing",
     "Insert line break": "Insert line break",
+    "Copy selected node": "Copy selected node",
+    "Cut selected node": "Cut selected node",
+    "Paste as child node": "Paste as child node",
+    "Undo mindmap action": "Undo mindmap action",
+    "Bold selected text": "Bold selected text",
+    "Italicize selected text": "Italicize selected text",
+    "Strike through selected text": "Strike through selected text",
     "Press a shortcut": "Press a shortcut",
     "Reset shortcut defaults": "Reset defaults",
     "Shortcut must include a non-modifier key": "Shortcut must include a non-modifier key",
@@ -435,12 +445,22 @@ var zhCN = {
     "Mindmap shortcuts description": "适用于全部思维导图",
     "Custom shortcuts": "可自定义快捷键",
     "Other node shortcuts": "其他节点快捷键",
+    "Clipboard and history": "剪贴板与撤销",
+    "Markdown formatting": "Markdown 格式（仅编辑态）",
+    "Plugin command shortcuts": "插件命令快捷键",
     "Add sibling below": "在下方新增同级节点",
     "Add sibling above": "在上方新增同级节点",
     "Enter edit mode": "进入编辑",
     "Delete selected node": "删除选中节点",
     "Finish editing": "完成编辑",
     "Insert line break": "插入换行",
+    "Copy selected node": "复制选中节点",
+    "Cut selected node": "剪切选中节点",
+    "Paste as child node": "粘贴为子节点",
+    "Undo mindmap action": "撤销脑图操作",
+    "Bold selected text": "加粗选中文本",
+    "Italicize selected text": "斜体选中文本",
+    "Strike through selected text": "删除线选中文本",
     "Press a shortcut": "请按下快捷键",
     "Reset shortcut defaults": "恢复默认值",
     "Shortcut must include a non-modifier key": "快捷键必须包含非修饰键",
@@ -530,7 +550,17 @@ var zhTW = {
     "Remove column": "刪除欄",
     "Edit source": "編輯原始碼",
     "Table header": "表頭儲存格",
-    "Table cell": "表格儲存格"
+    "Table cell": "表格儲存格",
+    "Clipboard and history": "剪貼簿與復原",
+    "Markdown formatting": "Markdown 格式（僅編輯態）",
+    "Plugin command shortcuts": "外掛命令快速鍵",
+    "Copy selected node": "複製選取節點",
+    "Cut selected node": "剪下選取節點",
+    "Paste as child node": "貼上為子節點",
+    "Undo mindmap action": "復原心智圖操作",
+    "Bold selected text": "粗體選取文字",
+    "Italicize selected text": "斜體選取文字",
+    "Strike through selected text": "刪除線選取文字"
 };
 
 const localeMap = {
@@ -1371,6 +1401,7 @@ class Node$1 {
         this._editLinks = [];
         this._editStructureChanged = false;
         this._renderVersion = 0;
+        this._renderPromise = Promise.resolve();
         this._linkCount = 0;
         //isRoot?:boolean;
         this.children = [];
@@ -1407,7 +1438,7 @@ class Node$1 {
             this.data.isRoot = false;
             this.containEl.classList.remove('mm-root');
         }
-        this.parseText();
+        this._renderPromise = this.parseText();
     }
     initNodeBar() {
         this._barDom = document.createElement('div');
@@ -1636,14 +1667,21 @@ class Node$1 {
             this.containEl.classList.remove('mm-node-select');
         }
     }
-    edit() {
-        if (getNodeTableDocument(this.data.text)) {
-            this.openTableEditor();
-            return;
-        }
-        this.beginSourceEdit();
+    edit(options = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const renderPromise = this._renderPromise;
+            yield renderPromise;
+            if (renderPromise !== this._renderPromise) {
+                return this.edit(options);
+            }
+            if (getNodeTableDocument(this.data.text)) {
+                this.openTableEditor();
+                return;
+            }
+            this.beginSourceEdit(options);
+        });
     }
-    beginSourceEdit() {
+    beginSourceEdit(options = {}) {
         var _a;
         this.contentEl.innerText = '';
         this._oldText = this.data.text;
@@ -1665,10 +1703,17 @@ class Node$1 {
         this.applyEditSurfaceStyle();
         this.contentEl.focus();
         keepLastIndex(this.contentEl);
-        if (this.contentEl.innerText == t('Sub title')) {
+        if (options.selectAll)
             this.selectText();
-        }
         (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.insertController.beginEdit(this);
+        if (options.selectAll) {
+            requestAnimationFrame(() => {
+                if (this.data.isEdit && this.mindmap.editNode === this) {
+                    this.contentEl.focus();
+                    this.selectText();
+                }
+            });
+        }
     }
     attachTablePreview() {
         var _a;
@@ -1717,19 +1762,54 @@ class Node$1 {
         });
     }
     selectText() {
-        var text = this.contentEl;
+        var _a;
+        const text = this.contentEl;
         // if (document.body.createTextRange) {
         //     var range = document.body.createTextRange();
         //     range.moveToElementText(text);
         //     range.select();
         // }
-        if (window.getSelection) {
-            var selection = window.getSelection();
-            var range = document.createRange();
+        const selection = (_a = this.contentEl.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.getSelection();
+        if (selection) {
+            const range = this.contentEl.ownerDocument.createRange();
             range.selectNodeContents(text);
             selection.removeAllRanges();
             selection.addRange(range);
         }
+    }
+    toggleMarkdownFormatting(primaryMarker, alternateMarker) {
+        var _a;
+        const selection = (_a = this.contentEl.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.getSelection();
+        if (!selection || selection.rangeCount === 0)
+            return false;
+        const range = selection.getRangeAt(0);
+        if (!this.contentEl.contains(range.commonAncestorContainer))
+            return false;
+        if (!range.collapsed &&
+            Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment')).some((image) => range.intersectsNode(image))) {
+            return false;
+        }
+        const selectedText = range.toString();
+        const marker = [primaryMarker, alternateMarker]
+            .filter((value) => Boolean(value))
+            .find((value) => selectedText.startsWith(value) && selectedText.endsWith(value));
+        const replacement = marker
+            ? selectedText.slice(marker.length, -marker.length)
+            : `${primaryMarker}${selectedText}${primaryMarker}`;
+        const textNode = this.contentEl.ownerDocument.createTextNode(replacement);
+        range.deleteContents();
+        range.insertNode(textNode);
+        const nextRange = this.contentEl.ownerDocument.createRange();
+        if (selectedText) {
+            nextRange.selectNodeContents(textNode);
+        }
+        else {
+            nextRange.setStart(textNode, primaryMarker.length);
+            nextRange.collapse(true);
+        }
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+        return true;
     }
     insertText(i_str_1) {
         // Replace regular spaces with non-breaking spaces
@@ -2537,7 +2617,8 @@ class Node$1 {
     }
     setText(text) {
         this.data.text = text;
-        return this.parseText();
+        this._renderPromise = this.parseText();
+        return this._renderPromise;
     }
     removeLineBreak() {
         var l_newText = this.data.text.replace('<br>', ' ');
@@ -8824,7 +8905,7 @@ class AddNode extends Command {
         this.mind.clearSelectNode();
         setTimeout(() => {
             this.node.select();
-            this.node.edit();
+            this.node.edit({ selectAll: true });
         }, 0);
         return true; //exit with no error
     }
@@ -9888,14 +9969,14 @@ class NodeKeyboardController {
     handleKeydown(event) {
         if (this.handleUndoShortcut(event))
             return true;
+        const node = this.mindmap.selectNode;
+        if (!node || !this.isNodeKeyboardTarget(event, node))
+            return false;
         if (event.defaultPrevented ||
             event.isComposing ||
             this.mindmap.isComposing) {
             return false;
         }
-        const node = this.mindmap.selectNode;
-        if (!node || !this.isNodeKeyboardTarget(event, node))
-            return false;
         if (!node.data.isEdit && this.handleSiblingShortcut(event, node))
             return true;
         if (node.data.isEdit &&
@@ -40735,6 +40816,38 @@ const fixedShortcuts = [
         shortcut: { key: 'Enter', shiftKey: true, ctrlKey: false, metaKey: false, altKey: false },
     },
 ];
+const clipboardAndHistoryShortcuts = [
+    {
+        label: 'Copy selected node',
+        shortcut: { key: 'c', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Cut selected node',
+        shortcut: { key: 'x', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Paste as child node',
+        shortcut: { key: 'v', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Undo mindmap action',
+        shortcut: { key: 'z', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+    },
+];
+const markdownFormattingShortcuts = [
+    {
+        label: 'Bold selected text',
+        shortcut: { key: 'b', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Italicize selected text',
+        shortcut: { key: 'i', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+    },
+    {
+        label: 'Strike through selected text',
+        shortcut: { key: 's', shiftKey: true, ctrlKey: true, metaKey: false, altKey: false },
+    },
+];
 class MindMapShortcutInspector {
     constructor(options) {
         this.inspectorEl = null;
@@ -40744,6 +40857,7 @@ class MindMapShortcutInspector {
         this.isSaving = false;
         this.parentEl = options.parentEl;
         this.shortcuts = normalizeNodeKeyboardShortcuts(options.shortcuts);
+        this.pluginShortcuts = options.pluginShortcuts;
         this.onChange = options.onChange;
         this.onClose = options.onClose;
     }
@@ -40811,9 +40925,27 @@ class MindMapShortcutInspector {
         }
         this.createSection(contentEl, t('Other node shortcuts'), (section) => {
             fixedShortcuts.forEach(({ label, shortcut }) => {
-                this.createFixedShortcutRow(section, t(label), formatNodeKeyboardShortcut(shortcut));
+                this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
             });
         });
+        this.createSection(contentEl, t('Clipboard and history'), (section) => {
+            clipboardAndHistoryShortcuts.forEach(({ label, shortcut }) => {
+                this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
+            });
+        });
+        this.createSection(contentEl, t('Markdown formatting'), (section) => {
+            markdownFormattingShortcuts.forEach(({ label, shortcut }) => {
+                this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
+            });
+        });
+        const pluginShortcuts = this.pluginShortcuts();
+        if (pluginShortcuts.length) {
+            this.createSection(contentEl, t('Plugin command shortcuts'), (section) => {
+                pluginShortcuts.forEach(({ label, shortcuts }) => {
+                    this.createFixedShortcutRow(section, label, shortcuts.join(' / '));
+                });
+            });
+        }
         if (this.recordingShortcutId) {
             const button = contentEl.querySelector(`[data-shortcut-id="${this.recordingShortcutId}"]`);
             button === null || button === void 0 ? void 0 : button.focus();
@@ -40901,6 +41033,10 @@ class MindMapShortcutInspector {
             }
         });
     }
+}
+function formatPlatformShortcut(shortcut) {
+    const platformShortcut = Object.assign(Object.assign({}, shortcut), { ctrlKey: obsidian.Platform.isMacOS ? false : shortcut.ctrlKey, metaKey: obsidian.Platform.isMacOS ? shortcut.ctrlKey : shortcut.metaKey });
+    return formatNodeKeyboardShortcut(platformShortcut);
 }
 
 var domToImageMore = createCommonjsModule(function (module, exports) {
@@ -42774,6 +42910,10 @@ class MindMapView extends obsidian.TextFileView {
     }
     onload() {
         super.onload();
+        this.scope = new obsidian.Scope(this.app.scope);
+        this.scope.register(['Mod'], 'b', () => this.formatEditingNode('**', '__'));
+        this.scope.register(['Mod'], 'i', () => this.formatEditingNode('_', '*'));
+        this.scope.register(['Mod', 'Shift'], 's', () => this.formatEditingNode('~~'));
         this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
         this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
         this.registerEvent(this.app.workspace.on("quick-preview", () => this.onQuickPreview, this));
@@ -42858,6 +42998,7 @@ class MindMapView extends obsidian.TextFileView {
         this.shortcutInspector = new MindMapShortcutInspector({
             parentEl: this.contentEl,
             shortcuts: this.plugin.settings.nodeKeyboardShortcuts,
+            pluginShortcuts: () => this.getPluginShortcuts(),
             onChange: (shortcuts) => this.updateNodeKeyboardShortcuts(shortcuts),
             onClose: () => {
                 this.isShortcutInspectorOpen = false;
@@ -42875,6 +43016,30 @@ class MindMapView extends obsidian.TextFileView {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.plugin.updateNodeKeyboardShortcuts(shortcuts);
         });
+    }
+    formatEditingNode(primaryMarker, alternateMarker) {
+        var _a;
+        const node = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.editNode;
+        if (!(node === null || node === void 0 ? void 0 : node.data.isEdit))
+            return;
+        return node.toggleMarkdownFormatting(primaryMarker, alternateMarker) ? false : undefined;
+    }
+    getPluginShortcuts() {
+        var _a, _b;
+        const app = this.app;
+        const commands = Object.values(((_a = app.commands) === null || _a === void 0 ? void 0 : _a.commands) || {});
+        const getHotkeys = (_b = app.hotkey) === null || _b === void 0 ? void 0 : _b.getHotkeys;
+        if (!getHotkeys)
+            return [];
+        const prefix = `${this.plugin.manifest.id}:`;
+        return commands
+            .filter((command) => { var _a; return (_a = command.id) === null || _a === void 0 ? void 0 : _a.startsWith(prefix); })
+            .map((command) => ({
+            label: command.name || command.id.slice(prefix.length),
+            shortcuts: getHotkeys(command.id).map((shortcut) => formatPluginHotkey(shortcut)),
+        }))
+            .filter((command) => command.shortcuts.length > 0)
+            .sort((left, right) => left.label.localeCompare(right.label));
     }
     previewStyleTemplate(styleTemplateId) {
         if (!this.mindmap)
@@ -43013,6 +43178,19 @@ class MindMapView extends obsidian.TextFileView {
         // })
         super.onPaneMenu(menu, 'more-options');
     }
+}
+function formatPluginHotkey(shortcut) {
+    const modifiers = shortcut.modifiers || [];
+    const parts = modifiers.map((modifier) => {
+        if (modifier === 'Mod')
+            return obsidian.Platform.isMacOS ? 'Cmd' : 'Ctrl';
+        if (modifier === 'Meta')
+            return 'Cmd';
+        return modifier;
+    });
+    const key = shortcut.key || '';
+    parts.push(key.length === 1 ? key.toUpperCase() : key);
+    return parts.filter(Boolean).join(' + ');
 }
 
 class MindMapSettingsTab extends obsidian.PluginSettingTab {

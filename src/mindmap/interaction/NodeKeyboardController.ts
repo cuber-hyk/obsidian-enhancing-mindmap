@@ -15,6 +15,8 @@ export default class NodeKeyboardController {
   handleKeydown(event: KeyboardEvent): boolean {
     if (this.handleUndoShortcut(event)) return true;
 
+    const node = this.mindmap.selectNode;
+    if (!node || !this.isNodeKeyboardTarget(event, node)) return false;
     if (
       event.defaultPrevented ||
       event.isComposing ||
@@ -22,9 +24,6 @@ export default class NodeKeyboardController {
     ) {
       return false;
     }
-
-    const node = this.mindmap.selectNode;
-    if (!node || !this.isNodeKeyboardTarget(event, node)) return false;
 
     if (!node.data.isEdit && this.handleSiblingShortcut(event, node)) return true;
 

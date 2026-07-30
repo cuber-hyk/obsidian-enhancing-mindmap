@@ -86,6 +86,7 @@ export default class Node {
     _editStructureChanged:boolean=false;
     _selectedEditImageEl?:HTMLElement;
     _renderVersion:number=0;
+    _renderPromise:Promise<void> = Promise.resolve();
     _linkCount:number=0;
     tablePreview?:NodeTablePreviewController;
     parent?:Node;
@@ -133,7 +134,7 @@ export default class Node {
             this.data.isRoot = false;
             this.containEl.classList.remove('mm-root');
         }
-        this.parseText();
+        this._renderPromise = this.parseText();
     }
 
     initNodeBar(){
@@ -381,15 +382,20 @@ export default class Node {
         }
     }
 
-    edit(){
+    async edit(options: { selectAll?: boolean } = {}): Promise<void> {
+        const renderPromise = this._renderPromise;
+        await renderPromise;
+        if (renderPromise !== this._renderPromise) {
+            return this.edit(options);
+        }
         if (getNodeTableDocument(this.data.text)) {
             this.openTableEditor();
             return;
         }
-        this.beginSourceEdit();
+        this.beginSourceEdit(options);
     }
 
-    private beginSourceEdit(){
+    private beginSourceEdit(options: { selectAll?: boolean } = {}){
         this.contentEl.innerText='';
         this._oldText = this.data.text;
         var editData = parseNodeMarkdown(this.data.text);
@@ -410,11 +416,16 @@ export default class Node {
         this.applyEditSurfaceStyle();
         this.contentEl.focus();
         keepLastIndex(this.contentEl);
-
-        if (this.contentEl.innerText == t('Sub title')) {
-            this.selectText();
-        }
+        if (options.selectAll) this.selectText();
         this.mindmap.view?.insertController.beginEdit(this);
+        if (options.selectAll) {
+            requestAnimationFrame(() => {
+                if (this.data.isEdit && this.mindmap.editNode === this) {
+                    this.contentEl.focus();
+                    this.selectText();
+                }
+            });
+        }
     }
 
     private attachTablePreview(): void {
@@ -468,19 +479,56 @@ export default class Node {
     }
 
     selectText() {
-        var text = this.contentEl;
+        const text = this.contentEl;
         // if (document.body.createTextRange) {
         //     var range = document.body.createTextRange();
         //     range.moveToElementText(text);
         //     range.select();
         // }
-        if (window.getSelection) {
-            var selection = window.getSelection();
-            var range = document.createRange();
+        const selection = this.contentEl.ownerDocument.defaultView?.getSelection();
+        if (selection) {
+            const range = this.contentEl.ownerDocument.createRange();
             range.selectNodeContents(text);
             selection.removeAllRanges();
             selection.addRange(range);
         }
+    }
+
+    toggleMarkdownFormatting(primaryMarker: string, alternateMarker?: string): boolean {
+        const selection = this.contentEl.ownerDocument.defaultView?.getSelection();
+        if (!selection || selection.rangeCount === 0) return false;
+
+        const range = selection.getRangeAt(0);
+        if (!this.contentEl.contains(range.commonAncestorContainer)) return false;
+        if (
+            !range.collapsed &&
+            Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment')).some((image) => range.intersectsNode(image))
+        ) {
+            return false;
+        }
+
+        const selectedText = range.toString();
+        const marker = [primaryMarker, alternateMarker]
+            .filter((value): value is string => Boolean(value))
+            .find((value) => selectedText.startsWith(value) && selectedText.endsWith(value));
+        const replacement = marker
+            ? selectedText.slice(marker.length, -marker.length)
+            : `${primaryMarker}${selectedText}${primaryMarker}`;
+        const textNode = this.contentEl.ownerDocument.createTextNode(replacement);
+
+        range.deleteContents();
+        range.insertNode(textNode);
+
+        const nextRange = this.contentEl.ownerDocument.createRange();
+        if (selectedText) {
+            nextRange.selectNodeContents(textNode);
+        } else {
+            nextRange.setStart(textNode, primaryMarker.length);
+            nextRange.collapse(true);
+        }
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+        return true;
     }
 
 
@@ -1399,7 +1447,8 @@ export default class Node {
 
     setText(text:string): Promise<void> {
         this.data.text = text;
-        return this.parseText();
+        this._renderPromise = this.parseText();
+        return this._renderPromise;
     }
 
     removeLineBreak() {

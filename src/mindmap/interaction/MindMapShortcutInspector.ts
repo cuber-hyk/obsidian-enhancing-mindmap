@@ -1,4 +1,4 @@
-import { setIcon } from 'obsidian';
+import { Platform, setIcon } from 'obsidian';
 import { t } from '../../lang/helpers';
 import {
   createDefaultNodeKeyboardShortcuts,
@@ -14,8 +14,14 @@ import {
 type MindMapShortcutInspectorOptions = {
   parentEl: HTMLElement;
   shortcuts: NodeKeyboardShortcuts;
+  pluginShortcuts: () => PluginShortcut[];
   onChange: (shortcuts: NodeKeyboardShortcuts) => Promise<void> | void;
   onClose: () => void;
+};
+
+export type PluginShortcut = {
+  label: string;
+  shortcuts: string[];
 };
 
 type FixedShortcut = {
@@ -46,9 +52,44 @@ const fixedShortcuts: FixedShortcut[] = [
   },
 ];
 
+const clipboardAndHistoryShortcuts: FixedShortcut[] = [
+  {
+    label: 'Copy selected node',
+    shortcut: { key: 'c', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+  },
+  {
+    label: 'Cut selected node',
+    shortcut: { key: 'x', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+  },
+  {
+    label: 'Paste as child node',
+    shortcut: { key: 'v', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+  },
+  {
+    label: 'Undo mindmap action',
+    shortcut: { key: 'z', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+  },
+];
+
+const markdownFormattingShortcuts: FixedShortcut[] = [
+  {
+    label: 'Bold selected text',
+    shortcut: { key: 'b', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+  },
+  {
+    label: 'Italicize selected text',
+    shortcut: { key: 'i', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
+  },
+  {
+    label: 'Strike through selected text',
+    shortcut: { key: 's', shiftKey: true, ctrlKey: true, metaKey: false, altKey: false },
+  },
+];
+
 export default class MindMapShortcutInspector {
   private parentEl: HTMLElement;
   private shortcuts: NodeKeyboardShortcuts;
+  private pluginShortcuts: () => PluginShortcut[];
   private onChange: (shortcuts: NodeKeyboardShortcuts) => Promise<void> | void;
   private onClose: () => void;
   private inspectorEl: HTMLElement | null = null;
@@ -60,6 +101,7 @@ export default class MindMapShortcutInspector {
   constructor(options: MindMapShortcutInspectorOptions) {
     this.parentEl = options.parentEl;
     this.shortcuts = normalizeNodeKeyboardShortcuts(options.shortcuts);
+    this.pluginShortcuts = options.pluginShortcuts;
     this.onChange = options.onChange;
     this.onClose = options.onClose;
   }
@@ -133,9 +175,30 @@ export default class MindMapShortcutInspector {
 
     this.createSection(contentEl, t('Other node shortcuts'), (section) => {
       fixedShortcuts.forEach(({ label, shortcut }) => {
-        this.createFixedShortcutRow(section, t(label), formatNodeKeyboardShortcut(shortcut));
+        this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
       });
     });
+
+    this.createSection(contentEl, t('Clipboard and history'), (section) => {
+      clipboardAndHistoryShortcuts.forEach(({ label, shortcut }) => {
+        this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
+      });
+    });
+
+    this.createSection(contentEl, t('Markdown formatting'), (section) => {
+      markdownFormattingShortcuts.forEach(({ label, shortcut }) => {
+        this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
+      });
+    });
+
+    const pluginShortcuts = this.pluginShortcuts();
+    if (pluginShortcuts.length) {
+      this.createSection(contentEl, t('Plugin command shortcuts'), (section) => {
+        pluginShortcuts.forEach(({ label, shortcuts }) => {
+          this.createFixedShortcutRow(section, label, shortcuts.join(' / '));
+        });
+      });
+    }
 
     if (this.recordingShortcutId) {
       const button = contentEl.querySelector<HTMLButtonElement>(
@@ -237,4 +300,13 @@ export default class MindMapShortcutInspector {
       this.renderContent();
     }
   }
+}
+
+function formatPlatformShortcut(shortcut: NodeKeyboardShortcut): string {
+  const platformShortcut: NodeKeyboardShortcut = {
+    ...shortcut,
+    ctrlKey: Platform.isMacOS ? false : shortcut.ctrlKey,
+    metaKey: Platform.isMacOS ? shortcut.ctrlKey : shortcut.metaKey,
+  };
+  return formatNodeKeyboardShortcut(platformShortcut);
 }

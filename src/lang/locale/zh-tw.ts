@@ -26,5 +26,15 @@ export default {
   "Remove column":"刪除欄",
   "Edit source":"編輯原始碼",
   "Table header":"表頭儲存格",
-  "Table cell":"表格儲存格"
+  "Table cell":"表格儲存格",
+  "Clipboard and history":"剪貼簿與復原",
+  "Markdown formatting":"Markdown 格式（僅編輯態）",
+  "Plugin command shortcuts":"外掛命令快速鍵",
+  "Copy selected node":"複製選取節點",
+  "Cut selected node":"剪下選取節點",
+  "Paste as child node":"貼上為子節點",
+  "Undo mindmap action":"復原心智圖操作",
+  "Bold selected text":"粗體選取文字",
+  "Italicize selected text":"斜體選取文字",
+  "Strike through selected text":"刪除線選取文字"
 };

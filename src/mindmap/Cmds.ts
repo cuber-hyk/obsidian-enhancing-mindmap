@@ -43,7 +43,7 @@ export class AddNode extends Command {
         this.mind.clearSelectNode();
         setTimeout(()=>{
             this.node.select();
-            this.node.edit();
+            this.node.edit({ selectAll: true });
         },0);
         return true; //exit with no error
     }
