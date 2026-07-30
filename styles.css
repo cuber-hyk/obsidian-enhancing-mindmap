@@ -221,9 +221,36 @@
   padding: 2px 4px;
   min-width: 2em;
   min-height: 1.4em;
-  max-width: 800px;
+  max-width: 1600px;
   word-break: break-word;
   overflow-x: auto;
+}
+
+.mm-node-auto-wrap-handle {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: -6px;
+  width: 10px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 999px;
+  background: var(--background-primary);
+  cursor: ew-resize;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+
+.mm-node.mm-node-select.mm-node-auto-wrap-supported:not(.mm-edit-node) .mm-node-auto-wrap-handle {
+  pointer-events: auto;
+}
+
+.mm-node.mm-node-select.mm-node-auto-wrap-supported:not(.mm-edit-node) .mm-node-auto-wrap-handle:hover,
+.mm-node.is-auto-wrapping .mm-node-auto-wrap-handle {
+  opacity: 1;
 }
 
 .mm-node-content table {

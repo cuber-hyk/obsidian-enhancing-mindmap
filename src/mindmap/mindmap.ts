@@ -1710,6 +1710,7 @@ export default class MindMap {
         this.nodeSelectionController.clearSelection();
         //delete node
         this.traverseBF((n: INode) => {
+            n.destroy();
             this.contentEL.removeChild(n.containEl);
         });
 

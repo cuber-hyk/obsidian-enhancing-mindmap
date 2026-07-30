@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-07-25
+updated: 2026-07-30
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -14,13 +14,14 @@ adr_reviewed: not_required
 
 ## 当前行为
 
-- `INode.data.text` 保存节点 Markdown 源文本。
+- `INode.data.text` 保存节点 Markdown 源文本；普通文本节点的已调整宽度以末尾 `<!-- enhancing-mindmap:width=<integer> -->` HTML 注释随该 Markdown 保存，节点阅读与编辑时均从正文中剥离该注释。
 - `INode.edit()` 将节点内容切换为 `contentEditable` 编辑状态；节点正文以文本编辑，图片附件以可选中的图片控件编辑。
 - `INode.cancelEdit()` 从 `innerText` 生成 Markdown，通过现有命令历史记录变更；节点文本更新只走 `setText()` 的单一阅读态渲染链路。
 - 节点可包含标题后的标准 Markdown 表格；加载脑图前会保护表格块，使其不会被 Markmap 拆成节点树；保存时恢复为原 Markdown 表格。表格标题只作为 Markdown 结构锚点保留，不在脑图阅读态或网格编辑器中显示。
 - 表格阅读态使用受限且默认自动适应的预览框；静止时不显示操作控件，悬停、选中或键盘聚焦时才显示缩放、适应、重置、展开和编辑图标。展开预览使用全宽 Modal，表格自动撑满可用宽度；局部缩放不写入 Markdown。
 - 表格节点进入编辑时打开网格 Modal，支持单元格、行列增删和 TSV 粘贴；保存通过一条 `ChangeNodeText` History 命令写回标准 Markdown，源码编辑只作为复杂内容的兜底入口。
 - `NodeKeyboardController` 是单节点键盘新增和删除的入口：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点；编辑态 `Enter` 保存并回到选中态，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 保存并新增子节点；选中态默认 `Enter` 在下方新增同级节点，`Shift+Enter` 在上方新增同级节点，根节点的下方新增快捷键例外为新增一级子节点，上方新增不执行操作，选中态 `Tab` 新增子节点。所有创建路径的新节点立即进入编辑态并全选默认文案；已有节点的普通编辑仍保留原光标行为。编辑态 `Ctrl`/`Cmd+B`、`Ctrl`/`Cmd+I` 和 `Ctrl`/`Cmd+Shift+S` 只通过 Markdown 标记切换选区的加粗、斜体和删除线，空选区插入标记对并将光标置中。脑图获得焦点且节点非编辑时，`Ctrl`/`Cmd+Z` 通过同一控制器撤销上一条脑图 History 命令；编辑态与其他视图保留原生文字撤销。
+- 手动 `<br>` 在编辑态以真正的 DOM 换行元素渲染，保存时再序列化为 Markdown；节点宽度拖拽仅改变 CSS 自动换行，不增删手动 `<br>`，松开时通过一条 `ChangeNodeText` 命令写回宽度注释。
 - 旧节点右侧新增按钮及 `Alt+Shift+Enter`、`Shift+Insert` 新增命令已移除。
 - 删除节点后优先选中同级节点：先选下一个同级节点，没有下一个时选上一个同级节点；没有同级节点时才回退到父节点。
 - 节点编辑时显示一个由 `NodeInsertController` 管理的上下文工具栏；编辑结束或视图销毁时移除。
@@ -79,6 +80,7 @@ adr_reviewed: not_required
 - 链接解析与交互：`src/mindmap/link/*.ts`
 - 节点表格 Markdown 与模型：`src/mindmap/table/NodeTableMarkdown.ts`
 - 节点表格预览与编辑：`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`
+- 节点宽度元数据与拖拽：`src/mindmap/wrap/NodeAutoWrapMarkdown.ts`、`src/mindmap/wrap/NodeAutoWrapController.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
