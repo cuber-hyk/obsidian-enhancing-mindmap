@@ -203,7 +203,6 @@ var en = {
     'Add tabulation': 'Add tabulation',
     'Add line break (<br>)': 'Add line break (<br>)',
     'Remove line breaks (<br>)': 'Remove line breaks (<br>)',
-    'Cancel edit': 'Cancel edit',
     'Expand one level': 'Expand one level',
     'Expand one level from the max. displayed level': 'Expand one level from the max. displayed level',
     'Collapse one level': 'Collapse one level',
@@ -334,7 +333,6 @@ var fr = {
     'Add tabulation': 'Ajouter une tabulation',
     'Add line break (<br>)': 'Ajouter un retour à la ligne (<br>)',
     'Remove line breaks (<br>)': 'Supprimer les retours à la ligne (<br>)',
-    'Cancel edit': 'Annuler la modification',
     'Expand one level': 'Étendre d\'un niveau',
     'Expand one level from the max. displayed level': 'Étendre d\'un niveau à partir du niveau maximal affiché',
     'Collapse one level': 'Réduire d\'un niveau',
@@ -38228,12 +38226,6 @@ class NodeSelectionController {
         return false;
     }
     handleKeydown(event) {
-        if (event.key === 'Escape' && this.selectedNodes.size > 0) {
-            event.preventDefault();
-            event.stopPropagation();
-            this.mindmap.clearSelectNode();
-            return true;
-        }
         if (this.isBatchDeleteEvent(event)) {
             event.preventDefault();
             event.stopPropagation();
@@ -39509,19 +39501,6 @@ class MindMap {
         //     this.selectingNodes = false;
         // }
         if (!ctrlKey && !shiftKey && !altKey) { // NO SPECIAL KEY
-            // Escape
-            if (keyCode == 27) {
-                e.preventDefault();
-                e.stopPropagation();
-                var node = this.selectNode;
-                if (node && node.data.isEdit) {
-                    node.select();
-                    node.mindmap.editNode = null;
-                    node.cancelEdit();
-                    this.undo();
-                    //this.selectNode.unSelect();
-                }
-            }
             // up
             if (keyCode == 38 || e.key == 'ArrowUp') {
                 e.preventDefault();
@@ -43776,31 +43755,6 @@ class MindMapView extends obsidian.TextFileView {
             }
         }
     }
-    getFrontMatter() {
-        var frontMatter = '---\n\n';
-        //  var v: any = '';
-        if (this.fileCache.frontmatter) {
-            // for (var k in this.fileCache.frontmatter) {
-            //   if (k != 'position') {
-            //     if (Object.prototype.toString.call(this.fileCache.frontmatter[k]) == '[object Array]' || Object.prototype.toString.call(this.fileCache.frontmatter[k]) == '[object Object]') {
-            //       v = JSON.stringify(this.fileCache.frontmatter[k]);
-            //     } else if (Object.prototype.toString.call(this.fileCache.frontmatter[k]) == '[object Number]' || Object.prototype.toString.call(this.fileCache.frontmatter[k]) == "[object String]") {
-            //       v = this.fileCache.frontmatter[k];
-            //     }
-            //     if (v) {
-            //       frontMatter += `${k}: ${v}\n`;
-            //     }
-            //   }
-            // }
-            //var position = this.fileCache.frontmatter.position;
-            var position = this.fileCache.frontmatterPosition;
-            var end = position['end'].offset;
-            frontMatter = this.data.substr(0, end);
-        }
-        frontMatter += '\n\n';
-        //frontMatter += `\n---\n\n`;
-        return frontMatter;
-    }
     constructor(leaf, plugin) {
         super(leaf);
         this.id = this.leaf.id;
@@ -43811,7 +43765,6 @@ class MindMapView extends obsidian.TextFileView {
         this.isShortcutInspectorOpen = false;
         this.isApplyingStyleTemplate = false;
         this.timeOut = null;
-        this.firstInit = true;
         this.yamlString = '';
         this.plugin = plugin;
         this.insertController = new NodeInsertController(this.app);
@@ -43843,6 +43796,7 @@ class MindMapView extends obsidian.TextFileView {
         return this.data;
     }
     setViewData(data) {
+        var _a;
         this.insertController.endEdit();
         this.destroyStyleInspector();
         this.destroyShortcutInspector();
@@ -43851,6 +43805,10 @@ class MindMapView extends obsidian.TextFileView {
         }
         this.contentEl.innerHTML = '';
         this.data = data;
+        this.yamlString = this.getFrontMatterFromData(data);
+        this.fileCache = this.file
+            ? this.app.metadataCache.getFileCache(this.file)
+            : null;
         var mdText = this.getMdText(this.data);
         var mindData = this.mdToData(mdText);
         mindData.isRoot = true;
@@ -43866,39 +43824,15 @@ class MindMapView extends obsidian.TextFileView {
         // }
         this.contentEl.addClass('mm-mindmap-view');
         const mindmapContainerEl = this.contentEl.createDiv({ cls: 'mm-mindmap-canvas' });
-        this.mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
-        if (this.firstInit) {
-            setTimeout(() => {
-                var leaf = this.leaf;
-                if (leaf) {
-                    var view = leaf.view;
-                    this.mindmap.path = view === null || view === void 0 ? void 0 : view.file.path;
-                    if (view.file) {
-                        this.fileCache = this.app.metadataCache.getFileCache(view.file);
-                        this.yamlString = this.getFrontMatter();
-                    }
-                }
-                this.mindmap.view = this;
-                const styleTemplate = this.prepareMindmapStyle();
-                this.mindmap.init();
-                applyMindMapStyleTemplate(this.mindmap, styleTemplate);
-                this.restoreStyleInspector();
-                this.restoreShortcutInspector();
-                this.firstInit = false;
-            }, 100);
-        }
-        else {
-            var view = this.leaf.view;
-            this.fileCache = this.app.metadataCache.getFileCache(view.file);
-            this.yamlString = this.getFrontMatter();
-            this.mindmap.path = view === null || view === void 0 ? void 0 : view.file.path;
-            this.mindmap.view = this;
-            const styleTemplate = this.prepareMindmapStyle();
-            this.mindmap.init();
-            applyMindMapStyleTemplate(this.mindmap, styleTemplate);
-            this.restoreStyleInspector();
-            this.restoreShortcutInspector();
-        }
+        const mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
+        this.mindmap = mindmap;
+        mindmap.path = ((_a = this.file) === null || _a === void 0 ? void 0 : _a.path) || '';
+        mindmap.view = this;
+        const styleTemplate = this.prepareMindmapStyle();
+        mindmap.init();
+        applyMindMapStyleTemplate(mindmap, styleTemplate);
+        this.restoreStyleInspector();
+        this.restoreShortcutInspector();
     }
     onunload() {
         this.app.workspace.offref("quick-preview");
@@ -44810,25 +44744,6 @@ class MindMapPlugin extends obsidian.Plugin {
                             node.removeLineBreak();
                         }
                         //else: no node selected
-                    }
-                }
-            });
-            // (Shift +) Escape
-            this.addCommand({
-                id: 'Cancel edit',
-                name: `${t('Cancel edit')}`,
-                callback: () => {
-                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        var mindmap = mindmapView.mindmap;
-                        var node = mindmap.selectNode;
-                        if (node && node.data.isEdit) {
-                            node.select();
-                            node.mindmap.editNode = null;
-                            node.cancelEdit();
-                            mindmap.undo();
-                            //this.selectNode.unSelect();
-                        }
                     }
                 }
             });

@@ -97,7 +97,6 @@ export default {
     'Add tabulation':'Add tabulation',
     'Add line break (<br>)':'Add line break (<br>)',
     'Remove line breaks (<br>)':'Remove line breaks (<br>)',
-    'Cancel edit':'Cancel edit',
     'Expand one level':'Expand one level',
     'Expand one level from the max. displayed level':'Expand one level from the max. displayed level',
     'Collapse one level':'Collapse one level',

@@ -56,7 +56,6 @@ export default {
     'Add tabulation':'Ajouter une tabulation',
     'Add line break (<br>)':'Ajouter un retour à la ligne (<br>)',
     'Remove line breaks (<br>)':'Supprimer les retours à la ligne (<br>)',
-    'Cancel edit':'Annuler la modification',
     'Expand one level':'Étendre d\'un niveau',
     'Expand one level from the max. displayed level':'Étendre d\'un niveau à partir du niveau maximal affiché',
     'Collapse one level':'Réduire d\'un niveau',

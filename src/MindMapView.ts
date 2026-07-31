@@ -57,7 +57,6 @@ export class MindMapView extends TextFileView implements HoverParent {
   isApplyingStyleTemplate: boolean = false;
   timeOut: any = null;
   fileCache: any;
-  firstInit: boolean = true;
   yamlString:string=''
 
   getViewType() {
@@ -287,35 +286,6 @@ export class MindMapView extends TextFileView implements HoverParent {
     }
   }
 
-  getFrontMatter() {
-    var frontMatter = '---\n\n';
-  //  var v: any = '';
-    if (this.fileCache.frontmatter) {
-      // for (var k in this.fileCache.frontmatter) {
-      //   if (k != 'position') {
-      //     if (Object.prototype.toString.call(this.fileCache.frontmatter[k]) == '[object Array]' || Object.prototype.toString.call(this.fileCache.frontmatter[k]) == '[object Object]') {
-      //       v = JSON.stringify(this.fileCache.frontmatter[k]);
-      //     } else if (Object.prototype.toString.call(this.fileCache.frontmatter[k]) == '[object Number]' || Object.prototype.toString.call(this.fileCache.frontmatter[k]) == "[object String]") {
-      //       v = this.fileCache.frontmatter[k];
-      //     }
-
-      //     if (v) {
-      //       frontMatter += `${k}: ${v}\n`;
-      //     }
-      //   }
-      // }
-      //var position = this.fileCache.frontmatter.position;
-      var position = this.fileCache.frontmatterPosition;
-      var end =  position['end'].offset;
-
-      frontMatter = this.data.substr(0,end);
-    }
-
-    frontMatter+='\n\n';
-    //frontMatter += `\n---\n\n`;
-    return frontMatter
-  }
-
   constructor(leaf: WorkspaceLeaf, plugin: MindMapPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -366,6 +336,10 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.contentEl.innerHTML = '';
 
     this.data = data;
+    this.yamlString = this.getFrontMatterFromData(data);
+    this.fileCache = this.file
+      ? this.app.metadataCache.getFileCache(this.file)
+      : null;
 
     var mdText = this.getMdText(this.data);
     var mindData = this.mdToData(mdText);
@@ -385,41 +359,15 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     this.contentEl.addClass('mm-mindmap-view');
     const mindmapContainerEl = this.contentEl.createDiv({ cls: 'mm-mindmap-canvas' });
-    this.mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
-    if (this.firstInit) {
-
-      setTimeout(() => {
-        var leaf = this.leaf;
-        if (leaf) {
-          var view = leaf.view as MindMapView;
-
-          this.mindmap.path = view?.file.path;
-          if (view.file) {
-            this.fileCache = this.app.metadataCache.getFileCache(view.file);
-            this.yamlString = this.getFrontMatter();
-          }
-        }
-        this.mindmap.view = this;
-        const styleTemplate = this.prepareMindmapStyle();
-        this.mindmap.init();
-        applyMindMapStyleTemplate(this.mindmap, styleTemplate);
-        this.restoreStyleInspector();
-        this.restoreShortcutInspector();
-        this.firstInit = false;
-      }, 100);
-    } else {
-      var view = this.leaf.view as MindMapView;
-      this.fileCache = this.app.metadataCache.getFileCache(view.file);
-      this.yamlString = this.getFrontMatter();
-
-      this.mindmap.path = view?.file.path;
-      this.mindmap.view = this;
-      const styleTemplate = this.prepareMindmapStyle();
-      this.mindmap.init();
-      applyMindMapStyleTemplate(this.mindmap, styleTemplate);
-      this.restoreStyleInspector();
-      this.restoreShortcutInspector();
-    }
+    const mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
+    this.mindmap = mindmap;
+    mindmap.path = this.file?.path || '';
+    mindmap.view = this;
+    const styleTemplate = this.prepareMindmapStyle();
+    mindmap.init();
+    applyMindMapStyleTemplate(mindmap, styleTemplate);
+    this.restoreStyleInspector();
+    this.restoreShortcutInspector();
   }
 
   onunload() {

@@ -489,21 +489,6 @@ export default class MindMap {
         // }
 
         if (!ctrlKey && !shiftKey && !altKey) { // NO SPECIAL KEY
-                // Escape
-            if (keyCode == 27) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                var node = this.selectNode;
-                if (node && node.data.isEdit) {
-                    node.select();
-                    node.mindmap.editNode = null;
-                    node.cancelEdit();
-                    this.undo();
-                    //this.selectNode.unSelect();
-                }
-            }
-
             // up
             if (keyCode == 38 || e.key == 'ArrowUp') {
                 e.preventDefault();
