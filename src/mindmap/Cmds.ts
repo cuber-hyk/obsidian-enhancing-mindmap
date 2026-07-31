@@ -1,4 +1,4 @@
-import INode from './INode'
+import INode, { INodeData } from './INode'
 import MindMap  from './mindmap';
 
 export abstract class Command {
@@ -594,5 +594,76 @@ export class ExpandNode extends Command{
                 this.refresh(this.mind);
             }
         });
+    }
+}
+
+interface PasteNodeForestData extends INodeData {
+    children?:PasteNodeForestData[];
+}
+
+export class PasteNodeForest extends Command {
+    node:INode;
+    data:PasteNodeForestData[];
+    roots:INode[]=[];
+    insertionIndex:number;
+    wasExpanded:boolean;
+    mind:MindMap;
+
+    constructor(node:INode, data:PasteNodeForestData[]) {
+        super('pasteNodeForest');
+        this.node = node;
+        this.data = data;
+        this.mind = node.mindmap;
+        this.insertionIndex = node.children.length;
+        this.wasExpanded = node.isExpand;
+    }
+
+    execute():boolean {
+        if (!this.data.length) return false;
+        if (!this.roots.length) {
+            this.roots = this.data.map((data) => this.createNodeTree(data));
+        }
+
+        this.node.expand();
+        this.roots.forEach((root, index) => {
+            this.mind.addNode(root, this.node, this.insertionIndex + index);
+            this.refreshNodeTree(root);
+        });
+        this.selectTargetAndRefresh();
+        return true;
+    }
+
+    undo() {
+        this.roots.forEach((root) => this.mind.removeNode(root));
+        if (this.wasExpanded) this.node.expand();
+        else this.node.collapse();
+        this.selectTargetAndRefresh();
+    }
+
+    private createNodeTree(data:PasteNodeForestData):INode {
+        const node = new INode({
+            ...data,
+            children: [],
+        }, this.mind);
+        (data.children || []).forEach((childData) => {
+            node.addChild(this.createNodeTree(childData));
+        });
+        return node;
+    }
+
+    private refreshNodeTree(root:INode) {
+        this.mind.traverseBF((node:INode) => {
+            node.setPosition(0, 0);
+            node.refreshBox();
+            node.boundingRect = null;
+            node.stroke = '';
+        }, root);
+    }
+
+    private selectTargetAndRefresh() {
+        this.node.clearCacheData();
+        this.mind.clearSelectNode();
+        this.refresh(this.mind);
+        this.node.select();
     }
 }
