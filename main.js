@@ -1797,7 +1797,7 @@ class Node$1 {
             this.attachTablePreview();
             (_b = this.autoWrapController) === null || _b === void 0 ? void 0 : _b.refresh();
             this.refreshBox();
-            this.mindmap && this.mindmap.emit('initNode', {});
+            this.mindmap && this.mindmap.emit('initNode', { node: this });
             this._delay();
         });
     }
@@ -1886,7 +1886,7 @@ class Node$1 {
             setTimeout(() => {
                 this.clearCacheData();
                 this.refreshBox();
-                this.mindmap && this.mindmap.emit('renderEditNode', {});
+                this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
             }, 100);
         }
         //image
@@ -1928,7 +1928,7 @@ class Node$1 {
         const refresh = () => {
             this.clearCacheData();
             this.refreshBox();
-            this.mindmap && this.mindmap.emit('renderEditNode', {});
+            this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
         };
         element.onload = refresh;
         element.onerror = refresh;
@@ -2065,7 +2065,7 @@ class Node$1 {
             onLayoutChange: () => {
                 this.refreshBox();
                 this.clearCacheData();
-                this.mindmap.emit('initNode', {});
+                this.mindmap.emit('renderEditNode', { node: this });
             },
         });
         if (preview.attach())
@@ -3097,7 +3097,7 @@ class Node$1 {
 }
 
 class Layout {
-    constructor(node, direct, colors) {
+    constructor(node, direct, colors, lineWidth) {
         this.layoutName = 'mindmap';
         this.direct = '';
         this.levelDis = 40;
@@ -3113,6 +3113,7 @@ class Layout {
         this.mind = (node === null || node === void 0 ? void 0 : node.mindmap) || null;
         this.direct = direct || 'mindmap';
         this.colors = colors || [];
+        this.lineWidth = lineWidth || 2;
         if (!this.svgDom)
             this.svgDom = this.mind.edgeGroup.group();
         this.layout();
@@ -11553,8 +11554,12 @@ class MindMapNavigatorController {
 let tempDispLevel = 0;
 class MindMap {
     constructor(data, containerEL, setting) {
-        this._nodeNum = 0;
-        this._tempNum = 0;
+        this.pendingInitialNodes = new Set();
+        this.isBuildingInitialTree = false;
+        this.isInitialLayoutReady = false;
+        this.initialLayoutFrame = null;
+        this.renderLayoutFrame = null;
+        this.layoutLineWidth = 2;
         this.colors = [];
         this.scalePointer = [];
         this.mindScale = 100;
@@ -11642,9 +11647,13 @@ class MindMap {
         var x = this.setting.canvasSize / 2 - 60;
         var y = this.setting.canvasSize / 2 - 200;
         var waitCollapseNodes = [];
+        this.cancelScheduledLayout();
+        this.pendingInitialNodes.clear();
+        this.isBuildingInitialTree = true;
+        this.isInitialLayoutReady = false;
         function initNode(d, isRoot, p) {
-            that._nodeNum++;
             var n = new Node$1(d, that);
+            that.pendingInitialNodes.add(n);
             // if (collapsedIds && collapsedIds.includes(n.getId())) {
             //     n.isExpand = false;
             // }
@@ -11679,6 +11688,8 @@ class MindMap {
                 n.collapse();
             });
         }
+        this.isBuildingInitialTree = false;
+        this.scheduleInitialLayoutIfReady();
     }
     traverseBF(callback, node) {
         var array = [];
@@ -11806,17 +11817,63 @@ class MindMap {
         (_a = this.nodeSelectionController) === null || _a === void 0 ? void 0 : _a.destroy();
     }
     initNode(evt) {
-        this._tempNum++;
-        //console.log(this._nodeNum,this._tempNum);
-        if (this._tempNum == this._nodeNum) {
-            this.refresh();
-            //this.center();
-        }
+        const node = evt.detail.node;
+        if (!node || !this.pendingInitialNodes.delete(node))
+            return;
+        this.scheduleInitialLayoutIfReady();
     }
     renderEditNode(evt) {
-        var node = evt.detail.node || null;
-        node === null || node === void 0 ? void 0 : node.clearCacheData();
-        this.refresh();
+        var _a;
+        const node = evt.detail.node;
+        if (node) {
+            node.refreshBox();
+            node.clearCacheData();
+        }
+        else {
+            (_a = this.root) === null || _a === void 0 ? void 0 : _a.clearTreeCacheData();
+        }
+        this.scheduleRenderedLayout();
+    }
+    scheduleInitialLayoutIfReady() {
+        if (this.isInitialLayoutReady ||
+            this.isBuildingInitialTree ||
+            this.pendingInitialNodes.size > 0 ||
+            this.initialLayoutFrame !== null) {
+            return;
+        }
+        this.initialLayoutFrame = requestAnimationFrame(() => {
+            this.initialLayoutFrame = null;
+            if (this.isBuildingInitialTree || this.pendingInitialNodes.size > 0)
+                return;
+            this.traverseBF((node) => {
+                node.refreshBox();
+                node.boundingRect = null;
+            });
+            this.isInitialLayoutReady = true;
+            this.performLayoutRefresh();
+        });
+    }
+    scheduleRenderedLayout() {
+        if (!this.isInitialLayoutReady)
+            return;
+        if (this.renderLayoutFrame !== null)
+            return;
+        this.renderLayoutFrame = requestAnimationFrame(() => {
+            this.renderLayoutFrame = null;
+            if (!this.isInitialLayoutReady)
+                return;
+            this.performLayoutRefresh();
+        });
+    }
+    cancelScheduledLayout() {
+        if (this.initialLayoutFrame !== null) {
+            cancelAnimationFrame(this.initialLayoutFrame);
+            this.initialLayoutFrame = null;
+        }
+        if (this.renderLayoutFrame !== null) {
+            cancelAnimationFrame(this.renderLayoutFrame);
+            this.renderLayoutFrame = null;
+        }
     }
     mindMapChange() {
         var _a;
@@ -12841,6 +12898,10 @@ class MindMap {
     }
     clear() {
         var _a, _b;
+        this.cancelScheduledLayout();
+        this.pendingInitialNodes.clear();
+        this.isBuildingInitialTree = false;
+        this.isInitialLayoutReady = false;
         this.clearNode();
         (_a = this.navigatorController) === null || _a === void 0 ? void 0 : _a.destroy();
         this.removeEvent();
@@ -13044,7 +13105,7 @@ class MindMap {
     //layout
     layout() {
         if (!this.mmLayout) {
-            this.mmLayout = new Layout(this.root, this.setting.layoutDirect || 'mind map', this.colors);
+            this.mmLayout = new Layout(this.root, this.setting.layoutDirect || 'mind map', this.colors, this.layoutLineWidth);
             // Select and center on the mindmap's root when opening it
             this.root.select();
             this.centerOnNode(this.root);
@@ -13053,6 +13114,13 @@ class MindMap {
         this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
     }
     refresh() {
+        if (!this.isInitialLayoutReady) {
+            this.scheduleInitialLayoutIfReady();
+            return;
+        }
+        this.performLayoutRefresh();
+    }
+    performLayoutRefresh() {
         var _a;
         this.layout();
         (_a = this.navigatorController) === null || _a === void 0 ? void 0 : _a.scheduleUpdate();
@@ -41028,6 +41096,7 @@ function applyMindMapStyleTemplate(mindmap, templateOrId) {
     const colors = getMindMapStyleBranchPalette(template);
     const needsInitialLayout = !mindmap.mmLayout;
     mindmap.colors = colors;
+    mindmap.layoutLineWidth = template.branch.lineWidth;
     if (mindmap.mmLayout) {
         mindmap.mmLayout.colors = colors;
         mindmap.mmLayout.lineWidth = template.branch.lineWidth;
