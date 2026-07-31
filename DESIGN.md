@@ -1,7 +1,7 @@
 ---
 artifact_type: design_system
 status: current
-updated: 2026-07-19
+updated: 2026-07-31
 token_source: design-tokens.json
 ---
 
@@ -24,7 +24,7 @@ token_source: design-tokens.json
 
 - 令牌：`design-tokens.json`
 - 节点插入 UI：`src/mindmap/insert/NodeInsertController.ts`、`src/mindmap/INode.ts`、`styles.css`
-- 节点键盘交互：`src/mindmap/interaction/NodeKeyboardController.ts`
+- 节点键盘交互：`src/mindmap/interaction/NodeKeyboardController.ts`、`src/mindmap/interaction/OrderedSiblingNumbering.ts`
 - 链接操作 UI：`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/link/EditNodeLinkModal.ts`
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/image/NodeImageReorderController.ts`、`src/mindmap/INode.ts`
 - 节点表格：`src/mindmap/table/NodeTableMarkdown.ts`、`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`、`src/mindmap/INode.ts`、`styles.css`
@@ -79,7 +79,7 @@ token_source: design-tokens.json
 - 单击链接图标执行跳转；右键菜单提供复制链接、编辑和删除，复制内容保留完整 Markdown 链接以支持粘贴还原，悬停与右键不得改变当前节点选择。
 - 编辑或删除链接只影响目标链接，并通过节点文本命令历史支持撤销和重做。
 - 链接图标不参与节点正文宽度计算，避免改变分支线位置。
-- 节点新增和删除只使用画布键盘状态机：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点，`Enter` 默认在下方新增同级，`Shift+Enter` 默认在上方新增同级；根节点的下方新增快捷键仍新增一级子节点，上方新增不执行操作。所有新节点创建后立即进入编辑态并全选默认文案。编辑态 `Enter` 结束编辑，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 新增子节点；`Ctrl`/`Cmd+B`、`Ctrl`/`Cmd+I` 与 `Ctrl`/`Cmd+Shift+S` 分别切换选区的加粗、斜体与删除线 Markdown 标记，空选区插入标记对并将光标置中。
+- 节点新增和删除只使用画布键盘状态机：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点，`Enter` 默认在下方新增同级，`Shift+Enter` 默认在上方新增同级；根节点的下方新增快捷键仍新增一级子节点，上方新增不执行操作。新节点创建后立即进入编辑态；普通新节点全选默认文案，从 `数字.` 或 `数字)` 节点新增同级节点时保留自动生成的编号前缀并只选中默认正文。编辑态 `Enter` 结束编辑，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 新增子节点；`Ctrl`/`Cmd+B`、`Ctrl`/`Cmd+I` 与 `Ctrl`/`Cmd+Shift+S` 分别切换选区的加粗、斜体与删除线 Markdown 标记，空选区插入标记对并将光标置中。
 - 快捷键检查器仅允许修改新增上方/下方同级节点的全局绑定；这两项以纵向录制卡展示完整动作名和全宽键帽，恢复默认作为区块级低强调操作。固定节点、剪贴板与编辑格式操作使用轻量只读列表；插件命令快捷键从宿主当前热键注册表读取，以反映用户在 Obsidian 中的改绑。录制须拒绝固定节点操作或两个可配置操作之间的冲突，保存后立即作用于所有已打开脑图。
 - 编辑态图片显示为可选中的图片控件，不显示原始图片 Markdown；点击图片选中，拖拽手柄调整宽度，`Backspace` 或 `Delete` 删除选中图片。
 - 编辑态已选中的图片可拖到节点正文上方或下方，拖动时使用强调色横线提示唯一落点；图片手势不得触发节点整体拖动。聚焦图片后可使用 `Alt+↑/↓/←/→` 将图片放到文字对应方向，四项均注册为可重新绑定的 Obsidian 命令。多图节点只移动当前图片，其余内容保持相对顺序。

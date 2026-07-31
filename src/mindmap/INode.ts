@@ -183,10 +183,16 @@ export default class Node {
             this.data.text = "Sub title";
         }
         const text = getNodeAutoWrapContent(this.data.text);
+        const renderText = text.includes('$$')
+            ? text
+                .split('\n')
+                .map((line) => line.trim() === '<br>' ? '' : line)
+                .join('\n')
+            : text;
         const renderVersion = ++this._renderVersion;
         const stagedContent = this.contentEl.ownerDocument.createElement('div');
         await MarkdownRenderer.renderMarkdown(
-            text,
+            renderText,
             stagedContent,
             this.mindmap.path || "",
             this.mindmap.view,
@@ -420,7 +426,7 @@ export default class Node {
         }
     }
 
-    async edit(options: { selectAll?: boolean } = {}): Promise<void> {
+    async edit(options: { selectAll?: boolean, selectFrom?: number } = {}): Promise<void> {
         const renderPromise = this._renderPromise;
         await renderPromise;
         if (renderPromise !== this._renderPromise) {
@@ -433,7 +439,7 @@ export default class Node {
         this.beginSourceEdit(options);
     }
 
-    private beginSourceEdit(options: { selectAll?: boolean } = {}){
+    private beginSourceEdit(options: { selectAll?: boolean, selectFrom?: number } = {}){
         this.autoWrapController?.cancel();
         this.contentEl.innerText='';
         this._oldText = this.data.text;
@@ -458,12 +464,14 @@ export default class Node {
         this.contentEl.focus();
         keepLastIndex(this.contentEl);
         if (options.selectAll) this.selectText();
+        else if (options.selectFrom !== undefined) this.selectTextFrom(options.selectFrom);
         this.mindmap.view?.insertController.beginEdit(this);
-        if (options.selectAll) {
+        if (options.selectAll || options.selectFrom !== undefined) {
             requestAnimationFrame(() => {
                 if (this.data.isEdit && this.mindmap.editNode === this) {
                     this.contentEl.focus();
-                    this.selectText();
+                    if (options.selectAll) this.selectText();
+                    else this.selectTextFrom(options.selectFrom);
                 }
             });
         }
@@ -533,6 +541,36 @@ export default class Node {
             selection.removeAllRanges();
             selection.addRange(range);
         }
+    }
+
+    private selectTextFrom(offset: number) {
+        const selection = this.contentEl.ownerDocument.defaultView?.getSelection();
+        const nodeFilter = this.contentEl.ownerDocument.defaultView?.NodeFilter;
+        if (!selection || !nodeFilter) return;
+
+        const range = this.contentEl.ownerDocument.createRange();
+        range.selectNodeContents(this.contentEl);
+        const walker = this.contentEl.ownerDocument.createTreeWalker(
+            this.contentEl,
+            nodeFilter.SHOW_TEXT,
+        );
+        var remaining = Math.max(0, offset);
+        var textNode = walker.nextNode();
+        while (textNode) {
+            const length = textNode.textContent?.length || 0;
+            if (remaining <= length) {
+                range.setStart(textNode, remaining);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+            remaining -= length;
+            textNode = walker.nextNode();
+        }
+
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
     }
 
     toggleMarkdownFormatting(primaryMarker: string, alternateMarker?: string): boolean {

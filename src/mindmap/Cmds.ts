@@ -1,5 +1,6 @@
 import INode, { INodeData } from './INode'
 import MindMap  from './mindmap';
+import { getOrderedSiblingNumbering } from './interaction/OrderedSiblingNumbering';
 
 export abstract class Command {
     name:string;
@@ -56,6 +57,95 @@ export class AddNode extends Command {
             this.refresh();
             p&&p.select();
         },0)
+    }
+}
+
+interface NodeTextChange {
+    node:INode;
+    oldText:string;
+    text:string;
+}
+
+export class AddSiblingNode extends Command {
+    node:INode;
+    reference:INode;
+    parent:INode;
+    mind:MindMap;
+    index:number;
+    textChanges:NodeTextChange[] = [];
+    selectionOffset:number = 0;
+    initialized:boolean = false;
+
+    constructor(node:INode, reference:INode, direct:'top'|'down') {
+        super('addSiblingNode');
+        this.node = node;
+        this.reference = reference;
+        this.parent = reference.parent;
+        this.mind = reference.mindmap;
+        this.index = reference.getIndex() + (direct === 'top' ? 0 : 1);
+    }
+
+    execute():boolean {
+        if (!this.parent || !this.parent.children.includes(this.reference)) return false;
+        if (!this.initialized) this.initializeTextChanges();
+
+        this.textChanges.forEach(({node, text}) => node.setText(text));
+        this.mind.addNode(this.node, this.parent, this.index);
+        this.refreshNodes();
+        this.mind.clearSelectNode();
+        setTimeout(() => {
+            this.node.select();
+            if (this.selectionOffset > 0) {
+                this.node.edit({ selectFrom: this.selectionOffset });
+            } else {
+                this.node.edit({ selectAll: true });
+            }
+        }, 0);
+        return true;
+    }
+
+    undo() {
+        this.mind.removeNode(this.node);
+        this.textChanges.forEach(({node, oldText}) => {
+            if (node !== this.node) node.setText(oldText);
+        });
+        this.refreshNodes();
+        this.mind.clearSelectNode();
+        this.reference.select();
+    }
+
+    private initializeTextChanges() {
+        this.initialized = true;
+        const numbering = getOrderedSiblingNumbering(
+            this.parent.children.map((node) => node.data.text),
+            this.reference.getIndex(),
+            this.index,
+            this.node.data.text,
+        );
+        if (!numbering) return;
+
+        const group = this.parent.children.slice(
+            numbering.startIndex,
+            numbering.startIndex + numbering.texts.length - 1,
+        );
+        group.splice(this.index - numbering.startIndex, 0, this.node);
+        group.forEach((node, offset) => {
+            this.textChanges.push({
+                node,
+                oldText: node.data.text,
+                text: numbering.texts[offset],
+            });
+        });
+        this.selectionOffset = numbering.selectionOffset;
+    }
+
+    private refreshNodes() {
+        this.parent.clearCacheData();
+        this.textChanges.forEach(({node}) => {
+            node.clearCacheData();
+            node.refreshBox();
+        });
+        this.refresh(this.mind);
     }
 }
 

@@ -1782,9 +1782,15 @@ class Node$1 {
                 this.data.text = "Sub title";
             }
             const text = getNodeAutoWrapContent(this.data.text);
+            const renderText = text.includes('$$')
+                ? text
+                    .split('\n')
+                    .map((line) => line.trim() === '<br>' ? '' : line)
+                    .join('\n')
+                : text;
             const renderVersion = ++this._renderVersion;
             const stagedContent = this.contentEl.ownerDocument.createElement('div');
-            yield obsidian.MarkdownRenderer.renderMarkdown(text, stagedContent, this.mindmap.path || "", this.mindmap.view);
+            yield obsidian.MarkdownRenderer.renderMarkdown(renderText, stagedContent, this.mindmap.path || "", this.mindmap.view);
             if (parseNodeImages(text).length > 0) {
                 yield new Promise((resolve) => setTimeout(resolve, 120));
             }
@@ -2043,12 +2049,17 @@ class Node$1 {
         keepLastIndex(this.contentEl);
         if (options.selectAll)
             this.selectText();
+        else if (options.selectFrom !== undefined)
+            this.selectTextFrom(options.selectFrom);
         (_b = this.mindmap.view) === null || _b === void 0 ? void 0 : _b.insertController.beginEdit(this);
-        if (options.selectAll) {
+        if (options.selectAll || options.selectFrom !== undefined) {
             requestAnimationFrame(() => {
                 if (this.data.isEdit && this.mindmap.editNode === this) {
                     this.contentEl.focus();
-                    this.selectText();
+                    if (options.selectAll)
+                        this.selectText();
+                    else
+                        this.selectTextFrom(options.selectFrom);
                 }
             });
         }
@@ -2114,6 +2125,32 @@ class Node$1 {
             selection.removeAllRanges();
             selection.addRange(range);
         }
+    }
+    selectTextFrom(offset) {
+        var _a, _b, _c;
+        const selection = (_a = this.contentEl.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.getSelection();
+        const nodeFilter = (_b = this.contentEl.ownerDocument.defaultView) === null || _b === void 0 ? void 0 : _b.NodeFilter;
+        if (!selection || !nodeFilter)
+            return;
+        const range = this.contentEl.ownerDocument.createRange();
+        range.selectNodeContents(this.contentEl);
+        const walker = this.contentEl.ownerDocument.createTreeWalker(this.contentEl, nodeFilter.SHOW_TEXT);
+        var remaining = Math.max(0, offset);
+        var textNode = walker.nextNode();
+        while (textNode) {
+            const length = ((_c = textNode.textContent) === null || _c === void 0 ? void 0 : _c.length) || 0;
+            if (remaining <= length) {
+                range.setStart(textNode, remaining);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+            remaining -= length;
+            textNode = walker.nextNode();
+        }
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
     }
     toggleMarkdownFormatting(primaryMarker, alternateMarker) {
         var _a;
@@ -9299,6 +9336,57 @@ class History {
     }
 }
 
+function parseOrderedNodeText(text) {
+    const match = /^(\d+)([.)])\s+/.exec(text);
+    if (!match)
+        return null;
+    return {
+        number: Number(match[1]),
+        delimiter: match[2],
+        content: text.slice(match[0].length),
+    };
+}
+function escapeLeadingOrderedNodeMarker(text) {
+    return text.replace(/^(\d+)([.)])(?=\s)/, '$1\\$2');
+}
+function restoreLeadingOrderedNodeMarker(text) {
+    return text.replace(/^(\d+)\\([.)])(?=\s)/, '$1$2');
+}
+function getOrderedSiblingNumbering(siblingTexts, referenceIndex, insertionIndex, newNodeText) {
+    const reference = parseOrderedNodeText(siblingTexts[referenceIndex]);
+    if (!reference)
+        return null;
+    var startIndex = referenceIndex;
+    var endIndex = referenceIndex;
+    while (startIndex > 0) {
+        const previous = parseOrderedNodeText(siblingTexts[startIndex - 1]);
+        if (!previous || previous.delimiter !== reference.delimiter)
+            break;
+        startIndex--;
+    }
+    while (endIndex < siblingTexts.length - 1) {
+        const next = parseOrderedNodeText(siblingTexts[endIndex + 1]);
+        if (!next || next.delimiter !== reference.delimiter)
+            break;
+        endIndex++;
+    }
+    const group = siblingTexts.slice(startIndex, endIndex + 1);
+    group.splice(insertionIndex - startIndex, 0, newNodeText);
+    const startNumber = parseOrderedNodeText(siblingTexts[startIndex]).number;
+    const insertedOffset = insertionIndex - startIndex;
+    const texts = group.map((text, offset) => {
+        const content = offset === insertedOffset
+            ? text
+            : parseOrderedNodeText(text).content;
+        return `${startNumber + offset}${reference.delimiter} ${content}`;
+    });
+    return {
+        startIndex,
+        texts,
+        selectionOffset: `${startNumber + insertedOffset}${reference.delimiter} `.length,
+    };
+}
+
 class Command {
     constructor(name) {
         this.name = name;
@@ -9350,6 +9438,73 @@ class AddNode extends Command {
             this.refresh();
             p && p.select();
         }, 0);
+    }
+}
+class AddSiblingNode extends Command {
+    constructor(node, reference, direct) {
+        super('addSiblingNode');
+        this.textChanges = [];
+        this.selectionOffset = 0;
+        this.initialized = false;
+        this.node = node;
+        this.reference = reference;
+        this.parent = reference.parent;
+        this.mind = reference.mindmap;
+        this.index = reference.getIndex() + (direct === 'top' ? 0 : 1);
+    }
+    execute() {
+        if (!this.parent || !this.parent.children.includes(this.reference))
+            return false;
+        if (!this.initialized)
+            this.initializeTextChanges();
+        this.textChanges.forEach(({ node, text }) => node.setText(text));
+        this.mind.addNode(this.node, this.parent, this.index);
+        this.refreshNodes();
+        this.mind.clearSelectNode();
+        setTimeout(() => {
+            this.node.select();
+            if (this.selectionOffset > 0) {
+                this.node.edit({ selectFrom: this.selectionOffset });
+            }
+            else {
+                this.node.edit({ selectAll: true });
+            }
+        }, 0);
+        return true;
+    }
+    undo() {
+        this.mind.removeNode(this.node);
+        this.textChanges.forEach(({ node, oldText }) => {
+            if (node !== this.node)
+                node.setText(oldText);
+        });
+        this.refreshNodes();
+        this.mind.clearSelectNode();
+        this.reference.select();
+    }
+    initializeTextChanges() {
+        this.initialized = true;
+        const numbering = getOrderedSiblingNumbering(this.parent.children.map((node) => node.data.text), this.reference.getIndex(), this.index, this.node.data.text);
+        if (!numbering)
+            return;
+        const group = this.parent.children.slice(numbering.startIndex, numbering.startIndex + numbering.texts.length - 1);
+        group.splice(this.index - numbering.startIndex, 0, this.node);
+        group.forEach((node, offset) => {
+            this.textChanges.push({
+                node,
+                oldText: node.data.text,
+                text: numbering.texts[offset],
+            });
+        });
+        this.selectionOffset = numbering.selectionOffset;
+    }
+    refreshNodes() {
+        this.parent.clearCacheData();
+        this.textChanges.forEach(({ node }) => {
+            node.clearCacheData();
+            node.refreshBox();
+        });
+        this.refresh(this.mind);
     }
 }
 class RemoveNode extends Command {
@@ -9867,7 +10022,6 @@ class Exec {
         var l_return = null;
         switch (name) {
             case 'addChildNode':
-            case 'addSiblingNode':
                 if (data) {
                     var d = {
                         id: uuid(),
@@ -9876,6 +10030,19 @@ class Exec {
                     var parent = data.parent;
                     var node = new Node$1(d, parent.mindmap);
                     this.history.execute(new AddNode(node, data.parent, parent.mindmap));
+                    l_return = node;
+                }
+                break;
+            case 'addSiblingNode':
+                if ((data === null || data === void 0 ? void 0 : data.node) &&
+                    (data.direct === 'top' || data.direct === 'down') &&
+                    data.node.parent) {
+                    var d = {
+                        id: uuid(),
+                        text: data.text || t('Sub title')
+                    };
+                    var node = new Node$1(d, data.node.mindmap);
+                    this.history.execute(new AddSiblingNode(node, data.node, data.direct));
                     l_return = node;
                 }
                 break;
@@ -37914,18 +38081,16 @@ class NodeKeyboardController {
         node.mindmap.execute('addChildNode', { parent: node });
     }
     addSiblingAfter(node) {
-        const newNode = node.mindmap.execute('addSiblingNode', {
-            parent: node.parent,
+        node.mindmap.execute('addSiblingNode', {
+            node,
+            direct: 'down',
         });
-        if (newNode)
-            node.mindmap.moveNode(newNode, node, 'down', false);
     }
     addSiblingBefore(node) {
-        const newNode = node.mindmap.execute('addSiblingNode', {
-            parent: node.parent,
+        node.mindmap.execute('addSiblingNode', {
+            node,
+            direct: 'top',
         });
-        if (newNode)
-            node.mindmap.moveNode(newNode, node, 'top', false);
     }
     handleSiblingShortcut(event, node) {
         const shortcuts = normalizeNodeKeyboardShortcuts(this.mindmap.setting.nodeKeyboardShortcuts);
@@ -40709,7 +40874,7 @@ class MindMap {
                 for (var i = 0; i < n.getLevel() - level; i++) {
                     space += '\t';
                 }
-                var text = n.getData().text.trim();
+                var text = escapeLeadingOrderedNodeMarker(n.getData().text.trim());
                 if (table) {
                     md += `${space}- ${table.title}${ending}\n`;
                     table.markdown.split('\n').forEach((line) => {
@@ -40737,10 +40902,7 @@ class MindMap {
                             //text
                             md += `${space}- `;
                             textArr.forEach((t, i) => {
-                                var contentText = "void";
-                                if (t.trim().length > 0) {
-                                    contentText = t.trim();
-                                }
+                                var contentText = t.trim() || '<br>';
                                 if (i > 0) {
                                     md += `${space}${contentText}${i === textArr.length - 1 ? ending : ''}\n`;
                                 }
@@ -43960,6 +44122,31 @@ class MindMapView extends obsidian.TextFileView {
     mdToData(str) {
         var _a;
         const protectedTables = protectMindMapTables(str);
+        function restoreLegacyFormulaBlankLines(text) {
+            if (!text.includes('$$'))
+                return text;
+            const lines = text.split('\n');
+            return lines.map((line, index) => {
+                var _a, _b;
+                if (line.trim() !== 'void')
+                    return line;
+                const previous = (_a = lines[index - 1]) === null || _a === void 0 ? void 0 : _a.trim();
+                const next = (_b = lines[index + 1]) === null || _b === void 0 ? void 0 : _b.trim();
+                return previous === '$$' || next === '$$' ? '<br>' : line;
+            }).join('\n');
+        }
+        function appendTransformedChildren(target, children) {
+            children.forEach((data) => {
+                var _a, _b;
+                if (data.t === 'list_item' &&
+                    (!((_a = data.v) === null || _a === void 0 ? void 0 : _a.trim()) || data.v.trim() === 'Sub title') &&
+                    ((_b = data.c) === null || _b === void 0 ? void 0 : _b.length) === 1) {
+                    appendTransformedChildren(target, data.c);
+                    return;
+                }
+                target.push(transformData(data));
+            });
+        }
         function transformData(mapData) {
             var flag = true;
             if (mapData.t == 'blockquote') {
@@ -43970,7 +44157,8 @@ class MindMapView extends obsidian.TextFileView {
             const regexResult = /^.+ \^([a-z0-9\-]+)$/gim.exec(mapData.v);
             const id = regexResult != null ? regexResult[1] : null;
             // console.log(id);
-            const text = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
+            const rawText = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
+            const text = restoreLeadingOrderedNodeMarker(restoreLegacyFormulaBlankLines(rawText));
             var map = {
                 id: id || uuid(),
                 text: restoreProtectedMindMapTables(text, protectedTables.tables),
@@ -43978,9 +44166,7 @@ class MindMapView extends obsidian.TextFileView {
                 expanded: id ? false : true
             };
             if (flag && mapData.c && mapData.c.length) {
-                mapData.c.forEach((data) => {
-                    map.children.push(transformData(data));
-                });
+                appendTransformedChildren(map.children, mapData.c);
             }
             return map;
         }

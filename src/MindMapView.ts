@@ -32,6 +32,7 @@ import {
   restoreProtectedMindMapTables,
 } from './mindmap/table/NodeTableMarkdown';
 import { uuid } from './mindmap/NodeId';
+import { restoreLeadingOrderedNodeMarker } from './mindmap/interaction/OrderedSiblingNumbering';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
@@ -650,6 +651,31 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   mdToData(str: string) {
     const protectedTables = protectMindMapTables(str);
+    function restoreLegacyFormulaBlankLines(text: string) {
+      if (!text.includes('$$')) return text;
+      const lines = text.split('\n');
+      return lines.map((line, index) => {
+        if (line.trim() !== 'void') return line;
+        const previous = lines[index - 1]?.trim();
+        const next = lines[index + 1]?.trim();
+        return previous === '$$' || next === '$$' ? '<br>' : line;
+      }).join('\n');
+    }
+
+    function appendTransformedChildren(target: INodeData[], children: any[]) {
+      children.forEach((data: any) => {
+        if (
+          data.t === 'list_item' &&
+          (!data.v?.trim() || data.v.trim() === 'Sub title') &&
+          data.c?.length === 1
+        ) {
+          appendTransformedChildren(target, data.c);
+          return;
+        }
+        target.push(transformData(data));
+      });
+    }
+
     function transformData(mapData: any) {
       var flag = true;
       if (mapData.t == 'blockquote') {
@@ -662,7 +688,10 @@ export class MindMapView extends TextFileView implements HoverParent {
 
      // console.log(id);
 
-      const text = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
+      const rawText = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
+      const text = restoreLeadingOrderedNodeMarker(
+        restoreLegacyFormulaBlankLines(rawText),
+      );
       var map: INodeData = {
         id: id || uuid(),
         text: restoreProtectedMindMapTables(text, protectedTables.tables),
@@ -671,9 +700,7 @@ export class MindMapView extends TextFileView implements HoverParent {
       };
 
       if (flag && mapData.c && mapData.c.length) {
-        mapData.c.forEach((data: any) => {
-          map.children.push(transformData(data));
-        });
+        appendTransformedChildren(map.children, mapData.c);
       }
 
       return map;

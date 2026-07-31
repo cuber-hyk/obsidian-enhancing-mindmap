@@ -39,7 +39,6 @@ export default class Exec{
         var l_return = null;
         switch(name){
             case 'addChildNode':
-            case 'addSiblingNode':
                 if(data){
                     var d = {
                         id: uuid(),
@@ -48,6 +47,21 @@ export default class Exec{
                     var parent:INode = data.parent;
                     var node = new INode(d,parent.mindmap);
                     this.history.execute(new cmd.AddNode(node, data.parent, parent.mindmap));
+                    l_return = node;
+                }
+                break;
+            case 'addSiblingNode':
+                if(
+                    data?.node &&
+                    (data.direct === 'top' || data.direct === 'down') &&
+                    data.node.parent
+                ){
+                    var d = {
+                        id: uuid(),
+                        text: data.text || t('Sub title')
+                    }
+                    var node = new INode(d, data.node.mindmap);
+                    this.history.execute(new cmd.AddSiblingNode(node, data.node, data.direct));
                     l_return = node;
                 }
                 break;
