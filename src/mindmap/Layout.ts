@@ -16,11 +16,12 @@ export default class Layout {
     rights:Node[]=[];
     colors:string[]=[];
     lineWidth=2;
-    constructor(node:Node,direct?:string,colors?:string[]){
+    constructor(node:Node,direct?:string,colors?:string[],lineWidth?:number){
        this.root = node||null;
        this.mind = node?.mindmap||null;
        this.direct = direct||'mindmap';
        this.colors=colors||[];
+       this.lineWidth=lineWidth||2;
       
        if (!this.svgDom) this.svgDom = this.mind.edgeGroup.group();
 

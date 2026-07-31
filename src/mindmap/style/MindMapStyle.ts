@@ -138,6 +138,7 @@ export function applyMindMapStyleTemplate(
   const colors = getMindMapStyleBranchPalette(template);
   const needsInitialLayout = !mindmap.mmLayout;
   mindmap.colors = colors;
+  mindmap.layoutLineWidth = template.branch.lineWidth;
 
   if (mindmap.mmLayout) {
     mindmap.mmLayout.colors = colors;

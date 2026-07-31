@@ -203,7 +203,7 @@ export default class Node {
         this.attachTablePreview();
         this.autoWrapController?.refresh();
         this.refreshBox();
-        this.mindmap&&this.mindmap.emit('initNode',{});
+        this.mindmap&&this.mindmap.emit('initNode',{node:this});
         this._delay();
 
     }
@@ -296,7 +296,7 @@ export default class Node {
                 setTimeout(()=>{
                     this.clearCacheData();
                     this.refreshBox();
-                    this.mindmap&&this.mindmap.emit('renderEditNode',{});
+                    this.mindmap&&this.mindmap.emit('renderEditNode',{node:this});
                 },100);
             }
             //image
@@ -342,7 +342,7 @@ export default class Node {
         const refresh = () => {
             this.clearCacheData();
             this.refreshBox();
-            this.mindmap&&this.mindmap.emit('renderEditNode',{});
+            this.mindmap&&this.mindmap.emit('renderEditNode',{node:this});
         };
         element.onload = refresh;
         element.onerror = refresh;
@@ -479,7 +479,7 @@ export default class Node {
             onLayoutChange: () => {
                 this.refreshBox();
                 this.clearCacheData();
-                this.mindmap.emit('initNode', {});
+                this.mindmap.emit('renderEditNode', {node:this});
             },
         });
         if (preview.attach()) this.tablePreview = preview;
