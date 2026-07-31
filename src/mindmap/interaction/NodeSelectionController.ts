@@ -123,13 +123,6 @@ export default class NodeSelectionController {
   }
 
   handleKeydown(event: KeyboardEvent): boolean {
-    if (event.key === 'Escape' && this.selectedNodes.size > 0) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.mindmap.clearSelectNode();
-      return true;
-    }
-
     if (this.isBatchDeleteEvent(event)) {
       event.preventDefault();
       event.stopPropagation();
