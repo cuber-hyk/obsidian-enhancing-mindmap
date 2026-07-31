@@ -129,17 +129,17 @@ export default class NodeKeyboardController {
   }
 
   private addSiblingAfter(node: Node): void {
-    const newNode = node.mindmap.execute('addSiblingNode', {
-      parent: node.parent,
-    }) as Node;
-    if (newNode) node.mindmap.moveNode(newNode, node, 'down', false);
+    node.mindmap.execute('addSiblingNode', {
+      node,
+      direct: 'down',
+    });
   }
 
   private addSiblingBefore(node: Node): void {
-    const newNode = node.mindmap.execute('addSiblingNode', {
-      parent: node.parent,
-    }) as Node;
-    if (newNode) node.mindmap.moveNode(newNode, node, 'top', false);
+    node.mindmap.execute('addSiblingNode', {
+      node,
+      direct: 'top',
+    });
   }
 
   private handleSiblingShortcut(event: KeyboardEvent, node: Node): boolean {
