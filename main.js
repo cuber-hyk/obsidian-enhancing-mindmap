@@ -245,6 +245,11 @@ var en = {
     "Unsupported image type": "Unsupported image type",
     "Image import failed": "Image import failed",
     "Image preview": "Image preview",
+    "Node image reorder hint": "Node image. Drag vertically to reorder, or press Alt plus an arrow key to place it around the text.",
+    "Move focused node image up": "Move focused node image above text",
+    "Move focused node image down": "Move focused node image below text",
+    "Move focused node image left": "Move focused node image left of text",
+    "Move focused node image right": "Move focused node image right of text",
     "Copy link": "Copy link",
     "Link copied": "Link copied",
     "Failed to copy link": "Failed to copy link",
@@ -497,6 +502,11 @@ var zhCN = {
     "Unsupported image type": "不支持的图片类型",
     "Image import failed": "图片导入失败",
     "Image preview": "图片预览",
+    "Node image reorder hint": "节点图片。可纵向拖动排序，或按 Alt 加方向键将图片放到文字对应方向。",
+    "Move focused node image up": "将聚焦的节点图片移到文字上方",
+    "Move focused node image down": "将聚焦的节点图片移到文字下方",
+    "Move focused node image left": "将聚焦的节点图片移到文字左侧",
+    "Move focused node image right": "将聚焦的节点图片移到文字右侧",
     "Copy link": "复制链接",
     "Link copied": "链接已复制",
     "Failed to copy link": "复制链接失败",
@@ -802,6 +812,41 @@ function parseNodeImages(markdown) {
     }
     return images;
 }
+function moveNodeImageToPosition(markdown, imageIndex, position) {
+    const image = parseNodeImages(markdown)[imageIndex];
+    if (!image)
+        return markdown;
+    const before = markdown.slice(0, image.start);
+    const after = markdown.slice(image.end);
+    const beforeContent = before.trim();
+    const afterContent = after.trim();
+    if (position === 'top' &&
+        !beforeContent &&
+        (!afterContent || /^<br\s*\/?>/i.test(afterContent))) {
+        return markdown;
+    }
+    if (position === 'bottom' &&
+        !afterContent &&
+        (!beforeContent || /<br\s*\/?>$/i.test(beforeContent))) {
+        return markdown;
+    }
+    const beforeBreak = before.match(/(?:\s*<br\s*\/?>\s*)$/i);
+    const afterBreak = after.match(/^(?:\s*<br\s*\/?>\s*)/i);
+    const leading = beforeBreak ? before.slice(0, beforeBreak.index) : before;
+    const trailing = afterBreak ? after.slice(afterBreak[0].length) : after;
+    const separator = leading && trailing && (beforeBreak || afterBreak) ? '<br>' : '';
+    const remaining = `${leading}${separator}${trailing}`;
+    if (!remaining.trim())
+        return image.markdown;
+    if (position === 'top')
+        return `${image.markdown}<br>${remaining}`;
+    if (position === 'bottom')
+        return `${remaining}<br>${image.markdown}`;
+    const inlineRemaining = remaining.trim();
+    if (position === 'left')
+        return `${image.markdown} ${inlineRemaining}`;
+    return `${inlineRemaining} ${image.markdown}`;
+}
 function createVaultImageMarkdown(target, width = DEFAULT_NODE_IMAGE_WIDTH) {
     const safeTarget = target.replace(/\|/g, '\\|');
     return `![[${safeTarget}|${clampNodeImageWidth(width)}]]`;
@@ -974,6 +1019,119 @@ class NodeImagePreviewModal extends obsidian.Modal {
     onClose() {
         this.contentEl.empty();
         this.onCloseCallback();
+    }
+}
+
+const DRAG_THRESHOLD = 4;
+class NodeImageReorderController {
+    constructor(options) {
+        this.reorder = null;
+        this.onPointerDown = (event) => {
+            var _a;
+            if (event.button !== 0)
+                return;
+            const target = event.target instanceof Element ? event.target : null;
+            if (!target || target.closest('.mm-node-image-resize-handle'))
+                return;
+            const imageEl = target.closest('.mm-node-image-attachment');
+            if (!(imageEl instanceof HTMLElement) || !imageEl.classList.contains('is-selected'))
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.reorder = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                imageEl,
+                boundary: null,
+                active: false,
+            };
+            (_a = imageEl.setPointerCapture) === null || _a === void 0 ? void 0 : _a.call(imageEl, event.pointerId);
+        };
+        this.onPointerMove = (event) => {
+            const reorder = this.reorder;
+            if (!reorder || event.pointerId !== reorder.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (!reorder.active) {
+                const distance = Math.hypot(event.clientX - reorder.startX, event.clientY - reorder.startY);
+                if (distance < DRAG_THRESHOLD)
+                    return;
+                reorder.active = true;
+                reorder.imageEl.classList.add('is-reordering');
+                reorder.imageEl.setAttribute('aria-grabbed', 'true');
+                this.containEl.classList.add('is-reordering-image');
+            }
+            const rect = this.contentEl.getBoundingClientRect();
+            const boundary = event.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
+            if (boundary !== reorder.boundary) {
+                reorder.boundary = boundary;
+                this.showIndicator(boundary);
+            }
+        };
+        this.onPointerUp = (event) => {
+            const reorder = this.reorder;
+            if (!reorder || event.pointerId !== reorder.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const shouldMove = reorder.active && reorder.boundary;
+            const imageEl = reorder.imageEl;
+            const boundary = reorder.boundary;
+            this.finishReorder();
+            if (shouldMove && boundary)
+                this.onMove(imageEl, boundary);
+        };
+        this.onPointerCancel = (event) => {
+            if (!this.reorder || event.pointerId !== this.reorder.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.finishReorder();
+        };
+        this.containEl = options.containEl;
+        this.contentEl = options.contentEl;
+        this.onMove = options.onMove;
+        this.indicatorEl = this.containEl.ownerDocument.createElement('span');
+        this.indicatorEl.classList.add('mm-node-image-reorder-indicator');
+        this.indicatorEl.setAttribute('aria-hidden', 'true');
+        this.indicatorEl.hidden = true;
+        this.containEl.appendChild(this.indicatorEl);
+        this.contentEl.addEventListener('pointerdown', this.onPointerDown);
+        this.contentEl.addEventListener('pointermove', this.onPointerMove);
+        this.contentEl.addEventListener('pointerup', this.onPointerUp);
+        this.contentEl.addEventListener('pointercancel', this.onPointerCancel);
+    }
+    cancel() {
+        this.finishReorder();
+    }
+    destroy() {
+        this.cancel();
+        this.contentEl.removeEventListener('pointerdown', this.onPointerDown);
+        this.contentEl.removeEventListener('pointermove', this.onPointerMove);
+        this.contentEl.removeEventListener('pointerup', this.onPointerUp);
+        this.contentEl.removeEventListener('pointercancel', this.onPointerCancel);
+        this.indicatorEl.remove();
+    }
+    showIndicator(boundary) {
+        this.indicatorEl.hidden = false;
+        this.indicatorEl.classList.toggle('is-top', boundary === 'top');
+        this.indicatorEl.classList.toggle('is-bottom', boundary === 'bottom');
+    }
+    finishReorder() {
+        var _a, _b, _c, _d;
+        if (this.reorder) {
+            this.reorder.imageEl.classList.remove('is-reordering');
+            this.reorder.imageEl.setAttribute('aria-grabbed', 'false');
+            if ((_b = (_a = this.reorder.imageEl).hasPointerCapture) === null || _b === void 0 ? void 0 : _b.call(_a, this.reorder.pointerId)) {
+                (_d = (_c = this.reorder.imageEl).releasePointerCapture) === null || _d === void 0 ? void 0 : _d.call(_c, this.reorder.pointerId);
+            }
+        }
+        this.reorder = null;
+        this.indicatorEl.hidden = true;
+        this.indicatorEl.classList.remove('is-top', 'is-bottom');
+        this.containEl.classList.remove('is-reordering-image');
     }
 }
 
@@ -1577,6 +1735,11 @@ class Node$1 {
         this.linkLayerEl = document.createElement('div');
         this.linkLayerEl.classList.add('mm-node-link-layer');
         this.containEl.appendChild(this.linkLayerEl);
+        this.imageReorderController = new NodeImageReorderController({
+            containEl: this.containEl,
+            contentEl: this.contentEl,
+            onMove: (imageEl, boundary) => this.moveEditImageToBoundary(imageEl, boundary),
+        });
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
         this.autoWrapController = new NodeAutoWrapController({
@@ -1817,7 +1980,7 @@ class Node$1 {
     select() {
         var _a;
         this.isSelect = true;
-        this.containEl.setAttribute('draggable', 'true');
+        this.containEl.setAttribute('draggable', this.data.isEdit ? 'false' : 'true');
         //if(this.mindmap.view.plugin.settings.focusOnMove) {
         this.containEl.focus(); // set the dom to be focused
         //}
@@ -1871,6 +2034,7 @@ class Node$1 {
         this.contentEl.setAttribute('contentEditable', 'true');
         this.mindmap.editNode = this;
         this.data.isEdit = true;
+        this.containEl.setAttribute('draggable', 'false');
         if (!this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.add('mm-edit-node');
         }
@@ -2167,8 +2331,9 @@ class Node$1 {
         //selection.removeAllRanges();
     }
     cancelEdit() {
-        var _a;
+        var _a, _b;
         console.log("CancelEdit");
+        (_a = this.imageReorderController) === null || _a === void 0 ? void 0 : _a.cancel();
         var text = this.getMarkdownFromEditedText();
         if (text.length == 0 && !this._editStructureChanged) {
             text = this._oldText;
@@ -2179,6 +2344,7 @@ class Node$1 {
         this.clearEditSurfaceStyle();
         this.contentEl.setAttribute('contentEditable', 'false');
         this.data.isEdit = false;
+        this.containEl.setAttribute('draggable', this.isSelect ? 'true' : 'false');
         this._editText = '';
         this._editLinks = [];
         this._editStructureChanged = false;
@@ -2186,7 +2352,7 @@ class Node$1 {
         if (this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.remove('mm-edit-node');
         }
-        (_a = this.mindmap.view) === null || _a === void 0 ? void 0 : _a.insertController.endEdit(this);
+        (_b = this.mindmap.view) === null || _b === void 0 ? void 0 : _b.insertController.endEdit(this);
         if (text != this._oldText) {
             this.mindmap.execute('changeNodeText', {
                 node: this,
@@ -2256,6 +2422,9 @@ class Node$1 {
         wrapper.classList.add('mm-node-image-attachment');
         wrapper.setAttribute('contenteditable', 'false');
         wrapper.setAttribute('tabindex', '0');
+        wrapper.setAttribute('draggable', 'false');
+        wrapper.setAttribute('aria-label', t('Node image reorder hint'));
+        wrapper.setAttribute('aria-grabbed', 'false');
         wrapper.dataset.imageKind = image.kind;
         wrapper.dataset.imageTarget = image.target;
         wrapper.dataset.imageAlt = image.alt;
@@ -2280,6 +2449,8 @@ class Node$1 {
         wrapper.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (!this.contentEl.contains(wrapper))
+                return;
             this.selectEditImage(wrapper);
         });
         wrapper.addEventListener('dblclick', (event) => {
@@ -2288,6 +2459,8 @@ class Node$1 {
                 return;
             event.preventDefault();
             event.stopPropagation();
+            if (!this.contentEl.contains(wrapper))
+                return;
             this.selectEditImage(wrapper);
             const app = (_b = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.view) === null || _b === void 0 ? void 0 : _b.app;
             if (!app)
@@ -2381,6 +2554,44 @@ class Node$1 {
         this._editStructureChanged = true;
         this.normalizeEditContentAfterImageDelete();
         this.refreshEditingLayout();
+    }
+    moveEditImageToBoundary(imageEl, boundary) {
+        this.moveEditImageToPosition(imageEl, boundary);
+    }
+    moveEditImageToPosition(imageEl, position) {
+        if (!this.data.isEdit || !this.contentEl.contains(imageEl))
+            return;
+        const images = Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment'));
+        const imageIndex = images.indexOf(imageEl);
+        if (imageIndex < 0)
+            return;
+        const markdown = this.getEditedContentMarkdown().trim();
+        const nextMarkdown = moveNodeImageToPosition(markdown, imageIndex, position);
+        if (nextMarkdown === markdown) {
+            this.selectEditImage(imageEl);
+            return;
+        }
+        this.renderEditableContent(nextMarkdown, []);
+        const nextImages = Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment'));
+        const movedImage = position === 'top' || position === 'left'
+            ? nextImages[0]
+            : nextImages[nextImages.length - 1];
+        if (movedImage instanceof HTMLElement)
+            this.selectEditImage(movedImage);
+        this._editStructureChanged = true;
+        this.refreshEditingLayout();
+    }
+    moveFocusedEditImageToPosition(position) {
+        if (!this.data.isEdit)
+            return false;
+        const activeEl = this.contentEl.ownerDocument.activeElement;
+        const imageEl = activeEl instanceof HTMLElement
+            ? activeEl.closest('.mm-node-image-attachment')
+            : null;
+        if (!(imageEl instanceof HTMLElement) || !this.contentEl.contains(imageEl))
+            return false;
+        this.moveEditImageToPosition(imageEl, position);
+        return true;
     }
     normalizeEditContentAfterImageDelete() {
         const text = this.getEditedContentMarkdown().trim();
@@ -2515,8 +2726,9 @@ class Node$1 {
         this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
     }
     destroy() {
-        var _a;
-        (_a = this.autoWrapController) === null || _a === void 0 ? void 0 : _a.destroy();
+        var _a, _b;
+        (_a = this.imageReorderController) === null || _a === void 0 ? void 0 : _a.destroy();
+        (_b = this.autoWrapController) === null || _b === void 0 ? void 0 : _b.destroy();
     }
     renderLinkLayer(links) {
         this.linkLayerEl.innerHTML = '';
@@ -10613,7 +10825,7 @@ class NodeSelectionController {
         const selected = this.selectedNodes.has(node);
         node.containEl.classList.toggle('mm-node-multi-select', selected);
         node.containEl.setAttribute('aria-selected', selected ? 'true' : 'false');
-        node.containEl.setAttribute('draggable', selected || node.isSelect ? 'true' : 'false');
+        node.containEl.setAttribute('draggable', !node.data.isEdit && (selected || node.isSelect) ? 'true' : 'false');
     }
     getSelectionRoots() {
         return this.mindmap.root.getShowNodeList().filter((node) => {
@@ -44022,16 +44234,52 @@ class MindMapPlugin extends obsidian.Plugin {
                     }
                 }
             });
-            // Alt + Dn
+            const imagePositionCommands = [
+                {
+                    id: 'Move focused node image up',
+                    name: t('Move focused node image up'),
+                    key: 'ArrowUp',
+                    position: 'top',
+                },
+                {
+                    id: 'Move focused node image down',
+                    name: t('Move focused node image down'),
+                    key: 'ArrowDown',
+                    position: 'bottom',
+                },
+                {
+                    id: 'Move focused node image left',
+                    name: t('Move focused node image left'),
+                    key: 'ArrowLeft',
+                    position: 'left',
+                },
+                {
+                    id: 'Move focused node image right',
+                    name: t('Move focused node image right'),
+                    key: 'ArrowRight',
+                    position: 'right',
+                },
+            ];
+            imagePositionCommands.forEach((command) => {
+                this.addCommand({
+                    id: command.id,
+                    name: command.name,
+                    hotkeys: [
+                        {
+                            modifiers: ['Alt'],
+                            key: command.key,
+                        },
+                    ],
+                    callback: () => {
+                        var _a;
+                        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+                        (_a = mindmapView === null || mindmapView === void 0 ? void 0 : mindmapView.mindmap.editNode) === null || _a === void 0 ? void 0 : _a.moveFocusedEditImageToPosition(command.position);
+                    },
+                });
+            });
             this.addCommand({
                 id: 'Expand one level',
                 name: `${t('Expand one level')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: 'ArrowDown',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -44072,16 +44320,9 @@ class MindMapPlugin extends obsidian.Plugin {
                     }
                 }
             });
-            // Alt + Up
             this.addCommand({
                 id: 'Collapse one level',
                 name: `${t('Collapse one level')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: 'ArrowUp',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {

@@ -26,7 +26,7 @@ token_source: design-tokens.json
 - 节点插入 UI：`src/mindmap/insert/NodeInsertController.ts`、`src/mindmap/INode.ts`、`styles.css`
 - 节点键盘交互：`src/mindmap/interaction/NodeKeyboardController.ts`
 - 链接操作 UI：`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/link/EditNodeLinkModal.ts`
-- 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
+- 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/image/NodeImageReorderController.ts`、`src/mindmap/INode.ts`
 - 节点表格：`src/mindmap/table/NodeTableMarkdown.ts`、`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`、`src/mindmap/INode.ts`、`styles.css`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
@@ -82,6 +82,7 @@ token_source: design-tokens.json
 - 节点新增和删除只使用画布键盘状态机：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点，`Enter` 默认在下方新增同级，`Shift+Enter` 默认在上方新增同级；根节点的下方新增快捷键仍新增一级子节点，上方新增不执行操作。所有新节点创建后立即进入编辑态并全选默认文案。编辑态 `Enter` 结束编辑，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 新增子节点；`Ctrl`/`Cmd+B`、`Ctrl`/`Cmd+I` 与 `Ctrl`/`Cmd+Shift+S` 分别切换选区的加粗、斜体与删除线 Markdown 标记，空选区插入标记对并将光标置中。
 - 快捷键检查器仅允许修改新增上方/下方同级节点的全局绑定；这两项以纵向录制卡展示完整动作名和全宽键帽，恢复默认作为区块级低强调操作。固定节点、剪贴板与编辑格式操作使用轻量只读列表；插件命令快捷键从宿主当前热键注册表读取，以反映用户在 Obsidian 中的改绑。录制须拒绝固定节点操作或两个可配置操作之间的冲突，保存后立即作用于所有已打开脑图。
 - 编辑态图片显示为可选中的图片控件，不显示原始图片 Markdown；点击图片选中，拖拽手柄调整宽度，`Backspace` 或 `Delete` 删除选中图片。
+- 编辑态已选中的图片可拖到节点正文上方或下方，拖动时使用强调色横线提示唯一落点；图片手势不得触发节点整体拖动。聚焦图片后可使用 `Alt+↑/↓/←/→` 将图片放到文字对应方向，四项均注册为可重新绑定的 Obsidian 命令。多图节点只移动当前图片，其余内容保持相对顺序。
 - 编辑态双击图片打开只读大图预览；双击不得冒泡为节点编辑手势，关闭预览后仅在原编辑会话仍有效时恢复图片焦点。预览不修改节点 Markdown、图片宽度或撤销历史。
 - 节点只保存 Markdown 源文本，渲染后的 HTML 不得成为第二数据源。
 - 节点内表格以内容优先：标题仅作为 Markdown 结构锚点保留，不在脑图表格节点或网格编辑器中显示；阅读态默认自动适应最大约 760px 的受限预览框，静止时不显示操作控件；悬停、选中或工具条获得焦点时，右上角浮现带提示的图标工具条，提供缩放、适应、重置、展开和编辑。展开预览使用最大约 90vw × 85vh 的 Modal，表格自动撑满可用宽度。表格节点默认进入 Modal 网格编辑，源码编辑仅作为兜底入口。
@@ -115,6 +116,7 @@ token_source: design-tokens.json
 - 快捷键检查器的打开、关闭、录制和恢复默认控件必须可键盘聚焦；录制状态和冲突提示必须被辅助技术识别。
 - 链接图标必须可聚焦并提供链接标题作为可访问名称；上下文菜单使用宿主键盘导航。
 - 图片预览 Modal 必须提供可访问标题和图片替代文本，关闭后将焦点恢复到仍有效的原编辑图片。
+- 编辑态图片必须提供可访问的换位说明和键盘等价操作；拖动时同步 `aria-grabbed`，完成换位后焦点回到移动后的图片。
 - 导航控件的缩放按钮和滑动条必须提供可访问名称，百分比文本必须反映当前缩放状态，节点数统计必须反映当前可见节点数与总节点数。
 - 取消弹窗后焦点返回编辑节点，且不得改变节点文本。
 - 工具栏控件必须可通过键盘聚焦和操作。

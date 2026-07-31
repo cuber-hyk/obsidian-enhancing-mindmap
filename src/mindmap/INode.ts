@@ -10,10 +10,14 @@ import {
     clampNodeImageWidth,
     createNodeImageMarkdown,
     DEFAULT_NODE_IMAGE_WIDTH,
+    moveNodeImageToPosition,
+    NodeImageBoundary,
+    NodeImagePosition,
     NodeImageData,
     parseNodeImages,
 } from './image/NodeImageMarkdown'
 import NodeImagePreviewModal from './image/NodeImagePreviewModal'
+import NodeImageReorderController from './image/NodeImageReorderController'
 import {
     getNodeTableDocument,
 } from './table/NodeTableMarkdown'
@@ -96,6 +100,7 @@ export default class Node {
     _linkCount:number=0;
     tablePreview?:NodeTablePreviewController;
     autoWrapController?:NodeAutoWrapController;
+    imageReorderController?:NodeImageReorderController;
     parent?:Node;
     //isRoot?:boolean;
     children:Node[]=[];
@@ -131,6 +136,11 @@ export default class Node {
         this.linkLayerEl = document.createElement('div');
         this.linkLayerEl.classList.add('mm-node-link-layer');
         this.containEl.appendChild(this.linkLayerEl);
+        this.imageReorderController = new NodeImageReorderController({
+            containEl: this.containEl,
+            contentEl: this.contentEl,
+            onMove: (imageEl, boundary) => this.moveEditImageToBoundary(imageEl, boundary),
+        });
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
         this.autoWrapController = new NodeAutoWrapController({
@@ -387,7 +397,7 @@ export default class Node {
 
     select(){
         this.isSelect = true;
-        this.containEl.setAttribute('draggable','true');
+        this.containEl.setAttribute('draggable', this.data.isEdit ? 'false' : 'true');
         //if(this.mindmap.view.plugin.settings.focusOnMove) {
             this.containEl.focus(); // set the dom to be focused
         //}
@@ -440,6 +450,7 @@ export default class Node {
         this.contentEl.setAttribute('contentEditable','true');
         this.mindmap.editNode = this;
         this.data.isEdit = true;
+        this.containEl.setAttribute('draggable', 'false');
         if(!this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.add('mm-edit-node')
         }
@@ -782,6 +793,7 @@ export default class Node {
 
     cancelEdit(){
         console.log("CancelEdit");
+        this.imageReorderController?.cancel();
         var text = this.getMarkdownFromEditedText();
         if(text.length == 0 && !this._editStructureChanged){
             text = this._oldText
@@ -792,6 +804,7 @@ export default class Node {
         this.clearEditSurfaceStyle();
         this.contentEl.setAttribute('contentEditable','false');
         this.data.isEdit = false;
+        this.containEl.setAttribute('draggable', this.isSelect ? 'true' : 'false');
         this._editText = '';
         this._editLinks = [];
         this._editStructureChanged = false;
@@ -878,6 +891,9 @@ export default class Node {
         wrapper.classList.add('mm-node-image-attachment');
         wrapper.setAttribute('contenteditable', 'false');
         wrapper.setAttribute('tabindex', '0');
+        wrapper.setAttribute('draggable', 'false');
+        wrapper.setAttribute('aria-label', t('Node image reorder hint'));
+        wrapper.setAttribute('aria-grabbed', 'false');
         wrapper.dataset.imageKind = image.kind;
         wrapper.dataset.imageTarget = image.target;
         wrapper.dataset.imageAlt = image.alt;
@@ -905,12 +921,14 @@ export default class Node {
         wrapper.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (!this.contentEl.contains(wrapper)) return;
             this.selectEditImage(wrapper);
         });
         wrapper.addEventListener('dblclick', (event) => {
             if ((event.target as HTMLElement).closest('.mm-node-image-resize-handle')) return;
             event.preventDefault();
             event.stopPropagation();
+            if (!this.contentEl.contains(wrapper)) return;
             this.selectEditImage(wrapper);
 
             const app = this.mindmap?.view?.app;
@@ -1014,6 +1032,44 @@ export default class Node {
         this._editStructureChanged = true;
         this.normalizeEditContentAfterImageDelete();
         this.refreshEditingLayout();
+    }
+
+    moveEditImageToBoundary(imageEl: HTMLElement, boundary: NodeImageBoundary) {
+        this.moveEditImageToPosition(imageEl, boundary);
+    }
+
+    moveEditImageToPosition(imageEl: HTMLElement, position: NodeImagePosition) {
+        if (!this.data.isEdit || !this.contentEl.contains(imageEl)) return;
+        const images = Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment'));
+        const imageIndex = images.indexOf(imageEl);
+        if (imageIndex < 0) return;
+
+        const markdown = this.getEditedContentMarkdown().trim();
+        const nextMarkdown = moveNodeImageToPosition(markdown, imageIndex, position);
+        if (nextMarkdown === markdown) {
+            this.selectEditImage(imageEl);
+            return;
+        }
+
+        this.renderEditableContent(nextMarkdown, []);
+        const nextImages = Array.from(this.contentEl.querySelectorAll('.mm-node-image-attachment'));
+        const movedImage = position === 'top' || position === 'left'
+            ? nextImages[0]
+            : nextImages[nextImages.length - 1];
+        if (movedImage instanceof HTMLElement) this.selectEditImage(movedImage);
+        this._editStructureChanged = true;
+        this.refreshEditingLayout();
+    }
+
+    moveFocusedEditImageToPosition(position: NodeImagePosition): boolean {
+        if (!this.data.isEdit) return false;
+        const activeEl = this.contentEl.ownerDocument.activeElement;
+        const imageEl = activeEl instanceof HTMLElement
+            ? activeEl.closest('.mm-node-image-attachment')
+            : null;
+        if (!(imageEl instanceof HTMLElement) || !this.contentEl.contains(imageEl)) return false;
+        this.moveEditImageToPosition(imageEl, position);
+        return true;
     }
 
     normalizeEditContentAfterImageDelete() {
@@ -1156,6 +1212,7 @@ export default class Node {
     }
 
     destroy() {
+        this.imageReorderController?.destroy();
         this.autoWrapController?.destroy();
     }
 

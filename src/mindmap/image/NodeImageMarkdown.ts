@@ -3,6 +3,8 @@ export const MIN_NODE_IMAGE_WIDTH = 80;
 export const MAX_NODE_IMAGE_WIDTH = 960;
 
 export type NodeImageKind = 'vault' | 'markdown';
+export type NodeImageBoundary = 'top' | 'bottom';
+export type NodeImagePosition = NodeImageBoundary | 'left' | 'right';
 
 export interface NodeImageData {
   markdown: string;
@@ -43,6 +45,48 @@ export function removeNodeImages(markdown: string): string {
   text += markdown.slice(textStart);
 
   return text;
+}
+
+export function moveNodeImageToPosition(
+  markdown: string,
+  imageIndex: number,
+  position: NodeImagePosition,
+): string {
+  const image = parseNodeImages(markdown)[imageIndex];
+  if (!image) return markdown;
+
+  const before = markdown.slice(0, image.start);
+  const after = markdown.slice(image.end);
+  const beforeContent = before.trim();
+  const afterContent = after.trim();
+  if (
+    position === 'top' &&
+    !beforeContent &&
+    (!afterContent || /^<br\s*\/?>/i.test(afterContent))
+  ) {
+    return markdown;
+  }
+  if (
+    position === 'bottom' &&
+    !afterContent &&
+    (!beforeContent || /<br\s*\/?>$/i.test(beforeContent))
+  ) {
+    return markdown;
+  }
+
+  const beforeBreak = before.match(/(?:\s*<br\s*\/?>\s*)$/i);
+  const afterBreak = after.match(/^(?:\s*<br\s*\/?>\s*)/i);
+  const leading = beforeBreak ? before.slice(0, beforeBreak.index) : before;
+  const trailing = afterBreak ? after.slice(afterBreak[0].length) : after;
+  const separator = leading && trailing && (beforeBreak || afterBreak) ? '<br>' : '';
+  const remaining = `${leading}${separator}${trailing}`;
+  if (!remaining.trim()) return image.markdown;
+
+  if (position === 'top') return `${image.markdown}<br>${remaining}`;
+  if (position === 'bottom') return `${remaining}<br>${image.markdown}`;
+  const inlineRemaining = remaining.trim();
+  if (position === 'left') return `${image.markdown} ${inlineRemaining}`;
+  return `${inlineRemaining} ${image.markdown}`;
 }
 
 export function createVaultImageMarkdown(target: string, width = DEFAULT_NODE_IMAGE_WIDTH): string {
