@@ -114,11 +114,11 @@ function isTableStart(lines: string[], index: number): boolean {
   return Boolean(
     lines[index]?.includes('|') &&
     lines[index + 1] &&
-    isTableDivider(lines[index + 1]),
+    isMindMapTableDivider(lines[index + 1]),
   );
 }
 
-function isTableDivider(line: string): boolean {
+export function isMindMapTableDivider(line: string): boolean {
   const cells = trimTableEdges(line.trim()).split('|').map((cell) => cell.trim());
   return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
