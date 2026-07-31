@@ -31,16 +31,11 @@ import {
   protectMindMapTables,
   restoreProtectedMindMapTables,
 } from './mindmap/table/NodeTableMarkdown';
+import { uuid } from './mindmap/NodeId';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
 
-export function uuid(): string {
-  function S4() {
-    return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
-  }
-  return (S4() + S4() + '-' + S4() + '-' + S4());
-}
 const transformer = new Transformer();
 
 

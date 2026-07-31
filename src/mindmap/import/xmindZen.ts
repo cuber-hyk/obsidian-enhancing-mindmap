@@ -1,4 +1,4 @@
-import {uuid} from '../../MindMapView'
+import {uuid} from '../NodeId'
 
 var mind:{[ket:string]:any}={};
 

@@ -1,6 +1,6 @@
 import History from './History'
 import * as cmd from './Cmds'
-import { uuid } from '../MindMapView'
+import { uuid } from './NodeId'
 import {t} from '../lang/helpers'
 import INode from './INode'
 
@@ -104,6 +104,9 @@ export default class Exec{
             break
             case 'pasteNode':
                 this.history.execute(new cmd.PasteNode(data.node,data.data));
+                break;
+            case 'pasteNodeForest':
+                this.history.execute(new cmd.PasteNodeForest(data.node,data.data));
                 break;
        }
 

@@ -1,6 +1,7 @@
 import type {WorkspaceLeaf} from 'obsidian';
 import type Node from '../INode';
 import type MindMap from '../mindmap';
+import {parseMarkdownNodeForest} from '../clipboard/NodeMarkdownPaste';
 
 type ClipboardAction = 'copy' | 'cut' | 'paste';
 
@@ -77,7 +78,15 @@ export default class NodeClipboardController {
     try {
       const text = await navigator.clipboard.readText();
       if (!this.isOperationContextCurrent(context)) return false;
-      return this.mindmap.pasteNode(text);
+      if (this.mindmap.pasteNode(text)) return true;
+
+      const forest = parseMarkdownNodeForest(text);
+      if (!forest?.length) return false;
+      this.mindmap.execute('pasteNodeForest', {
+        node: context.node,
+        data: forest,
+      });
+      return true;
     } catch (error) {
       console.error('Failed to paste mindmap node', error);
       return false;

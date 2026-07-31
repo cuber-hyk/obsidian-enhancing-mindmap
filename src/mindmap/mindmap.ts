@@ -5,7 +5,7 @@ import SVG from 'svg.js'
 import { MindMapView } from '../MindMapView'
 import { frontMatterKey } from '../constants';
 import Exec from './Execute'
-import {uuid} from '../MindMapView'
+import {uuid} from './NodeId'
 
 import importXmind  from './import/xmindZen'
 import jsZip from 'jszip'
@@ -374,8 +374,16 @@ export default class MindMap {
 
     initNode(evt: CustomEvent) {
         const node = evt.detail.node as INode | undefined;
-        if (!node || !this.pendingInitialNodes.delete(node)) return;
-        this.scheduleInitialLayoutIfReady();
+        if (!node) return;
+        if (this.pendingInitialNodes.delete(node)) {
+            this.scheduleInitialLayoutIfReady();
+            return;
+        }
+        if (!this.isInitialLayoutReady) return;
+
+        node.refreshBox();
+        node.clearCacheData();
+        this.scheduleRenderedLayout();
     }
 
     renderEditNode(evt: CustomEvent) {
@@ -2401,9 +2409,7 @@ export default class MindMap {
                     })
                     return true;
                   }
-            }catch(err){
-                console.log(err)
-            }
+            }catch{}
         }
         return false;
   }
