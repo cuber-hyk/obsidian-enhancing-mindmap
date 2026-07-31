@@ -20,6 +20,7 @@ import {
   NodeKeyboardShortcuts,
   normalizeNodeKeyboardShortcuts,
 } from './mindmap/interaction/NodeKeyboardShortcuts';
+import { NodeImagePosition } from './mindmap/image/NodeImageMarkdown';
 
 
 export default class MindMapPlugin extends Plugin {
@@ -518,16 +519,57 @@ export default class MindMapPlugin extends Plugin {
       }
     });
 
-    // Alt + Dn
+    const imagePositionCommands: Array<{
+      id: string;
+      name: string;
+      key: string;
+      position: NodeImagePosition;
+    }> = [
+      {
+        id: 'Move focused node image up',
+        name: t('Move focused node image up'),
+        key: 'ArrowUp',
+        position: 'top',
+      },
+      {
+        id: 'Move focused node image down',
+        name: t('Move focused node image down'),
+        key: 'ArrowDown',
+        position: 'bottom',
+      },
+      {
+        id: 'Move focused node image left',
+        name: t('Move focused node image left'),
+        key: 'ArrowLeft',
+        position: 'left',
+      },
+      {
+        id: 'Move focused node image right',
+        name: t('Move focused node image right'),
+        key: 'ArrowRight',
+        position: 'right',
+      },
+    ];
+    imagePositionCommands.forEach((command) => {
+      this.addCommand({
+        id: command.id,
+        name: command.name,
+        hotkeys: [
+          {
+            modifiers: ['Alt'],
+            key: command.key,
+          },
+        ],
+        callback: () => {
+          const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+          mindmapView?.mindmap.editNode?.moveFocusedEditImageToPosition(command.position);
+        },
+      });
+    });
+
     this.addCommand({
       id: 'Expand one level',
       name: `${t('Expand one level')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt'],
-          key: 'ArrowDown',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -569,16 +611,9 @@ export default class MindMapPlugin extends Plugin {
       }
     });
 
-    // Alt + Up
     this.addCommand({
       id: 'Collapse one level',
       name: `${t('Collapse one level')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt'],
-          key: 'ArrowUp',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){

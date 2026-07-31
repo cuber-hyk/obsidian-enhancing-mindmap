@@ -509,6 +509,35 @@
   outline-offset: 2px;
 }
 
+.mm-node-image-attachment.is-selected:not(.is-reordering) {
+  cursor: grab;
+}
+
+.mm-node-image-attachment.is-reordering {
+  cursor: grabbing;
+  opacity: 0.72;
+}
+
+.mm-node-image-reorder-indicator {
+  position: absolute;
+  z-index: 6;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--background-primary);
+  pointer-events: none;
+}
+
+.mm-node-image-reorder-indicator.is-top {
+  top: -5px;
+}
+
+.mm-node-image-reorder-indicator.is-bottom {
+  bottom: -5px;
+}
+
 .mm-node-image-resize-handle {
   position: absolute;
   right: -5px;

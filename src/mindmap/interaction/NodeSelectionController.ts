@@ -321,7 +321,10 @@ export default class NodeSelectionController {
     const selected = this.selectedNodes.has(node);
     node.containEl.classList.toggle('mm-node-multi-select', selected);
     node.containEl.setAttribute('aria-selected', selected ? 'true' : 'false');
-    node.containEl.setAttribute('draggable', selected || node.isSelect ? 'true' : 'false');
+    node.containEl.setAttribute(
+      'draggable',
+      !node.data.isEdit && (selected || node.isSelect) ? 'true' : 'false',
+    );
   }
 
   getSelectionRoots(): Node[] {
