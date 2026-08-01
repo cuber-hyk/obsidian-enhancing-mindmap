@@ -44,7 +44,7 @@ The plug-in only support a limited markdown format
 | Delete node               | Delete           |
 | edit node                 | Space/dblclick node|
 | Undo                      | Ctrl/Cmd+Z       |
-| Redo                      | Ctrl/Cmd+Y       |
+| Redo                      | Ctrl+Y / Cmd+Shift+Z |
 | Quit edit node            | Tab              |
 | Expand node               | Ctrl/Cmd + /     |
 | Collapse node             | Ctrl/Cmd + /     |

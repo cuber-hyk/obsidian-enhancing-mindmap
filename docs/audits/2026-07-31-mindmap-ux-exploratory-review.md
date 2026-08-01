@@ -2,7 +2,7 @@
 artifact_type: audit
 status: active
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-08-01
 scope: "桌面端脑图高频使用流程：首次加载、选择编辑、键盘导航、撤销重做、剪贴板、列表编号和视图同步"
 source_of_truth: code
 ---
@@ -52,10 +52,10 @@ source_of_truth: code
 | UX-02 | P1 | verified | 首次 `setViewData()` 使用不可取消的 100ms 定时器，且回调读取的是届时的 `this.mindmap`。100ms 内再次载入会让多个回调初始化同一个新实例；关闭视图则可能在实例被置空后继续访问。结果可能是重复事件/节点初始化或关闭后异常。 | `src/MindMapView.ts:358-422`；`src/MindMapView.ts:425-438` | `docs/plans/archived/2026-07-31-mindmap-reliability-ux-fixes.md` | `task/20260731-fix-mindmap-reliability` | 已移除固定 timer 和双初始化分支；构建通过，用户在测试 Vault 同步新包并完成首次打开与交互回归后确认通过 | fixed and verified |
 | UX-03 | P2 | open | `quick-preview` 监听器返回 `this.onQuickPreview` 函数本身而没有调用它，外部 Markdown 或分栏编辑产生的实时变化不会沿预期路径刷新脑图。 | `src/MindMapView.ts:453-455`；`src/MindMapView.ts:625-630` | none | `main@62ae531` | 确认：注册回调不转发事件参数且没有调用处理器 | pending fix and regression verification |
 | UX-04 | P2 | open | 根节点执行“Collapse one level”时会把显示层级设为 `-1`，随后无条件调用空的 `parent.select()`，造成命令异常。 | `src/main.ts:614-629` | none | `main@62ae531` | 确认：根节点允许被选中，但命令无 root/parent 守卫 | pending fix and regression verification |
-| UX-05 | P2 | open | 撤销/重做体验存在三处不一致：`Ctrl/Cmd+Z` 只在已选节点且事件目标位于该节点时生效；左右方向导航会无条件记录 `ExpandNode`，即使节点已展开或没有子节点也污染撤销栈；README 的 Redo 是 `Ctrl/Cmd+Y`，实际默认键为 `Alt+Shift+Y`。 | `src/mindmap/interaction/NodeKeyboardController.ts:82-116`；`src/mindmap/mindmap.ts:542-585`；`src/mindmap/Execute.ts:109-117`；`src/mindmap/Cmds.ts:604-624`；`README.md:46-47`；`src/main.ts:149-166` | none | `main@62ae531` | 确认：事件目标守卫、History 入栈条件与文档默认键均可直接验证 | pending fix and regression verification |
+| UX-05 | P2 | verified | 撤销/重做体验存在三处不一致：`Ctrl/Cmd+Z` 只在已选节点且事件目标位于该节点时生效；左右方向导航会无条件记录 `ExpandNode`，即使节点已展开或没有子节点也污染撤销栈；README 的 Redo 是 `Ctrl/Cmd+Y`，实际默认键为 `Alt+Shift+Y`。 | `src/mindmap/interaction/NodeKeyboardController.ts`；`src/main.ts`；`src/mindmap/interaction/PluginShortcutCatalog.ts`；`src/mindmap/interaction/MindMapShortcutInspector.ts` | `docs/plans/archived/2026-08-01-mindmap-keyboard-focus-ux.md` | `task/20260801-mindmap-keyboard-focus-ux` | Undo/Redo 已收敛为带活动视图和交互目标守卫的命令；Windows/Linux Redo 为 `Ctrl+Y`，macOS 为 `Cmd+Shift+Z`；无效导航不写 History；构建通过且用户在测试 Vault 确认快捷键和面板行为 | fixed and verified |
 | UX-06 | P2 | open | 有序列表自动编号只在 `AddSiblingNode` 中执行。删除、批量删除、单节点移动和多节点移动均不重排受影响的同级组，用户会重新遇到 `1、3` 或拖动后 `3、1、2` 的序号。 | `src/mindmap/Cmds.ts:69-149`；`src/mindmap/Cmds.ts:153-280`；`src/mindmap/Cmds.ts:350-530`；`src/mindmap/interaction/OrderedSiblingNumbering.ts` | none | `main@62ae531` | 确认：编号函数只有同级新增命令调用，其他结构命令无等价逻辑 | pending fix and regression verification |
 | UX-07 | P2 | open | 多选状态下按复制、剪切或粘贴会被直接消费但不显示原因；剪贴板权限错误和解析失败也只写控制台或返回 `false`。从用户视角表现为“按了没有反应”。 | `src/mindmap/interaction/NodeClipboardController.ts:20-35`；`src/mindmap/interaction/NodeClipboardController.ts:38-93` | none | `main@62ae531` | 确认：失败路径没有 Notice、状态提示或调用方反馈 | pending fix and regression verification |
-| UX-08 | P2 | open | 旧的 document `keyup` 路由只检查延迟维护的 `isFocused`，没有排除 input、button、range 和 contenteditable 等交互目标。焦点进入使用 100ms 延迟且依据旧事件的 `relatedTarget`，快速离开后仍可能把状态改回 true；因此导航器滑杆或其他控件的方向键可能同时触发节点导航。 | `src/mindmap/mindmap.ts:450-478`；`src/mindmap/mindmap.ts:491-603` | none | `main@62ae531` | 证据充分：静态事件链确认；需在 Obsidian 中补一次焦点矩阵复现 | pending runtime reproduction and fix |
+| UX-08 | P2 | verified | 旧的 document `keyup` 路由只检查延迟维护的 `isFocused`，没有排除 input、button、range 和 contenteditable 等交互目标。焦点进入使用 100ms 延迟且依据旧事件的 `relatedTarget`，快速离开后仍可能把状态改回 true；因此导航器滑杆或其他控件的方向键可能同时触发节点导航。 | `src/mindmap/mindmap.ts`；`src/mindmap/interaction/NodeKeyboardController.ts`；`src/mindmap/interaction/NodeSelectionController.ts` | `docs/plans/archived/2026-08-01-mindmap-keyboard-focus-ux.md` | `task/20260801-mindmap-keyboard-focus-ux` | 已移除延迟焦点状态和 document 级旧 keyup 路由，画布容器与交互目标即时守卫成为唯一入口；构建通过且用户在测试 Vault 确认行为正常 | fixed and verified |
 | UX-09 | P3 | open | “Replace by the previous text”命令读取从未维护的 `node.data.oldText`；实际编辑快照存放在私有 `_oldText`。命令会把 `undefined` 传给 `setText()`，后续渲染访问 `text.length` 时异常。 | `src/main.ts:168-185`；`src/mindmap/INode.ts:93`；`src/mindmap/INode.ts:181-185`；`src/mindmap/INode.ts:1622-1625` | none | `main@62ae531` | 确认：字段写入已被注释，数据模型没有有效来源 | pending fix or command removal |
 
 ## 已排除或降级的候选

@@ -1059,6 +1059,36 @@
   font-size: var(--font-ui-small);
 }
 
+.mm-settings-shortcut-catalog {
+  margin-top: 18px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.mm-settings-shortcut-catalog > summary {
+  padding: 16px 0 10px;
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.mm-settings-shortcut-list {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.mm-settings-shortcut-binding {
+  max-width: 320px;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 480px) {
   .mm-mindmap-style-inspector,
   .mm-mindmap-shortcut-inspector {

@@ -80,7 +80,6 @@ export default class MindMap {
     _top:number;
     dispLevel:number;
     isComposing = false;
-    isFocused = true;
 
     constructor(data: INodeData, containerEL: HTMLElement, setting?: Setting) {
         this.setting = Object.assign({
@@ -100,6 +99,7 @@ export default class MindMap {
         this.appEl = document.createElement('div');
 
         this.appEl.classList.add('mm-mindmap');
+        this.appEl.tabIndex = -1;
         this.appEl.style.overflow = "auto";
 
 
@@ -141,7 +141,6 @@ export default class MindMap {
         this.appDblclickFn = this.appDblclickFn.bind(this);
         this.appMouseOverFn = this.appMouseOverFn.bind(this);
         this.appDrop = this.appDrop.bind(this);
-        this.appKeyup = this.appKeyup.bind(this);
         this.compositionStart = this.compositionStart.bind(this);
         this.compositionEnd = this.compositionEnd.bind(this);
 
@@ -151,9 +150,6 @@ export default class MindMap {
 
         this.appMouseDown = this.appMouseDown.bind(this);
         this.appMouseUp = this.appMouseUp.bind(this);
-
-        this.appFocusIn = this.appFocusIn.bind(this);
-        this.appFocusOut = this.appFocusOut.bind(this);
 
         //custom event
         this.initNode = this.initNode.bind(this);
@@ -319,10 +315,9 @@ export default class MindMap {
         this.appEl.addEventListener('dragover', this.appDragover);
         this.appEl.addEventListener('dragend', this.appDragend);
         this.appEl.addEventListener('drop', this.appDrop);
-        document.addEventListener('keyup', this.appKeyup);
-        document.addEventListener('keydown', this.appKeydown);
-        document.addEventListener('compositionstart',this.compositionStart)
-        document.addEventListener('compositionend',this.compositionEnd)
+        this.containerEL.addEventListener('keydown', this.appKeydown);
+        this.containerEL.addEventListener('compositionstart',this.compositionStart)
+        this.containerEL.addEventListener('compositionend',this.compositionEnd)
         this.containerEL.addEventListener('wheel', this.appMousewheel, {passive: false});
 
         if(Platform.isDesktop){
@@ -332,8 +327,6 @@ export default class MindMap {
 
         this.appEl.addEventListener('mousemove', this.appMouseMove);
 
-        this.containerEL.addEventListener('focusin', this.appFocusIn);
-        this.containerEL.addEventListener('focusout', this.appFocusOut);
         //custom event
         this.on('initNode', this.initNode);
         this.on('renderEditNode', this.renderEditNode);
@@ -350,10 +343,9 @@ export default class MindMap {
         this.appEl.removeEventListener('dblClick', this.appDblclickFn);
         this.appEl.removeEventListener('mouseover', this.appMouseOverFn);
         this.appEl.removeEventListener('drop', this.appDrop);
-        document.removeEventListener('keyup', this.appKeyup);
-        document.removeEventListener('keydown', this.appKeydown);
-        document.removeEventListener('compositionstart',this.compositionStart)
-        document.removeEventListener('compositionend',this.compositionEnd)
+        this.containerEL.removeEventListener('keydown', this.appKeydown);
+        this.containerEL.removeEventListener('compositionstart',this.compositionStart)
+        this.containerEL.removeEventListener('compositionend',this.compositionEnd)
 
         this.containerEL.removeEventListener('wheel', this.appMousewheel);
 
@@ -363,9 +355,6 @@ export default class MindMap {
         }
 
         this.appEl.removeEventListener('mousemove', this.appMouseMove);
-
-        this.containerEL.removeEventListener('focusin', this.appFocusIn);
-        this.containerEL.removeEventListener('focusout', this.appFocusOut);
 
         this.off('initNode', this.initNode);
         this.off('renderEditNode', this.renderEditNode);
@@ -447,18 +436,7 @@ export default class MindMap {
         //console.log(this.view)
         this.view?.mindMapChange();
     }
-    appFocusIn(evt: FocusEvent){
-        setTimeout(() => {
-            if (this.containerEL.contains(evt.relatedTarget as Node)) return;
-            this.isFocused = true;
-        }, 100);
-    }
-    appFocusOut(evt: FocusEvent){
-        if (this.containerEL.contains(evt.relatedTarget as Node)) return;
-        this.isFocused = false;
-    }
     appKeydown(e: KeyboardEvent) {
-        if (!this.isFocused) return; // Check if Mindmap is in focus or not
         if (this.nodeSelectionController.handleKeydown(e)) return;
         if (this.nodeClipboardController.handleKeydown(e)) return;
         this.nodeKeyboardController.handleKeydown(e);
@@ -473,582 +451,6 @@ export default class MindMap {
         this.isComposing = false;
      }
 
-    appKeyup(e: KeyboardEvent) {
-        if (!this.isFocused) return; // Check if Mindmap is in focus or not
-        if (this.nodeSelectionController.handleKeyup(e)) return;
-        var keyCode = e.keyCode || e.which || e.charCode;
-        var ctrlKey = e.ctrlKey || e.metaKey;
-        var shiftKey = e.shiftKey;
-        var altKey = e.altKey;
-
-        // if (ctrlKey) {                         // Shift -> Selecting
-        //     // Ctrl -> selecting
-        //     this.selectingNodes = true;
-        // } else {
-        //     this.selectingNodes = false;
-        // }
-
-        if (!ctrlKey && !shiftKey && !altKey) { // NO SPECIAL KEY
-            // up
-            if (keyCode == 38 || e.key == 'ArrowUp') {
-                e.preventDefault();
-                e.stopPropagation();
-
-                var node = this.selectNode;
-                if( node && !node.data.isEdit )
-                {
-                    var l_selectedNode = node;
-                    while(  (this.selectNode == node)       &&
-                            (l_selectedNode != this.root)   )
-                    {
-                        this._selectNode(l_selectedNode, "up");
-                        l_selectedNode = l_selectedNode.parent;
-                    }
-                }
-            }
-
-            if (keyCode == 40 || e.key == 'ArrowDown') {
-                e.preventDefault();
-                e.stopPropagation();
-
-                var node = this.selectNode;
-                if( node && !node.data.isEdit )
-                {
-                    var l_selectedNode = node;
-                    while(  (this.selectNode == node)       &&
-                            (l_selectedNode != this.root)   )
-                    {
-                        this._selectNode(l_selectedNode, "down");
-                        l_selectedNode = l_selectedNode.parent;
-                    }
-                }
-            }
-
-            if (keyCode == 39 || e.key == 'ArrowRight') {
-                e.preventDefault();
-                e.stopPropagation();
-
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    var rootPos = this.root.getPosition();
-                    var nodePos = node.getPosition();
-                    if(rootPos.x > nodePos.x)
-                    {// Node on left side of the mindmap
-                        node.unSelect();
-                        node.parent.select();
-                    }
-                    else
-                    {
-                        var node = this.selectNode;
-                        node.mindmap.execute('expandNode', {
-                            node
-                        });
-                        this._selectNode(node, "right");
-                    }
-                }
-            }
-
-            if (keyCode == 37 || e.key == 'ArrowLeft') {
-                e.preventDefault();
-                e.stopPropagation();
-
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    var rootPos = this.root.getPosition();
-                    var nodePos = node.getPosition();
-                    if(rootPos.x < nodePos.x)
-                    {// Node on right side of the mindmap
-                        node.unSelect();
-                        node.parent.select();
-                    }
-                    else
-                    {
-                        var node = this.selectNode;
-                        node.mindmap.execute('expandNode', {
-                            node
-                        });
-                        this._selectNode(node, "left");
-                    }
-                }
-            }
-
-            // Home : Select root node
-            if (keyCode == 36) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                if( (!this.selectNode)          ||
-                    (!this.selectNode.data.isEdit)   )
-                {// No edition: select root node
-                    if(this.selectNode)
-                    { this.selectNode.unSelect(); }
-                    this.root.select();
-                    this.center();
-                }
-            }
-        }
-
-
-        if (ctrlKey && !shiftKey && !altKey) {  // CTRL KEY
-            /*//ctr + /  (or Ctrl + NumpadDivide) toggle expand node
-            // if ((keyCode == 191) || (keyCode == 111)) {
-            //     var node = this.selectNode;
-            //     this._toggleExpandNode(node);
-            // }
-            if ((keyCode == 191) || (keyCode == 111)) {
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    if (node.isExpand) {
-                        node.mindmap.execute('collapseNode', {
-                            node
-                        })
-                    } else {
-                        node.mindmap.execute('expandNode', {
-                            node
-                        })
-                    }
-                }
-            }*/
-
-            // Ctrl + B => Bold
-            // if (keyCode == 66) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     if(this.selectNode) {
-            //         var l_prefix_1 = "**";
-            //         var l_prefix_2 = "__";
-            //         var node = this.selectNode;
-
-            //         if(node.data.isEdit)
-            //         {// A node is edited: set in bold only the selected part
-            //             var l_check_prefix = true;
-            //             node.setSelectedText(l_prefix_1, l_prefix_2, l_check_prefix);
-            //         }
-
-            //         else
-            //         {// Set in bold the whole node
-            //             this._formatNode(node, l_prefix_1, l_prefix_2);
-            //             e.preventDefault();
-            //             e.stopPropagation();
-            //         }
-
-            //         this.refresh();
-            //         this.scale(this.mindScale);
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-
-
-            // Ctrl + I => Italic
-            // if (keyCode == 73) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     if(this.selectNode) {
-            //         var node = this.selectNode;
-
-            //         if(node.data.isEdit)
-            //         {// A node is edited: set in italics only the selected part
-            //             node.setSelectedText_italic();
-            //         }
-
-            //         else
-            //         {// Set in italics the whole node
-            //             var text = node.data.text;
-            //             if( (  ((text.substring(0,1)=="*") ||
-            //                     (text.substring(0,1)=="_") )        &&
-            //                 (text.substring(0,2)!="**")             &&
-            //                 (text.substring(0,2)!="__")             )   ||
-            //                 (text.substring(0,3)=="***")                ||
-            //                 (text.substring(0,3)=="___")                )
-            //             {// Already italic
-            //                 text = text.substring(1); // Remove leading * / _
-
-            //                 if( (text.substring(text.length-1)=="*") ||
-            //                     (text.substring(text.length-1)=="_") )   {
-            //                     // Remove trailing * / _
-            //                     text = text.substring(0,text.length-1);
-            //                 }
-            //                 // else: no trailing *
-            //             }
-            //             else {// Not in italic
-            //                 text = "*"+text+"*"; // Use "*" to allow bold/italic change in whatever order
-            //             }
-
-            //             // Set in node text
-            //             node.data.oldText = node.data.text;
-            //             node.setText(text);
-            //             e.preventDefault();
-            //             e.stopPropagation();
-            //         }
-
-            //         this.refresh();
-            //         this.scale(this.mindScale);
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-
-
-            // ctrl + E  center mindmap view
-            // if (keyCode == 69) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     //this.center();
-            //     this.centerOnNode(this.selectNode);
-            // }
-
-
-            // ctrl + Up: Move one node above
-            // if (keyCode == 38 || e.key == 'ArrowUp') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected: select root node
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else if((!node.data.isEdit)  &&
-            //             (!node.data.isRoot)  )
-            //     {// The node can be moved
-            //         var type='top';
-            //         if(node.getIndex() == 0)
-            //         {// First sibling: move BELOW "previous" (=last) node
-            //             type='down';
-            //         }
-            //         //else: no special treatment
-            //         this.moveNode(node, node.getPreviousSibling(), type);
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-
-
-            // // Ctrl + Down: Move one step below
-            // if (keyCode == 40 || e.key == 'ArrowDown') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected: select root node
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else if((!node.data.isEdit)  &&
-            //             (!node.data.isRoot)  )
-            //     {// The node can be moved
-            //         var type='down';
-            //         if(node.getIndex() == node.parent.children.length-1)
-            //         {// Last sibling: move ABOVE "next" (=first) node
-            //             type='top';
-            //         }
-            //         //else: no special treatment
-            //         this.moveNode(node, node.getNextSibling(), type);
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-
-
-            // // Ctrl + Left
-            // if (keyCode == 37 || e.key == 'ArrowLeft') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected: select root node
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else {// Move current node as parent/child depending on the position
-            //         var rootPos = this.root.getPosition();
-            //         var nodePos = node.getPosition();
-            //         if(rootPos.x < nodePos.x)
-            //         {
-            //             this._moveAsParent(node);
-            //         }
-            //         else
-            //         {
-            //             this._moveAsChild(node, node.getPreviousSibling());
-            //         }
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-
-
-            // // Ctrl + Right
-            // if (keyCode == 39 || e.key == 'ArrowRight') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else {
-            //         var rootPos = this.root.getPosition();
-            //         var nodePos = node.getPosition();
-            //         if(rootPos.x < nodePos.x)
-            //         {
-            //             // this.selectedNodes.forEach((n:INode) => {
-            //             //     this._moveAsChild(n);
-            //             // });
-            //             this._moveAsChild(node, node.getPreviousSibling());
-            //         }
-            //         else
-            //         {
-            //             this._moveAsParent(node);
-            //         }
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-
-
-            // // Ctrl + J: Join with following node
-            // if (keyCode == 74) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(node)
-            //     {  this.joinWithFollowingNode(node); }
-            //     // else: No node selected: nothing to do
-            // }
-
-
-
-            // Ctrl + Home : Select root node
-            if (keyCode == 36) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                if( (!this.selectNode)              ||
-                    (!this.selectNode.data.isEdit)  )
-                {// No edition: select root node
-                    if(this.selectNode && !this.selectNode.data.isRoot)
-                    {
-                        this.selectNode.unSelect();
-                        this.root.select();
-                    }
-                    this.center();
-                }
-            }
-        }
-
-
-        if (ctrlKey && shiftKey && !altKey) {   // CTRL + SHIFT key
-            // //Shift + Ctrl + space: toggle expand node
-            // if (keyCode == 32) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(node)
-            //     { this._toggleExpandNode(node); }
-            // }
-
-
-            // Ctrl + Shift + Z => Old text
-            // if (keyCode == 90) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(node) {
-            //         // var text = (node.data.oldText as string);
-            //         var text = (node.data.oldText);
-            //         node.setText(text);
-            //         e.preventDefault();
-            //         e.stopPropagation();
-            //         console.log(text+" / "+node.data.text);
-            //     }
-            // }
-
-
-            // Ctrl + Shift + Home : Center map
-            // if (keyCode == 36) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     this.center();
-            // }
-
-        }
-
-
-        if (altKey && !ctrlKey && !shiftKey) {          // Alt key
-
-            // Alt + H => Highlight
-            // if (keyCode == 72) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     if(this.selectNode) {// There is a node selected: format
-            //         var l_prefix_1 = "==";
-            //         var l_prefix_2 = l_prefix_1;
-            //         var node = this.selectNode;
-
-            //         if(node.data.isEdit)
-            //         {// A node is edited: set in bold only the selected part
-            //             var l_check_prefix = true;
-            //             node.setSelectedText(l_prefix_1, l_prefix_2, l_check_prefix);
-            //         }
-
-            //         else
-            //         {// Set in bold the whole node
-            //             this._formatNode(node, l_prefix_1, l_prefix_2);
-            //             e.preventDefault();
-            //             e.stopPropagation();
-            //         }
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-
-
-            // Alt + é => Strike through
-            // if (keyCode == 50) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     if(this.selectNode) {// There is a node selected: format
-            //         var l_prefix_1 = "~~";
-            //         var l_prefix_2 = l_prefix_1;
-            //         var node = this.selectNode;
-
-            //         if(node.data.isEdit)
-            //         {// A node is edited: set in bold only the selected part
-            //             var l_check_prefix = true;
-            //             node.setSelectedText(l_prefix_1, l_prefix_2, l_check_prefix);
-            //         }
-
-            //         else
-            //         {// Set in bold the whole node
-            //             this._formatNode(node, l_prefix_1, l_prefix_2);
-            //             e.preventDefault();
-            //             e.stopPropagation();
-            //         }
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-
-
-            // Alt + Home : Node info in console
-            // if (keyCode == 36) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     var node = this.selectNode;
-            //     if(node) {
-            //         console.log("Node idx: "+node.getIndex());
-            //         console.log("Previous node idx: "+node.getPreviousSibling().getIndex());
-            //         console.log("Next node idx: "+node.getNextSibling().getIndex());
-            //         console.log("Node pos: x="+node.getPosition().x+" / y="+node.getPosition().y);
-            //         console.log("Node dim: x="+node.getDimensions().x+" / y="+node.getDimensions().y);
-            //         console.log("Canvas: "+this.setting.canvasSize);
-            //         console.log("Disp scroll: x="+this.containerEL.scrollLeft+" / y="+this.containerEL.scrollTop);
-            //         console.log("Disp client: x="+this.containerEL.clientWidth+" / y="+this.containerEL.clientHeight);
-
-            //         //node.setText
-            //     }
-            // }
-
-
-            // // Alt + PageUp: collapse one level from max displayed level
-            // if (keyCode == 33) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     node = this.selectNode;
-            //     if( (node)                                                  &&
-            //         (this.getMaxNodeDisplayedLevel(node)>node.getLevel())   )
-            //     {// Collapse only if current selected node would not be hidden
-            //         this.setChildrenDisplayedLevel(this.getMaxNodeDisplayedLevel(node)-1);
-            //         this.refresh();
-            //         this.scale(this.mindScale);
-            //         this.selectNode.select();
-            //     }
-            // }
-
-
-            // // Alt + PageDn: expand one level
-            // if (keyCode == 34) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     node = this.selectNode;
-            //     if(node) {
-            //         this.setChildrenDisplayedLevel(this.getMaxNodeDisplayedLevel(node)+1);
-            //         this.refresh();
-            //         this.scale(this.mindScale);
-            //         this.selectNode.select();
-            //     }
-            // }
-
-
-        }
-
-
-        if (altKey && !ctrlKey && shiftKey) {           // Alt + Shift key
-
-            // Alt + Shift + PageUp: collapse one level from current node
-            // if (keyCode == 33) {
-            //     if(this.selectNode) {
-            //         this.setDisplayedLevel(this.selectNode.getLevel()-1);
-            //         this.refresh();
-            //         this.selectNode.parent.select();
-            //     }
-            // }
-
-
-            // Alt + PageDn: expand one level
-            // if (keyCode == 34) {
-            //     if(this.selectNode) {
-            //         this.setDisplayedLevel(this.selectNode.getLevel()+1);
-            //         this.refresh();
-            //         this.selectNode.select();
-            //     }
-            // }
-
-        }
-
-
-        if (altKey && ctrlKey && !shiftKey) {           // Alt + Ctrl key
-            // Alt + Ctrl + S: Select node's text
-            // if (keyCode == 83) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     let node = this.selectNode;
-            //     if(node) {
-            //         node.edit();
-            //         node.selectText();
-            //     }
-            // }
-
-
-        }
-
-
-        if (altKey && ctrlKey && shiftKey) {            // Alt + Ctrl+ Shift key
-            // None
-            // if (keyCode == xx) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-
-            //     let node = this.selectNode;
-            //     if(node) {
-            //         TBD
-            //     }
-            // }
-        }
-
-
-    }
     _hierarchySelectNode(node: INode, direct: string){
         if (!node) {
             return;
@@ -1471,6 +873,7 @@ export default class MindMap {
                 }
             } else {
                 this.clearSelectNode();
+                this.appEl.focus({preventScroll: true});
             }
         }
     }

@@ -13,8 +13,6 @@ export default class NodeKeyboardController {
   }
 
   handleKeydown(event: KeyboardEvent): boolean {
-    if (this.handleUndoShortcut(event)) return true;
-
     const node = this.mindmap.selectNode;
     if (!node || !this.isNodeKeyboardTarget(event, node)) return false;
     if (
@@ -25,6 +23,7 @@ export default class NodeKeyboardController {
       return false;
     }
 
+    if (!node.data.isEdit && this.handleNavigationShortcut(event, node)) return true;
     if (!node.data.isEdit && this.handleSiblingShortcut(event, node)) return true;
 
     if (
@@ -79,27 +78,6 @@ export default class NodeKeyboardController {
     return true;
   }
 
-  private handleUndoShortcut(event: KeyboardEvent): boolean {
-    if (
-      event.defaultPrevented ||
-      event.isComposing ||
-      this.mindmap.isComposing ||
-      (!event.ctrlKey && !event.metaKey) ||
-      event.shiftKey ||
-      event.altKey ||
-      event.key.toLowerCase() !== 'z'
-    ) {
-      return false;
-    }
-
-    const node = this.mindmap.selectNode;
-    if (!node || node.data.isEdit || !this.isNodeKeyboardTarget(event, node)) return false;
-
-    this.consume(event);
-    this.mindmap.undo();
-    return true;
-  }
-
   private isNodeKeyboardTarget(event: KeyboardEvent, node: Node): boolean {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
@@ -113,6 +91,65 @@ export default class NodeKeyboardController {
     }
 
     return target === node.containEl || node.containEl.contains(target);
+  }
+
+  private handleNavigationShortcut(event: KeyboardEvent, node: Node): boolean {
+    if (event.key === 'Home' && this.hasHomeModifiers(event)) {
+      this.consume(event);
+      this.mindmap.clearSelectNode();
+      this.mindmap.root.select();
+      this.mindmap.center();
+      return true;
+    }
+
+    if (!this.hasNoModifiers(event)) return false;
+
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      this.consume(event);
+      this.selectVerticalNode(node, event.key === 'ArrowUp' ? 'up' : 'down');
+      return true;
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      this.consume(event);
+      this.selectHorizontalNode(node, event.key === 'ArrowLeft' ? 'left' : 'right');
+      return true;
+    }
+
+    return false;
+  }
+
+  private hasHomeModifiers(event: KeyboardEvent): boolean {
+    return !event.shiftKey && !event.altKey && !(event.ctrlKey && event.metaKey);
+  }
+
+  private selectVerticalNode(node: Node, direct: 'up' | 'down'): void {
+    let candidate: Node | undefined = node;
+    while (
+      candidate &&
+      this.mindmap.selectNode === node &&
+      candidate !== this.mindmap.root
+    ) {
+      this.mindmap._selectNode(candidate, direct);
+      candidate = candidate.parent;
+    }
+  }
+
+  private selectHorizontalNode(node: Node, direct: 'left' | 'right'): void {
+    const rootX = this.mindmap.root.getPosition().x;
+    const nodeX = node.getPosition().x;
+    const movesToParent = direct === 'right' ? rootX > nodeX : rootX < nodeX;
+
+    if (movesToParent && node.parent) {
+      this.mindmap.clearSelectNode();
+      node.parent.select();
+      return;
+    }
+
+    if (!node.isExpand && node.children.length > 0) {
+      node.mindmap.execute('expandNode', { node });
+    }
+    this.mindmap._selectNode(node, direct);
   }
 
   private finishEdit(node: Node): void {

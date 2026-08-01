@@ -10,6 +10,7 @@ import {
   shortcutFromKeyboardEvent,
   validateNodeKeyboardShortcut,
 } from './NodeKeyboardShortcuts';
+import type { PluginShortcut } from './PluginShortcutCatalog';
 
 type MindMapShortcutInspectorOptions = {
   parentEl: HTMLElement;
@@ -17,11 +18,6 @@ type MindMapShortcutInspectorOptions = {
   pluginShortcuts: () => PluginShortcut[];
   onChange: (shortcuts: NodeKeyboardShortcuts) => Promise<void> | void;
   onClose: () => void;
-};
-
-export type PluginShortcut = {
-  label: string;
-  shortcuts: string[];
 };
 
 type FixedShortcut = {
@@ -64,10 +60,6 @@ const clipboardAndHistoryShortcuts: FixedShortcut[] = [
   {
     label: 'Paste as child node',
     shortcut: { key: 'v', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-  },
-  {
-    label: 'Undo mindmap action',
-    shortcut: { key: 'z', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
   },
 ];
 
@@ -183,6 +175,16 @@ export default class MindMapShortcutInspector {
       clipboardAndHistoryShortcuts.forEach(({ label, shortcut }) => {
         this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
       });
+      const historyShortcuts = this.pluginShortcuts();
+      ['Undo', 'Redo'].forEach((id) => {
+        const command = historyShortcuts.find((shortcut) => shortcut.id === id);
+        if (!command) return;
+        this.createFixedShortcutRow(
+          section,
+          t(id as 'Undo' | 'Redo'),
+          command.shortcuts.length ? command.shortcuts.join(' / ') : t('Shortcut not assigned'),
+        );
+      });
     });
 
     this.createSection(contentEl, t('Markdown formatting'), (section) => {
@@ -190,15 +192,6 @@ export default class MindMapShortcutInspector {
         this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
       });
     });
-
-    const pluginShortcuts = this.pluginShortcuts();
-    if (pluginShortcuts.length) {
-      this.createSection(contentEl, t('Plugin command shortcuts'), (section) => {
-        pluginShortcuts.forEach(({ label, shortcuts }) => {
-          this.createFixedShortcutRow(section, label, shortcuts.join(' / '));
-        });
-      });
-    }
 
     if (this.recordingShortcutId) {
       const button = contentEl.querySelector<HTMLButtonElement>(

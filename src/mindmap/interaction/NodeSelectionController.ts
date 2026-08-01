@@ -123,6 +123,8 @@ export default class NodeSelectionController {
   }
 
   handleKeydown(event: KeyboardEvent): boolean {
+    if (!this.isCanvasKeyboardTarget(event)) return false;
+
     if (this.isBatchDeleteEvent(event)) {
       event.preventDefault();
       event.stopPropagation();
@@ -133,10 +135,6 @@ export default class NodeSelectionController {
       return true;
     }
 
-    return this.blockSingleNodeShortcut(event);
-  }
-
-  handleKeyup(event: KeyboardEvent): boolean {
     return this.blockSingleNodeShortcut(event);
   }
 
@@ -368,6 +366,13 @@ export default class NodeSelectionController {
     event.preventDefault();
     event.stopPropagation();
     return true;
+  }
+
+  private isCanvasKeyboardTarget(event: KeyboardEvent): boolean {
+    const target = event.target;
+    return target instanceof Element &&
+      this.mindmap.appEl.contains(target) &&
+      !target.closest('input, textarea, select, button, a, [contenteditable="true"]');
   }
 
   private suppressClick(): void {

@@ -4,7 +4,8 @@ import {
   TFile,
   TFolder,
   ViewState,
-  MarkdownView
+  MarkdownView,
+  Platform
 } from 'obsidian';
 // import DEFAULT_SETTINGS from './setting'
 import { around } from 'monkey-around'
@@ -137,31 +138,31 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Undo',
       name: `${t('Undo')}`,
-      callback: () => {
-        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          mindmap.undo();
-        }
+      hotkeys: [
+        {
+          modifiers: ['Mod'],
+          key: 'Z',
+        },
+      ],
+      checkCallback: (checking: boolean) => {
+        const mindmap = this.getActiveMindMapForHistory();
+        if (!mindmap) return false;
+        if (!checking) mindmap.undo();
+        return true;
       }
     });
 
-    // Alt + Shift + Y
     this.addCommand({
       id: 'Redo',
       name: `${t('Redo')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'Y',
-        },
-      ],
-      callback: () => {
-        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          mindmap.redo();
-        }
+      hotkeys: Platform.isMacOS
+        ? [{ modifiers: ['Mod', 'Shift'], key: 'Z' }]
+        : [{ modifiers: ['Mod'], key: 'Y' }],
+      checkCallback: (checking: boolean) => {
+        const mindmap = this.getActiveMindMapForHistory();
+        if (!mindmap) return false;
+        if (!checking) mindmap.redo();
+        return true;
       }
     });
 
@@ -1092,6 +1093,25 @@ export default class MindMapPlugin extends Plugin {
 
     this.addSettingTab(new MindMapSettingsTab(this.app, this));
 
+  }
+
+  private getActiveMindMapForHistory() {
+    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+    if (!mindmapView || this.app.workspace.activeLeaf !== mindmapView.leaf) return null;
+
+    const mindmap = mindmapView.mindmap;
+    if (!mindmap || mindmap.editNode?.data.isEdit || mindmap.selectNode?.data.isEdit) return null;
+
+    const activeElement = mindmap.containerEL.ownerDocument.activeElement;
+    if (
+      !(activeElement instanceof Element) ||
+      !mindmap.containerEL.contains(activeElement) ||
+      activeElement.closest('input, textarea, select, button, a, [contenteditable="true"]')
+    ) {
+      return null;
+    }
+
+    return mindmap;
   }
 
   onunload() {

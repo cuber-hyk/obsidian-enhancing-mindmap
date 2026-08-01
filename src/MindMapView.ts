@@ -25,8 +25,9 @@ import {
   resolveMindMapStyleTemplate,
 } from './mindmap/style/MindMapStyle';
 import MindMapStyleInspector from './mindmap/style/MindMapStyleInspector';
-import MindMapShortcutInspector, { PluginShortcut } from './mindmap/interaction/MindMapShortcutInspector';
+import MindMapShortcutInspector from './mindmap/interaction/MindMapShortcutInspector';
 import { NodeKeyboardShortcuts } from './mindmap/interaction/NodeKeyboardShortcuts';
+import { getPluginShortcutCatalog } from './mindmap/interaction/PluginShortcutCatalog';
 import {
   protectMindMapTables,
   restoreProtectedMindMapTables,
@@ -511,21 +512,8 @@ export class MindMapView extends TextFileView implements HoverParent {
     return node.toggleMarkdownFormatting(primaryMarker, alternateMarker) ? false : undefined;
   }
 
-  private getPluginShortcuts(): PluginShortcut[] {
-    const app = this.app as any;
-    const commands = Object.values(app.commands?.commands || {}) as Array<{ id?: string; name?: string }>;
-    const getHotkeys = app.hotkey?.getHotkeys as ((commandId: string) => Array<{ key?: string; modifiers?: string[] }>) | undefined;
-    if (!getHotkeys) return [];
-
-    const prefix = `${this.plugin.manifest.id}:`;
-    return commands
-      .filter((command) => command.id?.startsWith(prefix))
-      .map((command) => ({
-        label: command.name || command.id!.slice(prefix.length),
-        shortcuts: getHotkeys(command.id!).map((shortcut) => formatPluginHotkey(shortcut)),
-      }))
-      .filter((command) => command.shortcuts.length > 0)
-      .sort((left, right) => left.label.localeCompare(right.label));
+  private getPluginShortcuts() {
+    return getPluginShortcutCatalog(this.app, this.plugin.manifest.id);
   }
 
   private previewStyleTemplate(styleTemplateId: string) {
@@ -700,16 +688,4 @@ export class MindMapView extends TextFileView implements HoverParent {
     super.onPaneMenu(menu,'more-options');
   }
 
-}
-
-function formatPluginHotkey(shortcut: { key?: string; modifiers?: string[] }): string {
-  const modifiers = shortcut.modifiers || [];
-  const parts = modifiers.map((modifier) => {
-    if (modifier === 'Mod') return Platform.isMacOS ? 'Cmd' : 'Ctrl';
-    if (modifier === 'Meta') return 'Cmd';
-    return modifier;
-  });
-  const key = shortcut.key || '';
-  parts.push(key.length === 1 ? key.toUpperCase() : key);
-  return parts.filter(Boolean).join(' + ');
 }

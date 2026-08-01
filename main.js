@@ -151,7 +151,10 @@ var en = {
     "Other node shortcuts": "Other node shortcuts",
     "Clipboard and history": "Clipboard and history",
     "Markdown formatting": "Markdown formatting (editing only)",
-    "Plugin command shortcuts": "Plugin command shortcuts",
+    "Shortcut not assigned": "Not assigned",
+    "All plugin shortcuts": "All plugin shortcuts",
+    "All plugin shortcuts desc": "Read-only list of current Obsidian bindings. Use Obsidian Hotkeys to change them.",
+    "Manage shortcuts": "Manage shortcuts",
     "Add sibling below": "Add sibling below",
     "Add sibling above": "Add sibling above",
     "Add child node": "Add child node",
@@ -450,7 +453,10 @@ var zhCN = {
     "Other node shortcuts": "其他节点快捷键",
     "Clipboard and history": "剪贴板与撤销",
     "Markdown formatting": "Markdown 格式（仅编辑态）",
-    "Plugin command shortcuts": "插件命令快捷键",
+    "Shortcut not assigned": "未设置",
+    "All plugin shortcuts": "全部插件快捷键",
+    "All plugin shortcuts desc": "只读展示 Obsidian 当前实际绑定，请在 Obsidian 快捷键设置中修改。",
+    "Manage shortcuts": "管理快捷键",
     "Add sibling below": "在下方新增同级节点",
     "Add sibling above": "在上方新增同级节点",
     "Enter edit mode": "进入编辑",
@@ -561,7 +567,10 @@ var zhTW = {
     "Table cell": "表格儲存格",
     "Clipboard and history": "剪貼簿與復原",
     "Markdown formatting": "Markdown 格式（僅編輯態）",
-    "Plugin command shortcuts": "外掛命令快速鍵",
+    "Shortcut not assigned": "未設定",
+    "All plugin shortcuts": "全部外掛快速鍵",
+    "All plugin shortcuts desc": "只讀顯示 Obsidian 目前實際綁定，請在 Obsidian 快速鍵設定中修改。",
+    "Manage shortcuts": "管理快速鍵",
     "Copy selected node": "複製選取節點",
     "Cut selected node": "剪下選取節點",
     "Paste as child node": "貼上為子節點",
@@ -37978,8 +37987,6 @@ class NodeKeyboardController {
         this.mindmap = mindmap;
     }
     handleKeydown(event) {
-        if (this.handleUndoShortcut(event))
-            return true;
         const node = this.mindmap.selectNode;
         if (!node || !this.isNodeKeyboardTarget(event, node))
             return false;
@@ -37988,6 +37995,8 @@ class NodeKeyboardController {
             this.mindmap.isComposing) {
             return false;
         }
+        if (!node.data.isEdit && this.handleNavigationShortcut(event, node))
+            return true;
         if (!node.data.isEdit && this.handleSiblingShortcut(event, node))
             return true;
         if (node.data.isEdit &&
@@ -38037,23 +38046,6 @@ class NodeKeyboardController {
         }
         return true;
     }
-    handleUndoShortcut(event) {
-        if (event.defaultPrevented ||
-            event.isComposing ||
-            this.mindmap.isComposing ||
-            (!event.ctrlKey && !event.metaKey) ||
-            event.shiftKey ||
-            event.altKey ||
-            event.key.toLowerCase() !== 'z') {
-            return false;
-        }
-        const node = this.mindmap.selectNode;
-        if (!node || node.data.isEdit || !this.isNodeKeyboardTarget(event, node))
-            return false;
-        this.consume(event);
-        this.mindmap.undo();
-        return true;
-    }
     isNodeKeyboardTarget(event, node) {
         const target = event.target;
         if (!(target instanceof HTMLElement))
@@ -38065,6 +38057,54 @@ class NodeKeyboardController {
             return false;
         }
         return target === node.containEl || node.containEl.contains(target);
+    }
+    handleNavigationShortcut(event, node) {
+        if (event.key === 'Home' && this.hasHomeModifiers(event)) {
+            this.consume(event);
+            this.mindmap.clearSelectNode();
+            this.mindmap.root.select();
+            this.mindmap.center();
+            return true;
+        }
+        if (!this.hasNoModifiers(event))
+            return false;
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            this.consume(event);
+            this.selectVerticalNode(node, event.key === 'ArrowUp' ? 'up' : 'down');
+            return true;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            this.consume(event);
+            this.selectHorizontalNode(node, event.key === 'ArrowLeft' ? 'left' : 'right');
+            return true;
+        }
+        return false;
+    }
+    hasHomeModifiers(event) {
+        return !event.shiftKey && !event.altKey && !(event.ctrlKey && event.metaKey);
+    }
+    selectVerticalNode(node, direct) {
+        let candidate = node;
+        while (candidate &&
+            this.mindmap.selectNode === node &&
+            candidate !== this.mindmap.root) {
+            this.mindmap._selectNode(candidate, direct);
+            candidate = candidate.parent;
+        }
+    }
+    selectHorizontalNode(node, direct) {
+        const rootX = this.mindmap.root.getPosition().x;
+        const nodeX = node.getPosition().x;
+        const movesToParent = direct === 'right' ? rootX > nodeX : rootX < nodeX;
+        if (movesToParent && node.parent) {
+            this.mindmap.clearSelectNode();
+            node.parent.select();
+            return;
+        }
+        if (!node.isExpand && node.children.length > 0) {
+            node.mindmap.execute('expandNode', { node });
+        }
+        this.mindmap._selectNode(node, direct);
     }
     finishEdit(node) {
         node.cancelEdit();
@@ -38226,6 +38266,8 @@ class NodeSelectionController {
         return false;
     }
     handleKeydown(event) {
+        if (!this.isCanvasKeyboardTarget(event))
+            return false;
         if (this.isBatchDeleteEvent(event)) {
             event.preventDefault();
             event.stopPropagation();
@@ -38235,9 +38277,6 @@ class NodeSelectionController {
             });
             return true;
         }
-        return this.blockSingleNodeShortcut(event);
-    }
-    handleKeyup(event) {
         return this.blockSingleNodeShortcut(event);
     }
     handleWheel(event) {
@@ -38443,6 +38482,12 @@ class NodeSelectionController {
         event.preventDefault();
         event.stopPropagation();
         return true;
+    }
+    isCanvasKeyboardTarget(event) {
+        const target = event.target;
+        return target instanceof Element &&
+            this.mindmap.appEl.contains(target) &&
+            !target.closest('input, textarea, select, button, a, [contenteditable="true"]');
     }
     suppressClick() {
         this.suppressClickUntil = Date.now() + 200;
@@ -39136,7 +39181,6 @@ class MindMap {
         this.timeOut = null;
         this._dragType = '';
         this.isComposing = false;
-        this.isFocused = true;
         this.setting = Object.assign({
             //canvasSize: 8000,
             canvasSize: 36000,
@@ -39151,6 +39195,7 @@ class MindMap {
         this.data = data;
         this.appEl = document.createElement('div');
         this.appEl.classList.add('mm-mindmap');
+        this.appEl.tabIndex = -1;
         this.appEl.style.overflow = "auto";
         this.contentEL = document.createElement('div');
         this.contentEL.style.position = "relative";
@@ -39183,7 +39228,6 @@ class MindMap {
         this.appDblclickFn = this.appDblclickFn.bind(this);
         this.appMouseOverFn = this.appMouseOverFn.bind(this);
         this.appDrop = this.appDrop.bind(this);
-        this.appKeyup = this.appKeyup.bind(this);
         this.compositionStart = this.compositionStart.bind(this);
         this.compositionEnd = this.compositionEnd.bind(this);
         this.appKeydown = this.appKeydown.bind(this);
@@ -39191,8 +39235,6 @@ class MindMap {
         this.appMouseMove = this.appMouseMove.bind(this);
         this.appMouseDown = this.appMouseDown.bind(this);
         this.appMouseUp = this.appMouseUp.bind(this);
-        this.appFocusIn = this.appFocusIn.bind(this);
-        this.appFocusOut = this.appFocusOut.bind(this);
         //custom event
         this.initNode = this.initNode.bind(this);
         this.renderEditNode = this.renderEditNode.bind(this);
@@ -39342,18 +39384,15 @@ class MindMap {
         this.appEl.addEventListener('dragover', this.appDragover);
         this.appEl.addEventListener('dragend', this.appDragend);
         this.appEl.addEventListener('drop', this.appDrop);
-        document.addEventListener('keyup', this.appKeyup);
-        document.addEventListener('keydown', this.appKeydown);
-        document.addEventListener('compositionstart', this.compositionStart);
-        document.addEventListener('compositionend', this.compositionEnd);
+        this.containerEL.addEventListener('keydown', this.appKeydown);
+        this.containerEL.addEventListener('compositionstart', this.compositionStart);
+        this.containerEL.addEventListener('compositionend', this.compositionEnd);
         this.containerEL.addEventListener('wheel', this.appMousewheel, { passive: false });
         if (obsidian.Platform.isDesktop) {
             this.appEl.addEventListener('mousedown', this.appMouseDown);
             this.appEl.addEventListener('mouseup', this.appMouseUp);
         }
         this.appEl.addEventListener('mousemove', this.appMouseMove);
-        this.containerEL.addEventListener('focusin', this.appFocusIn);
-        this.containerEL.addEventListener('focusout', this.appFocusOut);
         //custom event
         this.on('initNode', this.initNode);
         this.on('renderEditNode', this.renderEditNode);
@@ -39369,18 +39408,15 @@ class MindMap {
         this.appEl.removeEventListener('dblClick', this.appDblclickFn);
         this.appEl.removeEventListener('mouseover', this.appMouseOverFn);
         this.appEl.removeEventListener('drop', this.appDrop);
-        document.removeEventListener('keyup', this.appKeyup);
-        document.removeEventListener('keydown', this.appKeydown);
-        document.removeEventListener('compositionstart', this.compositionStart);
-        document.removeEventListener('compositionend', this.compositionEnd);
+        this.containerEL.removeEventListener('keydown', this.appKeydown);
+        this.containerEL.removeEventListener('compositionstart', this.compositionStart);
+        this.containerEL.removeEventListener('compositionend', this.compositionEnd);
         this.containerEL.removeEventListener('wheel', this.appMousewheel);
         if (obsidian.Platform.isDesktop) {
             this.appEl.removeEventListener('mousedown', this.appMouseDown);
             this.appEl.removeEventListener('mouseup', this.appMouseUp);
         }
         this.appEl.removeEventListener('mousemove', this.appMouseMove);
-        this.containerEL.removeEventListener('focusin', this.appFocusIn);
-        this.containerEL.removeEventListener('focusout', this.appFocusOut);
         this.off('initNode', this.initNode);
         this.off('renderEditNode', this.renderEditNode);
         this.off('mindMapChange', this.mindMapChange);
@@ -39458,21 +39494,7 @@ class MindMap {
         //console.log(this.view)
         (_a = this.view) === null || _a === void 0 ? void 0 : _a.mindMapChange();
     }
-    appFocusIn(evt) {
-        setTimeout(() => {
-            if (this.containerEL.contains(evt.relatedTarget))
-                return;
-            this.isFocused = true;
-        }, 100);
-    }
-    appFocusOut(evt) {
-        if (this.containerEL.contains(evt.relatedTarget))
-            return;
-        this.isFocused = false;
-    }
     appKeydown(e) {
-        if (!this.isFocused)
-            return; // Check if Mindmap is in focus or not
         if (this.nodeSelectionController.handleKeydown(e))
             return;
         if (this.nodeClipboardController.handleKeydown(e))
@@ -39484,317 +39506,6 @@ class MindMap {
     }
     compositionEnd(e) {
         this.isComposing = false;
-    }
-    appKeyup(e) {
-        if (!this.isFocused)
-            return; // Check if Mindmap is in focus or not
-        if (this.nodeSelectionController.handleKeyup(e))
-            return;
-        var keyCode = e.keyCode || e.which || e.charCode;
-        var ctrlKey = e.ctrlKey || e.metaKey;
-        var shiftKey = e.shiftKey;
-        var altKey = e.altKey;
-        // if (ctrlKey) {                         // Shift -> Selecting
-        //     // Ctrl -> selecting
-        //     this.selectingNodes = true;
-        // } else {
-        //     this.selectingNodes = false;
-        // }
-        if (!ctrlKey && !shiftKey && !altKey) { // NO SPECIAL KEY
-            // up
-            if (keyCode == 38 || e.key == 'ArrowUp') {
-                e.preventDefault();
-                e.stopPropagation();
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    var l_selectedNode = node;
-                    while ((this.selectNode == node) &&
-                        (l_selectedNode != this.root)) {
-                        this._selectNode(l_selectedNode, "up");
-                        l_selectedNode = l_selectedNode.parent;
-                    }
-                }
-            }
-            if (keyCode == 40 || e.key == 'ArrowDown') {
-                e.preventDefault();
-                e.stopPropagation();
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    var l_selectedNode = node;
-                    while ((this.selectNode == node) &&
-                        (l_selectedNode != this.root)) {
-                        this._selectNode(l_selectedNode, "down");
-                        l_selectedNode = l_selectedNode.parent;
-                    }
-                }
-            }
-            if (keyCode == 39 || e.key == 'ArrowRight') {
-                e.preventDefault();
-                e.stopPropagation();
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    var rootPos = this.root.getPosition();
-                    var nodePos = node.getPosition();
-                    if (rootPos.x > nodePos.x) { // Node on left side of the mindmap
-                        node.unSelect();
-                        node.parent.select();
-                    }
-                    else {
-                        var node = this.selectNode;
-                        node.mindmap.execute('expandNode', {
-                            node
-                        });
-                        this._selectNode(node, "right");
-                    }
-                }
-            }
-            if (keyCode == 37 || e.key == 'ArrowLeft') {
-                e.preventDefault();
-                e.stopPropagation();
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    var rootPos = this.root.getPosition();
-                    var nodePos = node.getPosition();
-                    if (rootPos.x < nodePos.x) { // Node on right side of the mindmap
-                        node.unSelect();
-                        node.parent.select();
-                    }
-                    else {
-                        var node = this.selectNode;
-                        node.mindmap.execute('expandNode', {
-                            node
-                        });
-                        this._selectNode(node, "left");
-                    }
-                }
-            }
-            // Home : Select root node
-            if (keyCode == 36) {
-                e.preventDefault();
-                e.stopPropagation();
-                if ((!this.selectNode) ||
-                    (!this.selectNode.data.isEdit)) { // No edition: select root node
-                    if (this.selectNode) {
-                        this.selectNode.unSelect();
-                    }
-                    this.root.select();
-                    this.center();
-                }
-            }
-        }
-        if (ctrlKey && !shiftKey && !altKey) { // CTRL KEY
-            /*//ctr + /  (or Ctrl + NumpadDivide) toggle expand node
-            // if ((keyCode == 191) || (keyCode == 111)) {
-            //     var node = this.selectNode;
-            //     this._toggleExpandNode(node);
-            // }
-            if ((keyCode == 191) || (keyCode == 111)) {
-                var node = this.selectNode;
-                if (node && !node.data.isEdit) {
-                    if (node.isExpand) {
-                        node.mindmap.execute('collapseNode', {
-                            node
-                        })
-                    } else {
-                        node.mindmap.execute('expandNode', {
-                            node
-                        })
-                    }
-                }
-            }*/
-            // Ctrl + B => Bold
-            // if (keyCode == 66) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     if(this.selectNode) {
-            //         var l_prefix_1 = "**";
-            //         var l_prefix_2 = "__";
-            //         var node = this.selectNode;
-            //         if(node.data.isEdit)
-            //         {// A node is edited: set in bold only the selected part
-            //             var l_check_prefix = true;
-            //             node.setSelectedText(l_prefix_1, l_prefix_2, l_check_prefix);
-            //         }
-            //         else
-            //         {// Set in bold the whole node
-            //             this._formatNode(node, l_prefix_1, l_prefix_2);
-            //             e.preventDefault();
-            //             e.stopPropagation();
-            //         }
-            //         this.refresh();
-            //         this.scale(this.mindScale);
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-            // Ctrl + I => Italic
-            // if (keyCode == 73) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     if(this.selectNode) {
-            //         var node = this.selectNode;
-            //         if(node.data.isEdit)
-            //         {// A node is edited: set in italics only the selected part
-            //             node.setSelectedText_italic();
-            //         }
-            //         else
-            //         {// Set in italics the whole node
-            //             var text = node.data.text;
-            //             if( (  ((text.substring(0,1)=="*") ||
-            //                     (text.substring(0,1)=="_") )        &&
-            //                 (text.substring(0,2)!="**")             &&
-            //                 (text.substring(0,2)!="__")             )   ||
-            //                 (text.substring(0,3)=="***")                ||
-            //                 (text.substring(0,3)=="___")                )
-            //             {// Already italic
-            //                 text = text.substring(1); // Remove leading * / _
-            //                 if( (text.substring(text.length-1)=="*") ||
-            //                     (text.substring(text.length-1)=="_") )   {
-            //                     // Remove trailing * / _
-            //                     text = text.substring(0,text.length-1);
-            //                 }
-            //                 // else: no trailing *
-            //             }
-            //             else {// Not in italic
-            //                 text = "*"+text+"*"; // Use "*" to allow bold/italic change in whatever order
-            //             }
-            //             // Set in node text
-            //             node.data.oldText = node.data.text;
-            //             node.setText(text);
-            //             e.preventDefault();
-            //             e.stopPropagation();
-            //         }
-            //         this.refresh();
-            //         this.scale(this.mindScale);
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-            // ctrl + E  center mindmap view
-            // if (keyCode == 69) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     //this.center();
-            //     this.centerOnNode(this.selectNode);
-            // }
-            // ctrl + Up: Move one node above
-            // if (keyCode == 38 || e.key == 'ArrowUp') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected: select root node
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else if((!node.data.isEdit)  &&
-            //             (!node.data.isRoot)  )
-            //     {// The node can be moved
-            //         var type='top';
-            //         if(node.getIndex() == 0)
-            //         {// First sibling: move BELOW "previous" (=last) node
-            //             type='down';
-            //         }
-            //         //else: no special treatment
-            //         this.moveNode(node, node.getPreviousSibling(), type);
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-            // // Ctrl + Down: Move one step below
-            // if (keyCode == 40 || e.key == 'ArrowDown') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected: select root node
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else if((!node.data.isEdit)  &&
-            //             (!node.data.isRoot)  )
-            //     {// The node can be moved
-            //         var type='down';
-            //         if(node.getIndex() == node.parent.children.length-1)
-            //         {// Last sibling: move ABOVE "next" (=first) node
-            //             type='top';
-            //         }
-            //         //else: no special treatment
-            //         this.moveNode(node, node.getNextSibling(), type);
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-            // // Ctrl + Left
-            // if (keyCode == 37 || e.key == 'ArrowLeft') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected: select root node
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else {// Move current node as parent/child depending on the position
-            //         var rootPos = this.root.getPosition();
-            //         var nodePos = node.getPosition();
-            //         if(rootPos.x < nodePos.x)
-            //         {
-            //             this._moveAsParent(node);
-            //         }
-            //         else
-            //         {
-            //             this._moveAsChild(node, node.getPreviousSibling());
-            //         }
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-            // // Ctrl + Right
-            // if (keyCode == 39 || e.key == 'ArrowRight') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(!node)
-            //     {// No node selected
-            //         this.root.select();
-            //         node = this.selectNode;
-            //     }
-            //     else {
-            //         var rootPos = this.root.getPosition();
-            //         var nodePos = node.getPosition();
-            //         if(rootPos.x < nodePos.x)
-            //         {
-            //             // this.selectedNodes.forEach((n:INode) => {
-            //             //     this._moveAsChild(n);
-            //             // });
-            //             this._moveAsChild(node, node.getPreviousSibling());
-            //         }
-            //         else
-            //         {
-            //             this._moveAsParent(node);
-            //         }
-            //     }
-            //     this.centerOnNode(this.selectNode);
-            // }
-            // // Ctrl + J: Join with following node
-            // if (keyCode == 74) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(node)
-            //     {  this.joinWithFollowingNode(node); }
-            //     // else: No node selected: nothing to do
-            // }
-            // Ctrl + Home : Select root node
-            if (keyCode == 36) {
-                e.preventDefault();
-                e.stopPropagation();
-                if ((!this.selectNode) ||
-                    (!this.selectNode.data.isEdit)) { // No edition: select root node
-                    if (this.selectNode && !this.selectNode.data.isRoot) {
-                        this.selectNode.unSelect();
-                        this.root.select();
-                    }
-                    this.center();
-                }
-            }
-        }
     }
     _hierarchySelectNode(node, direct) {
         if (!node) {
@@ -40184,6 +39895,7 @@ class MindMap {
             }
             else {
                 this.clearSelectNode();
+                this.appEl.focus({ preventScroll: true });
             }
         }
     }
@@ -41821,10 +41533,6 @@ const clipboardAndHistoryShortcuts = [
         label: 'Paste as child node',
         shortcut: { key: 'v', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
     },
-    {
-        label: 'Undo mindmap action',
-        shortcut: { key: 'z', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-    },
 ];
 const markdownFormattingShortcuts = [
     {
@@ -41924,20 +41632,19 @@ class MindMapShortcutInspector {
             clipboardAndHistoryShortcuts.forEach(({ label, shortcut }) => {
                 this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
             });
+            const historyShortcuts = this.pluginShortcuts();
+            ['Undo', 'Redo'].forEach((id) => {
+                const command = historyShortcuts.find((shortcut) => shortcut.id === id);
+                if (!command)
+                    return;
+                this.createFixedShortcutRow(section, t(id), command.shortcuts.length ? command.shortcuts.join(' / ') : t('Shortcut not assigned'));
+            });
         });
         this.createSection(contentEl, t('Markdown formatting'), (section) => {
             markdownFormattingShortcuts.forEach(({ label, shortcut }) => {
                 this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
             });
         });
-        const pluginShortcuts = this.pluginShortcuts();
-        if (pluginShortcuts.length) {
-            this.createSection(contentEl, t('Plugin command shortcuts'), (section) => {
-                pluginShortcuts.forEach(({ label, shortcuts }) => {
-                    this.createFixedShortcutRow(section, label, shortcuts.join(' / '));
-                });
-            });
-        }
         if (this.recordingShortcutId) {
             const button = contentEl.querySelector(`[data-shortcut-id="${this.recordingShortcutId}"]`);
             button === null || button === void 0 ? void 0 : button.focus();
@@ -42029,6 +41736,44 @@ class MindMapShortcutInspector {
 function formatPlatformShortcut(shortcut) {
     const platformShortcut = Object.assign(Object.assign({}, shortcut), { ctrlKey: obsidian.Platform.isMacOS ? false : shortcut.ctrlKey, metaKey: obsidian.Platform.isMacOS ? shortcut.ctrlKey : shortcut.metaKey });
     return formatNodeKeyboardShortcut(platformShortcut);
+}
+
+function getPluginShortcutCatalog(app, pluginId) {
+    var _a;
+    const internalApp = app;
+    const commands = Object.values(((_a = internalApp.commands) === null || _a === void 0 ? void 0 : _a.commands) || {});
+    const hotkeyManager = internalApp.hotkeyManager;
+    if (!(hotkeyManager === null || hotkeyManager === void 0 ? void 0 : hotkeyManager.getHotkeys) || !hotkeyManager.getDefaultHotkeys)
+        return [];
+    const prefix = `${pluginId}:`;
+    return commands
+        .filter((command) => { var _a; return (_a = command.id) === null || _a === void 0 ? void 0 : _a.startsWith(prefix); })
+        .map((command) => {
+        const commandId = command.id;
+        const customHotkeys = hotkeyManager.getHotkeys(commandId);
+        const customized = customHotkeys !== null && customHotkeys !== undefined;
+        const hotkeys = customized
+            ? customHotkeys
+            : hotkeyManager.getDefaultHotkeys(commandId) || [];
+        return {
+            id: commandId.slice(prefix.length),
+            label: command.name || commandId.slice(prefix.length),
+            shortcuts: hotkeys.map(formatPluginHotkey),
+        };
+    })
+        .sort((left, right) => left.label.localeCompare(right.label));
+}
+function formatPluginHotkey(shortcut) {
+    const modifiers = (shortcut.modifiers || []).map((modifier) => {
+        if (modifier === 'Mod')
+            return obsidian.Platform.isMacOS ? 'Cmd' : 'Ctrl';
+        if (modifier === 'Meta')
+            return 'Cmd';
+        return modifier;
+    });
+    const key = shortcut.key || '';
+    const parts = [...modifiers, key.length === 1 ? key.toUpperCase() : key];
+    return parts.filter(Boolean).join(' + ');
 }
 
 var domToImageMore = createCommonjsModule(function (module, exports) {
@@ -43966,21 +43711,7 @@ class MindMapView extends obsidian.TextFileView {
         return node.toggleMarkdownFormatting(primaryMarker, alternateMarker) ? false : undefined;
     }
     getPluginShortcuts() {
-        var _a, _b;
-        const app = this.app;
-        const commands = Object.values(((_a = app.commands) === null || _a === void 0 ? void 0 : _a.commands) || {});
-        const getHotkeys = (_b = app.hotkey) === null || _b === void 0 ? void 0 : _b.getHotkeys;
-        if (!getHotkeys)
-            return [];
-        const prefix = `${this.plugin.manifest.id}:`;
-        return commands
-            .filter((command) => { var _a; return (_a = command.id) === null || _a === void 0 ? void 0 : _a.startsWith(prefix); })
-            .map((command) => ({
-            label: command.name || command.id.slice(prefix.length),
-            shortcuts: getHotkeys(command.id).map((shortcut) => formatPluginHotkey(shortcut)),
-        }))
-            .filter((command) => command.shortcuts.length > 0)
-            .sort((left, right) => left.label.localeCompare(right.label));
+        return getPluginShortcutCatalog(this.app, this.plugin.manifest.id);
     }
     previewStyleTemplate(styleTemplateId) {
         if (!this.mindmap)
@@ -44144,19 +43875,6 @@ class MindMapView extends obsidian.TextFileView {
         super.onPaneMenu(menu, 'more-options');
     }
 }
-function formatPluginHotkey(shortcut) {
-    const modifiers = shortcut.modifiers || [];
-    const parts = modifiers.map((modifier) => {
-        if (modifier === 'Mod')
-            return obsidian.Platform.isMacOS ? 'Cmd' : 'Ctrl';
-        if (modifier === 'Meta')
-            return 'Cmd';
-        return modifier;
-    });
-    const key = shortcut.key || '';
-    parts.push(key.length === 1 ? key.toUpperCase() : key);
-    return parts.filter(Boolean).join(' + ');
-}
 
 class MindMapSettingsTab extends obsidian.PluginSettingTab {
     constructor(app, plugin) {
@@ -44317,6 +44035,34 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                 v.mindmap.refresh();
             });
         }));
+        this.renderShortcutCatalog(containerEl);
+    }
+    renderShortcutCatalog(containerEl) {
+        const detailsEl = containerEl.createEl('details', {
+            cls: 'mm-settings-shortcut-catalog',
+        });
+        detailsEl.createEl('summary', { text: t('All plugin shortcuts') });
+        new obsidian.Setting(detailsEl)
+            .setDesc(t('All plugin shortcuts desc'))
+            .addButton((button) => button
+            .setButtonText(t('Manage shortcuts'))
+            .onClick(() => {
+            var _a, _b;
+            const setting = this.app.setting;
+            setting === null || setting === void 0 ? void 0 : setting.open();
+            const hotkeyTab = (_a = setting === null || setting === void 0 ? void 0 : setting.openTabById) === null || _a === void 0 ? void 0 : _a.call(setting, 'hotkeys');
+            (_b = hotkeyTab === null || hotkeyTab === void 0 ? void 0 : hotkeyTab.setQuery) === null || _b === void 0 ? void 0 : _b.call(hotkeyTab, this.plugin.manifest.id);
+        }));
+        const listEl = detailsEl.createDiv({ cls: 'mm-settings-shortcut-list' });
+        getPluginShortcutCatalog(this.app, this.plugin.manifest.id).forEach((command) => {
+            const setting = new obsidian.Setting(listEl).setName(command.label);
+            setting.controlEl.createSpan({
+                text: command.shortcuts.length
+                    ? command.shortcuts.join(' / ')
+                    : t('Shortcut not assigned'),
+                cls: 'mm-settings-shortcut-binding',
+            });
+        });
     }
 }
 
@@ -44422,30 +44168,34 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Undo',
                 name: `${t('Undo')}`,
-                callback: () => {
-                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        var mindmap = mindmapView.mindmap;
+                hotkeys: [
+                    {
+                        modifiers: ['Mod'],
+                        key: 'Z',
+                    },
+                ],
+                checkCallback: (checking) => {
+                    const mindmap = this.getActiveMindMapForHistory();
+                    if (!mindmap)
+                        return false;
+                    if (!checking)
                         mindmap.undo();
-                    }
+                    return true;
                 }
             });
-            // Alt + Shift + Y
             this.addCommand({
                 id: 'Redo',
                 name: `${t('Redo')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'Y',
-                    },
-                ],
-                callback: () => {
-                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        var mindmap = mindmapView.mindmap;
+                hotkeys: obsidian.Platform.isMacOS
+                    ? [{ modifiers: ['Mod', 'Shift'], key: 'Z' }]
+                    : [{ modifiers: ['Mod'], key: 'Y' }],
+                checkCallback: (checking) => {
+                    const mindmap = this.getActiveMindMapForHistory();
+                    if (!mindmap)
+                        return false;
+                    if (!checking)
                         mindmap.redo();
-                    }
+                    return true;
                 }
             });
             // Alt + Ctrl + Shift + Z
@@ -45291,6 +45041,22 @@ class MindMapPlugin extends obsidian.Plugin {
             this.registerMonkeyAround();
             this.addSettingTab(new MindMapSettingsTab(this.app, this));
         });
+    }
+    getActiveMindMapForHistory() {
+        var _a, _b;
+        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+        if (!mindmapView || this.app.workspace.activeLeaf !== mindmapView.leaf)
+            return null;
+        const mindmap = mindmapView.mindmap;
+        if (!mindmap || ((_a = mindmap.editNode) === null || _a === void 0 ? void 0 : _a.data.isEdit) || ((_b = mindmap.selectNode) === null || _b === void 0 ? void 0 : _b.data.isEdit))
+            return null;
+        const activeElement = mindmap.containerEL.ownerDocument.activeElement;
+        if (!(activeElement instanceof Element) ||
+            !mindmap.containerEL.contains(activeElement) ||
+            activeElement.closest('input, textarea, select, button, a, [contenteditable="true"]')) {
+            return null;
+        }
+        return mindmap;
     }
     onunload() {
         this.app.workspace.detachLeavesOfType(mindmapViewType);
