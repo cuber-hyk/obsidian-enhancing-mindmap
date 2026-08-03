@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
-status: active
+status: archived
 created: 2026-07-31
-updated: 2026-08-02
+updated: 2026-08-03
 scope: "桌面端脑图高频使用流程：首次加载、选择编辑、键盘导航、撤销重做、剪贴板、列表编号和视图同步"
 source_of_truth: code
 ---
@@ -54,9 +54,9 @@ source_of_truth: code
 | UX-04 | P2 | verified | 根节点执行“Collapse one level”时会把显示层级设为 `-1`，随后无条件调用空的 `parent.select()`，造成命令异常。 | `src/main.ts` | `docs/plans/archived/2026-08-02-mindmap-sync-collapse-numbering-fixes.md` | `task/20260802-fix-sync-collapse-numbering` | 命令已增加活动脑图、单选、非根和父节点守卫；构建与测试 Vault 回归通过 | fixed and verified |
 | UX-05 | P2 | verified | 撤销/重做体验存在三处不一致：`Ctrl/Cmd+Z` 只在已选节点且事件目标位于该节点时生效；左右方向导航会无条件记录 `ExpandNode`，即使节点已展开或没有子节点也污染撤销栈；README 的 Redo 是 `Ctrl/Cmd+Y`，实际默认键为 `Alt+Shift+Y`。 | `src/mindmap/interaction/NodeKeyboardController.ts`；`src/main.ts`；`src/mindmap/interaction/PluginShortcutCatalog.ts`；`src/mindmap/interaction/MindMapShortcutInspector.ts` | `docs/plans/archived/2026-08-01-mindmap-keyboard-focus-ux.md` | `task/20260801-mindmap-keyboard-focus-ux` | Undo/Redo 已收敛为带活动视图和交互目标守卫的命令；Windows/Linux Redo 为 `Ctrl+Y`，macOS 为 `Cmd+Shift+Z`；无效导航不写 History；构建通过且用户在测试 Vault 确认快捷键和面板行为 | fixed and verified |
 | UX-06 | P2 | verified | 有序列表自动编号只在 `AddSiblingNode` 中执行。删除、批量删除、单节点移动和多节点移动均不重排受影响的同级组，用户会重新遇到 `1、3` 或拖动后 `3、1、2` 的序号。 | `src/mindmap/Cmds.ts`；`src/mindmap/interaction/OrderedSiblingNumbering.ts` | `docs/plans/archived/2026-08-02-mindmap-sync-collapse-numbering-fixes.md` | `task/20260802-fix-sync-collapse-numbering` | 编号 owner 与四条结构 History 命令已覆盖删除、移动、撤销和重做；纯计算及命令级脚本通过，用户完成测试 Vault 验收 | fixed and verified |
-| UX-07 | P2 | open | 多选状态下按复制、剪切或粘贴会被直接消费但不显示原因；剪贴板权限错误和解析失败也只写控制台或返回 `false`。从用户视角表现为“按了没有反应”。 | `src/mindmap/interaction/NodeClipboardController.ts:20-35`；`src/mindmap/interaction/NodeClipboardController.ts:38-93` | none | `main@62ae531` | 确认：失败路径没有 Notice、状态提示或调用方反馈 | pending fix and regression verification |
+| UX-07 | P2 | verified | 多选状态下按复制、剪切或粘贴会被直接消费但不显示原因；剪贴板权限错误和解析失败也只写控制台或返回 `false`。从用户视角表现为“按了没有反应”。 | `src/mindmap/interaction/NodeClipboardController.ts` | `docs/plans/archived/2026-08-03-clipboard-feedback-command-cleanup.md` | `task/20260803-clipboard-feedback-cleanup` | 多选限制、剪贴板读写失败及不支持内容均使用本地化 Notice；夹具验证失败不写 History，用户在测试 Vault 确认通过 | fixed and verified |
 | UX-08 | P2 | verified | 旧的 document `keyup` 路由只检查延迟维护的 `isFocused`，没有排除 input、button、range 和 contenteditable 等交互目标。焦点进入使用 100ms 延迟且依据旧事件的 `relatedTarget`，快速离开后仍可能把状态改回 true；因此导航器滑杆或其他控件的方向键可能同时触发节点导航。 | `src/mindmap/mindmap.ts`；`src/mindmap/interaction/NodeKeyboardController.ts`；`src/mindmap/interaction/NodeSelectionController.ts` | `docs/plans/archived/2026-08-01-mindmap-keyboard-focus-ux.md` | `task/20260801-mindmap-keyboard-focus-ux` | 已移除延迟焦点状态和 document 级旧 keyup 路由，画布容器与交互目标即时守卫成为唯一入口；构建通过且用户在测试 Vault 确认行为正常 | fixed and verified |
-| UX-09 | P3 | open | “Replace by the previous text”命令读取从未维护的 `node.data.oldText`；实际编辑快照存放在私有 `_oldText`。命令会把 `undefined` 传给 `setText()`，后续渲染访问 `text.length` 时异常。 | `src/main.ts:168-185`；`src/mindmap/INode.ts:93`；`src/mindmap/INode.ts:181-185`；`src/mindmap/INode.ts:1622-1625` | none | `main@62ae531` | 确认：字段写入已被注释，数据模型没有有效来源 | pending fix or command removal |
+| UX-09 | P3 | verified | “Replace by the previous text”命令读取从未维护的 `node.data.oldText`；实际编辑快照存放在私有 `_oldText`。命令会把 `undefined` 传给 `setText()`，后续渲染访问 `text.length` 时异常。 | `src/main.ts`；`src/mindmap/Cmds.ts` | `docs/plans/archived/2026-08-03-clipboard-feedback-command-cleanup.md` | `task/20260803-clipboard-feedback-cleanup` | 失效命令、死翻译和旧字段注释已移除，Undo/Redo History 保持唯一文本恢复路径；构建通过且用户确认命令目录行为 | fixed and verified |
 
 ## 已排除或降级的候选
 
@@ -65,14 +65,12 @@ source_of_truth: code
 - 异步 `ChangeNodeText` 必然发生渲染覆盖：排除。节点通过 render promise/version 机制等待最新渲染，本轮未找到可闭合的错误时序。
 - 导航器每帧重建 marker、大图全树布局必然卡顿：降级为性能探针。静态复杂度值得关注，但没有 100/500/1000 节点基准数据，不判为缺陷。
 
-## 建议优化顺序
+## 处置结果
 
 1. UX-01、UX-02 已修复并验证：画布 Escape 不再触发编辑撤销或多选清理，视图装载使用单一初始化路径。
 2. UX-05、UX-08 已修复并验证：键盘事件已收敛到画布容器，Undo/Redo 与有效 History 规则一致。
 3. UX-03、UX-04、UX-06 已修复并验证：外部同步、根节点命令和结构化编号在完整生命周期内保持一致。
-4. 后续完善 UX-07、UX-09：给受限/失败操作明确反馈，移除或修复失效的低频命令。
-
-建议下一步为 UX-07、UX-09 创建计划并执行修复。
+4. UX-07、UX-09 已修复并验证：剪贴板失败提供明确反馈，失效低频命令已移除。
 
 ## ADR 门禁
 
@@ -83,7 +81,7 @@ source_of_truth: code
 
 - 已运行命令：`npm run build`（退出码 0；仍有仓库既存的 `WorkspaceLeaf.id` 与 xmind 隐式 `any` TypeScript 警告）
 - 已运行审查：Project Mapper、Risk Prober、Adversarial Verifier、Judge 四轮审查
-- 未验证内容：100、500、1000 节点性能基准；移动端和触摸交互
+- 导航器和大图性能只作为被降级的探索候选保留，不属于本审查确认发现；移动端专用优化和触摸适配经用户确认不纳入后续体验优化范围。
 
 ## Git 可见性
 
@@ -91,4 +89,4 @@ source_of_truth: code
 
 ## 关闭方式
 
-本审查包含 `open` 发现，保持 `status: active`。发现修复并完成 Obsidian 人工回归后更新为 `verified`；若完整转入活跃计划，可由 `dev-distill` 按仓库规则归档。
+全部发现均已完成修复或处置并通过验证，本审查归档保留历史证据。

@@ -1,7 +1,8 @@
-import type {WorkspaceLeaf} from 'obsidian';
+import {Notice, type WorkspaceLeaf} from 'obsidian';
 import type Node from '../INode';
 import type MindMap from '../mindmap';
 import {parseMarkdownNodeForest} from '../clipboard/NodeMarkdownPaste';
+import {t} from '../../lang/helpers';
 
 type ClipboardAction = 'copy' | 'cut' | 'paste';
 
@@ -23,6 +24,7 @@ export default class NodeClipboardController {
 
     if (this.mindmap.nodeSelectionController.hasMultipleSelection()) {
       this.consume(event);
+      new Notice(t('Clipboard actions require a single selected node'));
       return true;
     }
 
@@ -40,13 +42,19 @@ export default class NodeClipboardController {
     if (!context) return false;
 
     const text = this.mindmap.copyNode(context.node);
-    if (!text) return false;
+    if (!text) {
+      new Notice(t('Failed to copy node'));
+      return false;
+    }
 
     try {
       await navigator.clipboard.writeText(text);
       return true;
     } catch (error) {
       console.error('Failed to copy mindmap node', error);
+      if (this.isOperationContextCurrent(context)) {
+        new Notice(t('Failed to copy node'));
+      }
       return false;
     }
   }
@@ -56,12 +64,18 @@ export default class NodeClipboardController {
     if (!context) return false;
 
     const text = this.mindmap.copyNode(context.node);
-    if (!text) return false;
+    if (!text) {
+      new Notice(t('Failed to cut node'));
+      return false;
+    }
 
     try {
       await navigator.clipboard.writeText(text);
     } catch (error) {
       console.error('Failed to cut mindmap node', error);
+      if (this.isOperationContextCurrent(context)) {
+        new Notice(t('Failed to cut node'));
+      }
       return false;
     }
 
@@ -81,7 +95,10 @@ export default class NodeClipboardController {
       if (this.mindmap.pasteNode(text)) return true;
 
       const forest = parseMarkdownNodeForest(text);
-      if (!forest?.length) return false;
+      if (!forest?.length) {
+        new Notice(t('Unsupported node clipboard content'));
+        return false;
+      }
       this.mindmap.execute('pasteNodeForest', {
         node: context.node,
         data: forest,
@@ -89,8 +106,15 @@ export default class NodeClipboardController {
       return true;
     } catch (error) {
       console.error('Failed to paste mindmap node', error);
+      if (this.isOperationContextCurrent(context)) {
+        new Notice(t('Failed to paste node'));
+      }
       return false;
     }
+  }
+
+  canOperateSelectedNode():boolean {
+    return Boolean(this.getOperationContext());
   }
 
   private getOperableNode():Node | null {

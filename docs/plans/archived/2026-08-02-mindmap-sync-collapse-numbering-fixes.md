@@ -4,7 +4,7 @@ status: archived
 created: 2026-08-02
 updated: 2026-08-02
 owner: codex
-source_audit: docs/audits/2026-07-31-mindmap-ux-exploratory-review.md
+source_audit: docs/audits/archived/2026-07-31-mindmap-ux-exploratory-review.md
 covered_findings:
   - UX-03
   - UX-04
@@ -38,7 +38,7 @@ covered_findings:
 
 ## 事实来源
 
-- 源审计：`docs/audits/2026-07-31-mindmap-ux-exploratory-review.md`
+- 源审计：`docs/audits/archived/2026-07-31-mindmap-ux-exploratory-review.md`
 - 当前能力：`docs/capabilities/mindmap-editing.md`
 - 外部同步入口：`src/MindMapView.ts`
 - 层级命令注册：`src/main.ts`
@@ -87,7 +87,7 @@ covered_findings:
 ## 产物路由与收尾
 
 - Persistent plan：本文件；实施验证完成后移入 `docs/plans/archived/`。
-- Source audit：`docs/audits/2026-07-31-mindmap-ux-exploratory-review.md`。
+- Source audit：`docs/audits/archived/2026-07-31-mindmap-ux-exploratory-review.md`。
 - Covered findings：UX-03、UX-04、UX-06。
 - Deferred findings：UX-07、UX-09。
 - Capability：实施后更新 `docs/capabilities/mindmap-editing.md` 的外部同步、层级命令和编号生命周期事实。
