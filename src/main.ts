@@ -22,6 +22,10 @@ import {
   normalizeNodeKeyboardShortcuts,
 } from './mindmap/interaction/NodeKeyboardShortcuts';
 import { NodeImagePosition } from './mindmap/image/NodeImageMarkdown';
+import {
+  DEFAULT_NODE_WIDTH_SETTINGS,
+  normalizeNodeWidthSettings,
+} from './mindmap/NodeWidthSettings';
 
 
 export default class MindMapPlugin extends Plugin {
@@ -1149,8 +1153,10 @@ export default class MindMapPlugin extends Plugin {
       layoutDirect: 'mindmap',
       defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
       showLinkTitle: false,
+      ...DEFAULT_NODE_WIDTH_SETTINGS,
       nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts(),
     }, await this.loadData());
+    Object.assign(this.settings, normalizeNodeWidthSettings(this.settings));
     this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(
       this.settings.nodeKeyboardShortcuts,
     );

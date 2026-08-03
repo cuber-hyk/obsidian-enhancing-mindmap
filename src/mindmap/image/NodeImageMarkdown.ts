@@ -1,6 +1,12 @@
+import {
+  clampWidth,
+  DEFAULT_NODE_IMAGE_WIDTH_LIMITS,
+  NodeWidthLimits,
+} from '../NodeWidthSettings';
+
 export const DEFAULT_NODE_IMAGE_WIDTH = 320;
-export const MIN_NODE_IMAGE_WIDTH = 80;
-export const MAX_NODE_IMAGE_WIDTH = 960;
+export const MIN_NODE_IMAGE_WIDTH = DEFAULT_NODE_IMAGE_WIDTH_LIMITS.min;
+export const MAX_NODE_IMAGE_WIDTH = DEFAULT_NODE_IMAGE_WIDTH_LIMITS.max;
 
 export type NodeImageKind = 'vault' | 'markdown';
 export type NodeImageBoundary = 'top' | 'bottom';
@@ -89,13 +95,20 @@ export function moveNodeImageToPosition(
   return `${inlineRemaining} ${image.markdown}`;
 }
 
-export function createVaultImageMarkdown(target: string, width = DEFAULT_NODE_IMAGE_WIDTH): string {
+export function createVaultImageMarkdown(
+  target: string,
+  width = DEFAULT_NODE_IMAGE_WIDTH,
+  limits: NodeWidthLimits = DEFAULT_NODE_IMAGE_WIDTH_LIMITS,
+): string {
   const safeTarget = target.replace(/\|/g, '\\|');
-  return `![[${safeTarget}|${clampNodeImageWidth(width)}]]`;
+  return `![[${safeTarget}|${clampNodeImageWidth(width, limits)}]]`;
 }
 
-export function createNodeImageMarkdown(image: NodeImageData): string {
-  const width = clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH);
+export function createNodeImageMarkdown(
+  image: NodeImageData,
+  limits: NodeWidthLimits = DEFAULT_NODE_IMAGE_WIDTH_LIMITS,
+): string {
+  const width = clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH, limits);
   if (image.kind === 'vault') {
     const safeTarget = image.target.replace(/\|/g, '\\|');
     return `![[${safeTarget}|${width}]]`;
@@ -104,9 +117,11 @@ export function createNodeImageMarkdown(image: NodeImageData): string {
   return `![${escapeMarkdownLabel(image.alt)}|${width}](${image.target})`;
 }
 
-export function clampNodeImageWidth(width: number): number {
-  const value = Number.isFinite(width) ? Math.round(width) : DEFAULT_NODE_IMAGE_WIDTH;
-  return Math.max(MIN_NODE_IMAGE_WIDTH, Math.min(MAX_NODE_IMAGE_WIDTH, value));
+export function clampNodeImageWidth(
+  width: number,
+  limits: NodeWidthLimits = DEFAULT_NODE_IMAGE_WIDTH_LIMITS,
+): number {
+  return clampWidth(width, limits, DEFAULT_NODE_IMAGE_WIDTH);
 }
 
 function readImage(markdown: string, start: number): NodeImageData | null {
@@ -220,8 +235,10 @@ function splitUnescaped(value: string, separator: string): string[] {
 
 function readWidth(value?: string): number | null {
   if (!value) return null;
-  const match = value.trim().match(/^(\d{2,4})(?:px)?$/i);
-  return match ? clampNodeImageWidth(Number(match[1])) : null;
+  const match = value.trim().match(/^(\d+)(?:px)?$/i);
+  if (!match) return null;
+  const width = Number(match[1]);
+  return Number.isSafeInteger(width) && width > 0 ? width : null;
 }
 
 function stripAngleBrackets(value: string): string {
