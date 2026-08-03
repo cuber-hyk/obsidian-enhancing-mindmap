@@ -2,7 +2,7 @@
 artifact_type: audit
 status: active
 created: 2026-07-31
-updated: 2026-08-01
+updated: 2026-08-02
 scope: "桌面端脑图高频使用流程：首次加载、选择编辑、键盘导航、撤销重做、剪贴板、列表编号和视图同步"
 source_of_truth: code
 ---
@@ -50,10 +50,10 @@ source_of_truth: code
 |---|---|---|---|---|---|---|---|---|
 | UX-01 | P1 | verified | 在已有节点中进入编辑但不修改文字时，Escape 和“Cancel edit”仍无条件执行一次 `undo()`，会撤销上一条无关操作。若文字有变化，`cancelEdit()` 会先创建文本变更命令再撤销，说明真正缺失的是“本次编辑是否产生历史命令”的判断。 | `src/mindmap/mindmap.ts:493-503`；`src/main.ts:502-516`；`src/mindmap/INode.ts:832-864` | `docs/plans/archived/2026-07-31-mindmap-reliability-ux-fixes.md` | `task/20260731-fix-mindmap-reliability` | 已移除全部画布 Escape 分支及 `Cancel edit` 命令；构建通过，用户在测试 Vault 重载新包后确认编辑态和多选态 Escape 均不再触发画布行为 | fixed and verified |
 | UX-02 | P1 | verified | 首次 `setViewData()` 使用不可取消的 100ms 定时器，且回调读取的是届时的 `this.mindmap`。100ms 内再次载入会让多个回调初始化同一个新实例；关闭视图则可能在实例被置空后继续访问。结果可能是重复事件/节点初始化或关闭后异常。 | `src/MindMapView.ts:358-422`；`src/MindMapView.ts:425-438` | `docs/plans/archived/2026-07-31-mindmap-reliability-ux-fixes.md` | `task/20260731-fix-mindmap-reliability` | 已移除固定 timer 和双初始化分支；构建通过，用户在测试 Vault 同步新包并完成首次打开与交互回归后确认通过 | fixed and verified |
-| UX-03 | P2 | open | `quick-preview` 监听器返回 `this.onQuickPreview` 函数本身而没有调用它，外部 Markdown 或分栏编辑产生的实时变化不会沿预期路径刷新脑图。 | `src/MindMapView.ts:453-455`；`src/MindMapView.ts:625-630` | none | `main@62ae531` | 确认：注册回调不转发事件参数且没有调用处理器 | pending fix and regression verification |
-| UX-04 | P2 | open | 根节点执行“Collapse one level”时会把显示层级设为 `-1`，随后无条件调用空的 `parent.select()`，造成命令异常。 | `src/main.ts:614-629` | none | `main@62ae531` | 确认：根节点允许被选中，但命令无 root/parent 守卫 | pending fix and regression verification |
+| UX-03 | P2 | verified | `quick-preview` 监听器返回 `this.onQuickPreview` 函数本身而没有调用它，外部 Markdown 或分栏编辑产生的实时变化不会沿预期路径刷新脑图。 | `src/MindMapView.ts` | `docs/plans/archived/2026-08-02-mindmap-sync-collapse-numbering-fixes.md` | `task/20260802-fix-sync-collapse-numbering` | 已转发宿主事件参数；后台实例完成布局和视图状态恢复后原子替换旧画布。构建通过，用户确认实时刷新、定位保持及无明显界面切换 | fixed and verified |
+| UX-04 | P2 | verified | 根节点执行“Collapse one level”时会把显示层级设为 `-1`，随后无条件调用空的 `parent.select()`，造成命令异常。 | `src/main.ts` | `docs/plans/archived/2026-08-02-mindmap-sync-collapse-numbering-fixes.md` | `task/20260802-fix-sync-collapse-numbering` | 命令已增加活动脑图、单选、非根和父节点守卫；构建与测试 Vault 回归通过 | fixed and verified |
 | UX-05 | P2 | verified | 撤销/重做体验存在三处不一致：`Ctrl/Cmd+Z` 只在已选节点且事件目标位于该节点时生效；左右方向导航会无条件记录 `ExpandNode`，即使节点已展开或没有子节点也污染撤销栈；README 的 Redo 是 `Ctrl/Cmd+Y`，实际默认键为 `Alt+Shift+Y`。 | `src/mindmap/interaction/NodeKeyboardController.ts`；`src/main.ts`；`src/mindmap/interaction/PluginShortcutCatalog.ts`；`src/mindmap/interaction/MindMapShortcutInspector.ts` | `docs/plans/archived/2026-08-01-mindmap-keyboard-focus-ux.md` | `task/20260801-mindmap-keyboard-focus-ux` | Undo/Redo 已收敛为带活动视图和交互目标守卫的命令；Windows/Linux Redo 为 `Ctrl+Y`，macOS 为 `Cmd+Shift+Z`；无效导航不写 History；构建通过且用户在测试 Vault 确认快捷键和面板行为 | fixed and verified |
-| UX-06 | P2 | open | 有序列表自动编号只在 `AddSiblingNode` 中执行。删除、批量删除、单节点移动和多节点移动均不重排受影响的同级组，用户会重新遇到 `1、3` 或拖动后 `3、1、2` 的序号。 | `src/mindmap/Cmds.ts:69-149`；`src/mindmap/Cmds.ts:153-280`；`src/mindmap/Cmds.ts:350-530`；`src/mindmap/interaction/OrderedSiblingNumbering.ts` | none | `main@62ae531` | 确认：编号函数只有同级新增命令调用，其他结构命令无等价逻辑 | pending fix and regression verification |
+| UX-06 | P2 | verified | 有序列表自动编号只在 `AddSiblingNode` 中执行。删除、批量删除、单节点移动和多节点移动均不重排受影响的同级组，用户会重新遇到 `1、3` 或拖动后 `3、1、2` 的序号。 | `src/mindmap/Cmds.ts`；`src/mindmap/interaction/OrderedSiblingNumbering.ts` | `docs/plans/archived/2026-08-02-mindmap-sync-collapse-numbering-fixes.md` | `task/20260802-fix-sync-collapse-numbering` | 编号 owner 与四条结构 History 命令已覆盖删除、移动、撤销和重做；纯计算及命令级脚本通过，用户完成测试 Vault 验收 | fixed and verified |
 | UX-07 | P2 | open | 多选状态下按复制、剪切或粘贴会被直接消费但不显示原因；剪贴板权限错误和解析失败也只写控制台或返回 `false`。从用户视角表现为“按了没有反应”。 | `src/mindmap/interaction/NodeClipboardController.ts:20-35`；`src/mindmap/interaction/NodeClipboardController.ts:38-93` | none | `main@62ae531` | 确认：失败路径没有 Notice、状态提示或调用方反馈 | pending fix and regression verification |
 | UX-08 | P2 | verified | 旧的 document `keyup` 路由只检查延迟维护的 `isFocused`，没有排除 input、button、range 和 contenteditable 等交互目标。焦点进入使用 100ms 延迟且依据旧事件的 `relatedTarget`，快速离开后仍可能把状态改回 true；因此导航器滑杆或其他控件的方向键可能同时触发节点导航。 | `src/mindmap/mindmap.ts`；`src/mindmap/interaction/NodeKeyboardController.ts`；`src/mindmap/interaction/NodeSelectionController.ts` | `docs/plans/archived/2026-08-01-mindmap-keyboard-focus-ux.md` | `task/20260801-mindmap-keyboard-focus-ux` | 已移除延迟焦点状态和 document 级旧 keyup 路由，画布容器与交互目标即时守卫成为唯一入口；构建通过且用户在测试 Vault 确认行为正常 | fixed and verified |
 | UX-09 | P3 | open | “Replace by the previous text”命令读取从未维护的 `node.data.oldText`；实际编辑快照存放在私有 `_oldText`。命令会把 `undefined` 传给 `setText()`，后续渲染访问 `text.length` 时异常。 | `src/main.ts:168-185`；`src/mindmap/INode.ts:93`；`src/mindmap/INode.ts:181-185`；`src/mindmap/INode.ts:1622-1625` | none | `main@62ae531` | 确认：字段写入已被注释，数据模型没有有效来源 | pending fix or command removal |
@@ -68,11 +68,11 @@ source_of_truth: code
 ## 建议优化顺序
 
 1. UX-01、UX-02 已修复并验证：画布 Escape 不再触发编辑撤销或多选清理，视图装载使用单一初始化路径。
-2. 下一批统一 UX-05、UX-08：把键盘事件收敛到有明确目标守卫的单一入口，并只为真实状态变化记录 History。
-3. 随后补齐 UX-03、UX-04、UX-06：保证外部同步、根节点命令和结构化编号在完整生命周期内一致。
-4. 最后完善 UX-07、UX-09：给受限/失败操作明确反馈，移除或修复失效的低频命令。
+2. UX-05、UX-08 已修复并验证：键盘事件已收敛到画布容器，Undo/Redo 与有效 History 规则一致。
+3. UX-03、UX-04、UX-06 已修复并验证：外部同步、根节点命令和结构化编号在完整生命周期内保持一致。
+4. 后续完善 UX-07、UX-09：给受限/失败操作明确反馈，移除或修复失效的低频命令。
 
-建议下一步用 `dev-plan` 规划 UX-05、UX-08；不要把剩余七项塞进一个提交。
+建议下一步为 UX-07、UX-09 创建计划并执行修复。
 
 ## ADR 门禁
 
@@ -83,7 +83,7 @@ source_of_truth: code
 
 - 已运行命令：`npm run build`（退出码 0；仍有仓库既存的 `WorkspaceLeaf.id` 与 xmind 隐式 `any` TypeScript 警告）
 - 已运行审查：Project Mapper、Risk Prober、Adversarial Verifier、Judge 四轮审查
-- 未验证内容：UX-08 所需的完整焦点/事件矩阵；100、500、1000 节点性能基准；移动端和触摸交互
+- 未验证内容：100、500、1000 节点性能基准；移动端和触摸交互
 
 ## Git 可见性
 

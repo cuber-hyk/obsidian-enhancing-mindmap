@@ -595,17 +595,26 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Collapse one level',
       name: `${t('Collapse one level')}`,
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          if(mindmap.nodeSelectionController.hasMultipleSelection()) return;
-            if(mindmap.selectNode) {
-              mindmap.setDisplayedLevel(mindmap.selectNode.getLevel()-1);
-              mindmap.refresh();
-              mindmap.selectNode.parent.select();
-          }
+        const mindmap = mindmapView?.mindmap;
+        const node = mindmap?.selectNode;
+        if (
+          !mindmap ||
+          !node ||
+          node.data.isRoot ||
+          !node.parent ||
+          mindmap.nodeSelectionController.hasMultipleSelection()
+        ) return false;
+
+        if (!checking) {
+          const parent = node.parent;
+          mindmap.setDisplayedLevel(node.getLevel() - 1);
+          mindmap.refresh();
+          mindmap.clearSelectNode();
+          parent.select();
         }
+        return true;
       }
     });
 

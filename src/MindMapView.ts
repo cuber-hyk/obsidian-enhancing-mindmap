@@ -13,7 +13,7 @@ import {
 import MindMapPlugin from './main'
 import { FRONT_MATTER_REGEX } from './constants'
 import MindMap from "./mindmap/mindmap";
-import { INodeData } from './mindmap/INode'
+import INode, { INodeData } from './mindmap/INode'
 import { Transformer } from './markmapLib/markmap-lib';
 import { t } from './lang/helpers'
 import NodeInsertController from './mindmap/insert/NodeInsertController';
@@ -40,6 +40,17 @@ import domtoimage from './dom-to-image-more.js'
 
 const transformer = new Transformer();
 
+interface MindMapViewState {
+  selectedNodeId?: string;
+  selectedNodeText?: string;
+  selectedNodePath?: number[];
+  hadCanvasFocus: boolean;
+  scale: number;
+  scalePointer: number[];
+  scrollLeft: number;
+  scrollTop: number;
+}
+
 
 export const mindmapViewType = "mindmapView";
 export const mindmapIcon = "blocks";
@@ -50,12 +61,15 @@ export class MindMapView extends TextFileView implements HoverParent {
   hoverPopover: HoverPopover | null;
   id: string = (this.leaf as any).id;
   mindmap: MindMap | null;
+  stagingMindmap: MindMap | null = null;
+  stagingMindmapContainerEl: HTMLElement | null = null;
   currentStyleTemplateId: string = DEFAULT_MINDMAP_STYLE_TEMPLATE_ID;
   styleInspector: MindMapStyleInspector | null = null;
   isStyleInspectorOpen: boolean = false;
   shortcutInspector: MindMapShortcutInspector | null = null;
   isShortcutInspectorOpen: boolean = false;
   isApplyingStyleTemplate: boolean = false;
+  pendingViewState?: MindMapViewState;
   timeOut: any = null;
   fileCache: any;
   yamlString:string=''
@@ -309,6 +323,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.destroyStyleInspector();
     this.isShortcutInspectorOpen = false;
     this.destroyShortcutInspector();
+    this.clearStagingMindmap();
     if (this.mindmap) {
       this.mindmap.clear();
       this.contentEl.innerHTML = '';
@@ -326,15 +341,22 @@ export class MindMapView extends TextFileView implements HoverParent {
     return this.data;
   }
 
-  setViewData(data: string) {
+  setViewData(data: string, clear: boolean) {
+
+    const viewState = this.pendingViewState;
+    this.pendingViewState = undefined;
+    const oldMindmap = viewState ? this.mindmap : null;
 
     this.insertController.endEdit();
-    this.destroyStyleInspector();
-    this.destroyShortcutInspector();
-    if (this.mindmap) {
-      this.mindmap.clear();
+    this.clearStagingMindmap();
+    if (!oldMindmap) {
+      this.destroyStyleInspector();
+      this.destroyShortcutInspector();
+      if (this.mindmap) {
+        this.mindmap.clear();
+      }
+      this.contentEl.innerHTML = '';
     }
-    this.contentEl.innerHTML = '';
 
     this.data = data;
     this.yamlString = this.getFrontMatterFromData(data);
@@ -360,15 +382,89 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     this.contentEl.addClass('mm-mindmap-view');
     const mindmapContainerEl = this.contentEl.createDiv({ cls: 'mm-mindmap-canvas' });
+    if (oldMindmap) {
+      this.prepareStagingMindmapContainer(mindmapContainerEl, oldMindmap.containerEL);
+    }
     const mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
-    this.mindmap = mindmap;
+    if (oldMindmap) {
+      this.stagingMindmap = mindmap;
+      this.stagingMindmapContainerEl = mindmapContainerEl;
+    } else {
+      this.mindmap = mindmap;
+    }
     mindmap.path = this.file?.path || '';
     mindmap.view = this;
-    const styleTemplate = this.prepareMindmapStyle();
+    const styleTemplate = this.prepareMindmapStyle(mindmap);
+    if (viewState) {
+      mindmap.focusInitialRoot = viewState.hadCanvasFocus;
+      const restoreViewState = () => {
+        mindmap.off('initialLayoutReady', restoreViewState);
+        if (this.stagingMindmap !== mindmap || !oldMindmap) return;
+        this.restoreMindMapViewState(mindmap, viewState);
+        this.swapStagingMindmap(mindmap, mindmapContainerEl, oldMindmap);
+        if (viewState.hadCanvasFocus) {
+          if (mindmap.selectNode) {
+            mindmap.selectNode.select();
+          } else {
+            mindmap.appEl.focus({preventScroll: true});
+          }
+        }
+      };
+      mindmap.on('initialLayoutReady', restoreViewState);
+    }
     mindmap.init();
     applyMindMapStyleTemplate(mindmap, styleTemplate);
+    if (!oldMindmap) {
+      this.restoreStyleInspector();
+      this.restoreShortcutInspector();
+    }
+  }
+
+  private prepareStagingMindmapContainer(
+    containerEl: HTMLElement,
+    visibleContainerEl: HTMLElement,
+  ): void {
+    containerEl.style.position = 'absolute';
+    containerEl.style.left = `${visibleContainerEl.offsetLeft}px`;
+    containerEl.style.top = `${visibleContainerEl.offsetTop}px`;
+    containerEl.style.width = `${visibleContainerEl.clientWidth}px`;
+    containerEl.style.height = `${visibleContainerEl.clientHeight}px`;
+    containerEl.style.visibility = 'hidden';
+    containerEl.style.pointerEvents = 'none';
+  }
+
+  private swapStagingMindmap(
+    mindmap: MindMap,
+    containerEl: HTMLElement,
+    oldMindmap: MindMap,
+  ): void {
+    if (this.stagingMindmap !== mindmap || this.stagingMindmapContainerEl !== containerEl) return;
+
+    this.destroyStyleInspector();
+    this.destroyShortcutInspector();
+    this.mindmap = mindmap;
+    this.stagingMindmap = null;
+    this.stagingMindmapContainerEl = null;
+
+    containerEl.style.removeProperty('position');
+    containerEl.style.removeProperty('left');
+    containerEl.style.removeProperty('top');
+    containerEl.style.removeProperty('width');
+    containerEl.style.removeProperty('height');
+    containerEl.style.removeProperty('visibility');
+    containerEl.style.removeProperty('pointer-events');
+
+    oldMindmap.clear();
+    oldMindmap.containerEL.remove();
     this.restoreStyleInspector();
     this.restoreShortcutInspector();
+  }
+
+  private clearStagingMindmap(): void {
+    this.stagingMindmap?.clear();
+    this.stagingMindmapContainerEl?.remove();
+    this.stagingMindmap = null;
+    this.stagingMindmapContainerEl = null;
   }
 
   onunload() {
@@ -379,6 +475,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.destroyStyleInspector();
     this.isShortcutInspectorOpen = false;
     this.destroyShortcutInspector();
+    this.clearStagingMindmap();
 
     if (this.mindmap) {
       this.mindmap.clear();
@@ -400,18 +497,18 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
     this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
     this.registerEvent(
-      this.app.workspace.on("quick-preview", () => this.onQuickPreview, this)
+      this.app.workspace.on("quick-preview", (file, data) => this.onQuickPreview(file, data), this)
     );
 //    this.registerEvent(
 //      this.app.workspace.on('resize', () => this.updateMindMap(), this)
 //    );
   }
 
-  private prepareMindmapStyle() {
+  private prepareMindmapStyle(mindmap: MindMap | null = this.mindmap) {
     const template = resolveMindMapStyleTemplate(this.getCurrentStyleTemplateId());
     this.currentStyleTemplateId = template.id;
-    if (this.mindmap) {
-      this.mindmap.colors = template.branchPalette;
+    if (mindmap) {
+      mindmap.colors = template.branchPalette;
     }
     return template;
   }
@@ -561,9 +658,83 @@ export class MindMapView extends TextFileView implements HoverParent {
   onQuickPreview(file: TFile, data: string) {
     if (file === this.file && this.isApplyingStyleTemplate) return;
     if (file === this.file && data !== this.data) {
+      this.pendingViewState = this.captureMindMapViewState();
       this.fileCache = this.app.metadataCache.getFileCache(file);
-      this.setViewData(data);
+      this.setViewData(data, false);
     }
+  }
+
+  private captureMindMapViewState(): MindMapViewState | undefined {
+    const mindmap = this.mindmap;
+    if (!mindmap) return undefined;
+
+    const selectedNode = mindmap.selectNode;
+    return {
+      selectedNodeId: selectedNode?.getId(),
+      selectedNodeText: selectedNode?.data.text,
+      selectedNodePath: selectedNode ? this.getNodePath(selectedNode) : undefined,
+      hadCanvasFocus: mindmap.appEl.contains(document.activeElement),
+      scale: mindmap.mindScale,
+      scalePointer: [...mindmap.scalePointer],
+      scrollLeft: mindmap.containerEL.scrollLeft,
+      scrollTop: mindmap.containerEL.scrollTop,
+    };
+  }
+
+  private restoreMindMapViewState(mindmap: MindMap, state: MindMapViewState): void {
+    mindmap.scalePointer = [...state.scalePointer];
+    mindmap.scale(state.scale);
+    mindmap.containerEL.scrollLeft = state.scrollLeft;
+    mindmap.containerEL.scrollTop = state.scrollTop;
+
+    const selectedNode = this.findRestoredSelectedNode(mindmap, state);
+    if (!selectedNode) {
+      mindmap.root?.unSelect();
+      mindmap.selectNode = null;
+      return;
+    }
+
+    if (mindmap.selectNode && mindmap.selectNode !== selectedNode) {
+      mindmap.selectNode.unSelect();
+    }
+    selectedNode.select(false);
+  }
+
+  private findRestoredSelectedNode(mindmap: MindMap, state: MindMapViewState): INode | undefined {
+    if (!state.selectedNodePath) return undefined;
+
+    if (state.selectedNodeId) {
+      const idMatch = mindmap.getNodeById(state.selectedNodeId);
+      if (idMatch) return idMatch;
+    }
+
+    const pathMatch = this.getNodeAtPath(mindmap.root, state.selectedNodePath);
+    if (pathMatch?.data.text === state.selectedNodeText) return pathMatch;
+
+    const textMatches: INode[] = [];
+    mindmap.traverseDF((node: INode) => {
+      if (node.data.text === state.selectedNodeText) textMatches.push(node);
+    });
+    return textMatches.length === 1 ? textMatches[0] : undefined;
+  }
+
+  private getNodePath(node: INode): number[] {
+    const path: number[] = [];
+    let current = node;
+    while (current.parent) {
+      path.unshift(current.parent.children.indexOf(current));
+      current = current.parent;
+    }
+    return path;
+  }
+
+  private getNodeAtPath(root: INode, path: number[]): INode | undefined {
+    let current: INode | undefined = root;
+    for (const index of path) {
+      current = current?.children[index];
+      if (!current) return undefined;
+    }
+    return current;
   }
 
   updateMindMap() {

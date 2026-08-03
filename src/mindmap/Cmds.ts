@@ -1,6 +1,12 @@
 import INode, { INodeData } from './INode'
 import MindMap  from './mindmap';
-import { getOrderedSiblingNumbering } from './interaction/OrderedSiblingNumbering';
+import {
+    captureOrderedSiblingGroups,
+    findOrderedSiblingGroup,
+    getOrderedSiblingNumbering,
+    getOrderedSiblingTextUpdates,
+    OrderedSiblingGroupSnapshot,
+} from './interaction/OrderedSiblingNumbering';
 
 export abstract class Command {
     name:string;
@@ -64,6 +70,93 @@ interface NodeTextChange {
     node:INode;
     oldText:string;
     text:string;
+}
+
+interface ParentNumberingSnapshot {
+    parent:INode;
+    groups:OrderedSiblingGroupSnapshot<INode>[];
+}
+
+function captureParentNumbering(parent:INode):ParentNumberingSnapshot {
+    return {
+        parent,
+        groups: captureOrderedSiblingGroups(
+            parent.children.map((node) => ({item: node, text: node.data.text}))
+        ),
+    };
+}
+
+function getNumberingTextChanges(
+    snapshot:ParentNumberingSnapshot,
+    options: {
+        additionalGroups?:OrderedSiblingGroupSnapshot<INode>[];
+        preferredGroup?:OrderedSiblingGroupSnapshot<INode>;
+        adoptNodes?:INode[];
+    } = {},
+):NodeTextChange[] {
+    const groups = [...snapshot.groups, ...(options.additionalGroups || [])];
+    return getOrderedSiblingTextUpdates(
+        snapshot.parent.children.map((node) => ({item: node, text: node.data.text})),
+        groups,
+        {
+            preferredGroup: options.preferredGroup,
+            adoptItems: options.adoptNodes,
+        },
+    ).map(({item, text}) => ({
+        node: item,
+        oldText: item.data.text,
+        text,
+    }));
+}
+
+function mergeNumberingTextChanges(changes:NodeTextChange[]):NodeTextChange[] {
+    const merged = new Map<INode, NodeTextChange>();
+    changes.forEach((change) => {
+        const current = merged.get(change.node);
+        merged.set(change.node, current
+            ? {...change, oldText: current.oldText}
+            : change
+        );
+    });
+    return [...merged.values()].filter(({oldText, text}) => oldText !== text);
+}
+
+function applyNumberingTextChanges(changes:NodeTextChange[], useNewText:boolean):void {
+    changes.forEach(({node, oldText, text}) => {
+        node.setText(useNewText ? text : oldText);
+        node.clearCacheData();
+        node.refreshBox();
+    });
+}
+
+function getMovedOrderedGroups(
+    snapshots:ParentNumberingSnapshot[],
+    movedNodes:INode[],
+):OrderedSiblingGroupSnapshot<INode>[] {
+    const movedGroups:OrderedSiblingGroupSnapshot<INode>[] = [];
+    snapshots.forEach(({groups}) => {
+        groups.forEach((group) => {
+            if (group.items.some((item) => movedNodes.includes(item))) movedGroups.push(group);
+        });
+    });
+    return movedGroups;
+}
+
+function getDestinationOrderedGroup(
+    snapshot:ParentNumberingSnapshot,
+    movedNodes:INode[],
+):OrderedSiblingGroupSnapshot<INode> | undefined {
+    const indices = movedNodes
+        .map((node) => snapshot.parent.children.indexOf(node))
+        .filter((index) => index >= 0);
+    if (!indices.length) return undefined;
+
+    const firstIndex = Math.min(...indices);
+    const lastIndex = Math.max(...indices);
+    const leftNode = snapshot.parent.children[firstIndex - 1];
+    const rightNode = snapshot.parent.children[lastIndex + 1];
+    return findOrderedSiblingGroup(snapshot.groups, leftNode) ||
+        findOrderedSiblingGroup(snapshot.groups, rightNode);
 }
 
 export class AddSiblingNode extends Command {
@@ -155,6 +248,9 @@ export class RemoveNode extends Command {
     parent:INode = null;
     mind:MindMap =null;
     index:number = -1;
+    numberingSnapshot?:ParentNumberingSnapshot;
+    textChanges:NodeTextChange[] = [];
+    numberingInitialized:boolean = false;
     constructor(node:INode, mind?:MindMap) {
         super('removeNode');
         this.node = node;
@@ -168,9 +264,15 @@ export class RemoveNode extends Command {
         const nextSelectNode = this.parent?.children[this.node.getIndex() + 1] ||
             this.parent?.children[this.node.getIndex() - 1] ||
             this.parent;
+        if (!this.numberingSnapshot) this.numberingSnapshot = captureParentNumbering(this.parent);
         this.node.clearCacheData();
         this.mind.clearSelectNode();
         this.index = this.mind.removeNode(this.node);
+        if (!this.numberingInitialized) {
+            this.textChanges = getNumberingTextChanges(this.numberingSnapshot);
+            this.numberingInitialized = true;
+        }
+        applyNumberingTextChanges(this.textChanges, true);
         this.refresh();
         nextSelectNode && nextSelectNode.select();
         return true; //exit with no error
@@ -178,6 +280,7 @@ export class RemoveNode extends Command {
 
     undo() {
         this.mind.addNode(this.node, this.parent, this.index);
+        applyNumberingTextChanges(this.textChanges, false);
         this.node.clearCacheData();
         this.node.refreshBox();
         this.mind.clearSelectNode();
@@ -207,6 +310,9 @@ export class RemoveNodes extends Command {
     mind:MindMap;
     locations:RemovedNodeLocation[];
     fallback?:INode;
+    numberingSnapshots:ParentNumberingSnapshot[] = [];
+    textChanges:NodeTextChange[] = [];
+    numberingInitialized:boolean = false;
 
     constructor(data:RemoveNodesData) {
         super('removeNodes');
@@ -241,6 +347,10 @@ export class RemoveNodes extends Command {
             return false;
         }
 
+        if (!this.numberingSnapshots.length) {
+            this.numberingSnapshots = [...new Set(this.locations.map(({parent}) => parent))]
+                .map(captureParentNumbering);
+        }
         this.mind.clearSelectNode();
         this.locations
             .slice()
@@ -249,6 +359,15 @@ export class RemoveNodes extends Command {
                 node.clearCacheData();
                 this.mind.removeNode(node);
             });
+        if (!this.numberingInitialized) {
+            const changes:NodeTextChange[] = [];
+            this.numberingSnapshots.forEach((snapshot) => {
+                changes.push(...getNumberingTextChanges(snapshot));
+            });
+            this.textChanges = mergeNumberingTextChanges(changes);
+            this.numberingInitialized = true;
+        }
+        applyNumberingTextChanges(this.textChanges, true);
         this.refreshAffectedTree();
         this.fallback?.select();
         return true;
@@ -264,6 +383,7 @@ export class RemoveNodes extends Command {
                 node.clearCacheData();
                 node.refreshBox();
             });
+        applyNumberingTextChanges(this.textChanges, false);
         this.refreshAffectedTree();
         (this.primary || this.nodes[0])?.select();
     }
@@ -356,6 +476,10 @@ export class MoveNode extends Command {
     dropNode?:INode;
     type?:string;
     index:number = -1;
+    numberingSnapshots:ParentNumberingSnapshot[] = [];
+    movedGroups:OrderedSiblingGroupSnapshot<INode>[] = [];
+    textChanges:NodeTextChange[] = [];
+    numberingInitialized:boolean = false;
     constructor(data:any) {
         super('moveNode');
         this.data = data;
@@ -373,6 +497,7 @@ export class MoveNode extends Command {
     }
 
     execute():boolean {
+        if (!this.numberingSnapshots.length) this.captureNumbering();
         this.node.mindmap.clearSelectNode();
         if (this.data.type.indexOf('child') > -1) {
             if (this.oldParent) {
@@ -386,6 +511,8 @@ export class MoveNode extends Command {
 
             this.node.clearCacheData();
             this.oldParent.clearCacheData();
+            this.initializeNumbering();
+            applyNumberingTextChanges(this.textChanges, true);
             this.refresh(this.node.mindmap);
             this.node.select();
         } else {
@@ -409,6 +536,8 @@ export class MoveNode extends Command {
             }
 
             this.node.clearCacheData();
+            this.initializeNumbering();
+            applyNumberingTextChanges(this.textChanges, true);
             this.refresh(this.node.mindmap);
             this.node.select();
         }
@@ -422,6 +551,7 @@ export class MoveNode extends Command {
             if (this.oldParent) {
                 this.oldParent.addChild(this.node, this.index);
             }
+            applyNumberingTextChanges(this.textChanges, false);
 
             this.node.mindmap.traverseBF((n:INode) => {
                 n.boundingRect = null;
@@ -437,10 +567,44 @@ export class MoveNode extends Command {
             this.newParent.removeChild(this.node);
             this.dropNode.clearCacheData();
             this.oldParent.addChild(this.node, this.index);
+            applyNumberingTextChanges(this.textChanges, false);
             this.node.clearCacheData();
             this.refresh(this.node.mindmap);
             this.node.select();
         }
+    }
+
+    private getDestinationParent():INode {
+        return this.data.type.indexOf('child') > -1 ? this.parent : this.newParent;
+    }
+
+    private captureNumbering():void {
+        const parents = [this.oldParent, this.getDestinationParent()]
+            .filter((parent, index, values) => parent && values.indexOf(parent) === index);
+        this.numberingSnapshots = parents.map(captureParentNumbering);
+        this.movedGroups = getMovedOrderedGroups(this.numberingSnapshots, [this.node]);
+    }
+
+    private initializeNumbering():void {
+        if (this.numberingInitialized) return;
+        const destinationParent = this.getDestinationParent();
+        const destinationSnapshot = this.numberingSnapshots.find(({parent}) => parent === destinationParent);
+        const preferredGroup = destinationSnapshot
+            ? getDestinationOrderedGroup(destinationSnapshot, [this.node])
+            : undefined;
+        const changes:NodeTextChange[] = [];
+        this.numberingSnapshots.forEach((snapshot) => {
+            changes.push(...getNumberingTextChanges(
+                snapshot,
+                snapshot === destinationSnapshot ? {
+                    additionalGroups: this.movedGroups.filter((group) => !snapshot.groups.includes(group)),
+                    preferredGroup,
+                    adoptNodes: preferredGroup ? [this.node] : [],
+                } : {},
+            ));
+        });
+        this.textChanges = mergeNumberingTextChanges(changes);
+        this.numberingInitialized = true;
     }
 }
 
@@ -464,6 +628,10 @@ export class MoveNodes extends Command {
     dropNode:INode;
     mind:MindMap;
     locations:NodeLocation[];
+    numberingSnapshots:ParentNumberingSnapshot[] = [];
+    movedGroups:OrderedSiblingGroupSnapshot<INode>[] = [];
+    textChanges:NodeTextChange[] = [];
+    numberingInitialized:boolean = false;
 
     constructor(data:MoveNodesData) {
         super('moveNodes');
@@ -483,12 +651,15 @@ export class MoveNodes extends Command {
         const destinationParent = this.getDestinationParent();
         if (!destinationParent || !this.nodes.length || this.hasInvalidTarget()) return false;
 
+        if (!this.numberingSnapshots.length) this.captureNumbering(destinationParent);
         this.removeNodes();
         let insertionIndex = this.getInsertionIndex(destinationParent);
         this.nodes.forEach((node) => {
             destinationParent.addChild(node, insertionIndex);
             insertionIndex++;
         });
+        this.initializeNumbering(destinationParent);
+        applyNumberingTextChanges(this.textChanges, true);
         this.refreshAffectedTree(destinationParent);
         return true;
     }
@@ -502,6 +673,7 @@ export class MoveNodes extends Command {
             .forEach(({node, parent, index}) => {
                 parent.addChild(node, index);
             });
+        applyNumberingTextChanges(this.textChanges, false);
         this.refreshAffectedTree(destinationParent);
     }
 
@@ -534,6 +706,36 @@ export class MoveNodes extends Command {
             }
             return false;
         });
+    }
+
+    private captureNumbering(destinationParent:INode):void {
+        const parents = [
+            destinationParent,
+            ...this.locations.map(({parent}) => parent),
+        ].filter((parent, index, values) => parent && values.indexOf(parent) === index);
+        this.numberingSnapshots = parents.map(captureParentNumbering);
+        this.movedGroups = getMovedOrderedGroups(this.numberingSnapshots, this.nodes);
+    }
+
+    private initializeNumbering(destinationParent:INode):void {
+        if (this.numberingInitialized) return;
+        const destinationSnapshot = this.numberingSnapshots.find(({parent}) => parent === destinationParent);
+        const preferredGroup = destinationSnapshot
+            ? getDestinationOrderedGroup(destinationSnapshot, this.nodes)
+            : undefined;
+        const changes:NodeTextChange[] = [];
+        this.numberingSnapshots.forEach((snapshot) => {
+            changes.push(...getNumberingTextChanges(
+                snapshot,
+                snapshot === destinationSnapshot ? {
+                    additionalGroups: this.movedGroups.filter((group) => !snapshot.groups.includes(group)),
+                    preferredGroup,
+                    adoptNodes: preferredGroup ? this.nodes : [],
+                } : {},
+            ));
+        });
+        this.textChanges = mergeNumberingTextChanges(changes);
+        this.numberingInitialized = true;
     }
 
     private refreshAffectedTree(destinationParent?:INode) {

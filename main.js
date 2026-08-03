@@ -1990,13 +1990,13 @@ class Node$1 {
         link.remove();
         return true;
     }
-    select() {
+    select(focus = true) {
         var _a;
         this.isSelect = true;
         this.containEl.setAttribute('draggable', this.data.isEdit ? 'false' : 'true');
-        //if(this.mindmap.view.plugin.settings.focusOnMove) {
-        this.containEl.focus(); // set the dom to be focused
-        //}
+        if (focus) {
+            this.containEl.focus(); // set the dom to be focused
+        }
         Object.assign(window, {
             myNode: this
         });
@@ -9393,6 +9393,109 @@ function getOrderedSiblingNumbering(siblingTexts, referenceIndex, insertionIndex
         selectionOffset: `${startNumber + insertedOffset}${reference.delimiter} `.length,
     };
 }
+function captureOrderedSiblingGroups(entries) {
+    const groups = [];
+    let index = 0;
+    while (index < entries.length) {
+        const parsed = parseOrderedNodeText(entries[index].text);
+        if (!parsed) {
+            index++;
+            continue;
+        }
+        const items = [entries[index].item];
+        var endIndex = index + 1;
+        while (endIndex < entries.length) {
+            const next = parseOrderedNodeText(entries[endIndex].text);
+            if (!next || next.delimiter !== parsed.delimiter)
+                break;
+            items.push(entries[endIndex].item);
+            endIndex++;
+        }
+        groups.push({
+            items,
+            startNumber: parsed.number,
+            delimiter: parsed.delimiter,
+        });
+        index = endIndex;
+    }
+    return groups;
+}
+function getOrderedSiblingTextUpdates(entries, originalGroups, options = {}) {
+    var _a;
+    const adoptItems = new Set(options.adoptItems || []);
+    const currentItems = entries.map(({ item }) => item);
+    const parsedEntries = entries.map((entry) => {
+        let parsed = parseOrderedNodeText(entry.text);
+        if (options.preferredGroup && adoptItems.has(entry.item)) {
+            parsed = parsed
+                ? Object.assign(Object.assign({}, parsed), { delimiter: options.preferredGroup.delimiter }) : {
+                number: options.preferredGroup.startNumber,
+                delimiter: options.preferredGroup.delimiter,
+                content: entry.text,
+            };
+        }
+        return { entry, parsed };
+    });
+    const updates = [];
+    let index = 0;
+    while (index < parsedEntries.length) {
+        const current = parsedEntries[index];
+        if (!current.parsed) {
+            index++;
+            continue;
+        }
+        const group = [current];
+        var endIndex = index + 1;
+        while (endIndex < parsedEntries.length &&
+            ((_a = parsedEntries[endIndex].parsed) === null || _a === void 0 ? void 0 : _a.delimiter) === current.parsed.delimiter) {
+            group.push(parsedEntries[endIndex]);
+            endIndex++;
+        }
+        const items = group.map(({ entry }) => entry.item);
+        const matchingGroups = originalGroups.filter((snapshot) => snapshot.items.some((item) => items.includes(item)));
+        const preferredGroup = options.preferredGroup && (options.preferredGroup.items.some((item) => items.includes(item)) ||
+            items.some((item) => adoptItems.has(item))) ? options.preferredGroup : undefined;
+        const sourceGroup = preferredGroup || matchingGroups[0];
+        if (!sourceGroup || isUnchangedGroup(items, matchingGroups, adoptItems)) {
+            index = endIndex;
+            continue;
+        }
+        const startNumber = getCurrentGroupStartNumber(items, currentItems, sourceGroup);
+        group.forEach(({ entry, parsed }, offset) => {
+            const text = `${startNumber + offset}${sourceGroup.delimiter} ${parsed.content}`;
+            if (text !== entry.text)
+                updates.push({ item: entry.item, text });
+        });
+        index = endIndex;
+    }
+    return updates;
+}
+function getCurrentGroupStartNumber(items, currentItems, sourceGroup) {
+    if (sourceGroup.items.every((item) => items.includes(item))) {
+        return sourceGroup.startNumber;
+    }
+    const currentIndex = items.findIndex((item) => sourceGroup.items.includes(item));
+    if (currentIndex < 0)
+        return sourceGroup.startNumber;
+    const sourceIndex = sourceGroup.items.indexOf(items[currentIndex]);
+    const earlierSourceItemStillExists = sourceGroup.items
+        .slice(0, sourceIndex)
+        .some((item) => currentItems.includes(item));
+    return earlierSourceItemStillExists
+        ? sourceGroup.startNumber + sourceIndex - currentIndex
+        : sourceGroup.startNumber;
+}
+function findOrderedSiblingGroup(groups, item) {
+    return item === undefined
+        ? undefined
+        : groups.find((group) => group.items.includes(item));
+}
+function isUnchangedGroup(items, matchingGroups, adoptItems) {
+    return matchingGroups.length === 1 &&
+        matchingGroups[0].items.length === items.length &&
+        matchingGroups[0].items.every((item, index) => item === items[index]) &&
+        !items.some((item) => adoptItems.has(item));
+}
 
 class Command {
     constructor(name) {
@@ -9446,6 +9549,62 @@ class AddNode extends Command {
             p && p.select();
         }, 0);
     }
+}
+function captureParentNumbering(parent) {
+    return {
+        parent,
+        groups: captureOrderedSiblingGroups(parent.children.map((node) => ({ item: node, text: node.data.text }))),
+    };
+}
+function getNumberingTextChanges(snapshot, options = {}) {
+    const groups = [...snapshot.groups, ...(options.additionalGroups || [])];
+    return getOrderedSiblingTextUpdates(snapshot.parent.children.map((node) => ({ item: node, text: node.data.text })), groups, {
+        preferredGroup: options.preferredGroup,
+        adoptItems: options.adoptNodes,
+    }).map(({ item, text }) => ({
+        node: item,
+        oldText: item.data.text,
+        text,
+    }));
+}
+function mergeNumberingTextChanges(changes) {
+    const merged = new Map();
+    changes.forEach((change) => {
+        const current = merged.get(change.node);
+        merged.set(change.node, current
+            ? Object.assign(Object.assign({}, change), { oldText: current.oldText }) : change);
+    });
+    return [...merged.values()].filter(({ oldText, text }) => oldText !== text);
+}
+function applyNumberingTextChanges(changes, useNewText) {
+    changes.forEach(({ node, oldText, text }) => {
+        node.setText(useNewText ? text : oldText);
+        node.clearCacheData();
+        node.refreshBox();
+    });
+}
+function getMovedOrderedGroups(snapshots, movedNodes) {
+    const movedGroups = [];
+    snapshots.forEach(({ groups }) => {
+        groups.forEach((group) => {
+            if (group.items.some((item) => movedNodes.includes(item)))
+                movedGroups.push(group);
+        });
+    });
+    return movedGroups;
+}
+function getDestinationOrderedGroup(snapshot, movedNodes) {
+    const indices = movedNodes
+        .map((node) => snapshot.parent.children.indexOf(node))
+        .filter((index) => index >= 0);
+    if (!indices.length)
+        return undefined;
+    const firstIndex = Math.min(...indices);
+    const lastIndex = Math.max(...indices);
+    const leftNode = snapshot.parent.children[firstIndex - 1];
+    const rightNode = snapshot.parent.children[lastIndex + 1];
+    return findOrderedSiblingGroup(snapshot.groups, leftNode) ||
+        findOrderedSiblingGroup(snapshot.groups, rightNode);
 }
 class AddSiblingNode extends Command {
     constructor(node, reference, direct) {
@@ -9520,6 +9679,8 @@ class RemoveNode extends Command {
         this.parent = null;
         this.mind = null;
         this.index = -1;
+        this.textChanges = [];
+        this.numberingInitialized = false;
         this.node = node;
         this.parent = this.node.parent || null;
         this.mind = mind || this.node.mindmap;
@@ -9532,15 +9693,23 @@ class RemoveNode extends Command {
         const nextSelectNode = ((_a = this.parent) === null || _a === void 0 ? void 0 : _a.children[this.node.getIndex() + 1]) ||
             ((_b = this.parent) === null || _b === void 0 ? void 0 : _b.children[this.node.getIndex() - 1]) ||
             this.parent;
+        if (!this.numberingSnapshot)
+            this.numberingSnapshot = captureParentNumbering(this.parent);
         this.node.clearCacheData();
         this.mind.clearSelectNode();
         this.index = this.mind.removeNode(this.node);
+        if (!this.numberingInitialized) {
+            this.textChanges = getNumberingTextChanges(this.numberingSnapshot);
+            this.numberingInitialized = true;
+        }
+        applyNumberingTextChanges(this.textChanges, true);
         this.refresh();
         nextSelectNode && nextSelectNode.select();
         return true; //exit with no error
     }
     undo() {
         this.mind.addNode(this.node, this.parent, this.index);
+        applyNumberingTextChanges(this.textChanges, false);
         this.node.clearCacheData();
         this.node.refreshBox();
         this.mind.clearSelectNode();
@@ -9554,6 +9723,9 @@ class RemoveNodes extends Command {
     constructor(data) {
         var _a;
         super('removeNodes');
+        this.numberingSnapshots = [];
+        this.textChanges = [];
+        this.numberingInitialized = false;
         const uniqueNodes = [...new Set(data.nodes)];
         const selectedNodes = new Set(uniqueNodes);
         this.nodes = uniqueNodes.filter((node) => {
@@ -9584,6 +9756,10 @@ class RemoveNodes extends Command {
             this.locations.some(({ node, parent }) => node.parent !== parent || !parent.children.includes(node))) {
             return false;
         }
+        if (!this.numberingSnapshots.length) {
+            this.numberingSnapshots = [...new Set(this.locations.map(({ parent }) => parent))]
+                .map(captureParentNumbering);
+        }
         this.mind.clearSelectNode();
         this.locations
             .slice()
@@ -9592,6 +9768,15 @@ class RemoveNodes extends Command {
             node.clearCacheData();
             this.mind.removeNode(node);
         });
+        if (!this.numberingInitialized) {
+            const changes = [];
+            this.numberingSnapshots.forEach((snapshot) => {
+                changes.push(...getNumberingTextChanges(snapshot));
+            });
+            this.textChanges = mergeNumberingTextChanges(changes);
+            this.numberingInitialized = true;
+        }
+        applyNumberingTextChanges(this.textChanges, true);
         this.refreshAffectedTree();
         (_a = this.fallback) === null || _a === void 0 ? void 0 : _a.select();
         return true;
@@ -9607,6 +9792,7 @@ class RemoveNodes extends Command {
             node.clearCacheData();
             node.refreshBox();
         });
+        applyNumberingTextChanges(this.textChanges, false);
         this.refreshAffectedTree();
         (_a = (this.primary || this.nodes[0])) === null || _a === void 0 ? void 0 : _a.select();
     }
@@ -9688,6 +9874,10 @@ class MoveNode extends Command {
         super('moveNode');
         this.data = {};
         this.index = -1;
+        this.numberingSnapshots = [];
+        this.movedGroups = [];
+        this.textChanges = [];
+        this.numberingInitialized = false;
         this.data = data;
         if (this.data.type.indexOf('child') > -1) {
             this.node = this.data.node;
@@ -9703,6 +9893,8 @@ class MoveNode extends Command {
         }
     }
     execute() {
+        if (!this.numberingSnapshots.length)
+            this.captureNumbering();
         this.node.mindmap.clearSelectNode();
         if (this.data.type.indexOf('child') > -1) {
             if (this.oldParent) {
@@ -9715,6 +9907,8 @@ class MoveNode extends Command {
             }, this.node);
             this.node.clearCacheData();
             this.oldParent.clearCacheData();
+            this.initializeNumbering();
+            applyNumberingTextChanges(this.textChanges, true);
             this.refresh(this.node.mindmap);
             this.node.select();
         }
@@ -9735,6 +9929,8 @@ class MoveNode extends Command {
                 this.newParent.addChild(this.node, dropNodeIndex + 1);
             }
             this.node.clearCacheData();
+            this.initializeNumbering();
+            applyNumberingTextChanges(this.textChanges, true);
             this.refresh(this.node.mindmap);
             this.node.select();
         }
@@ -9747,6 +9943,7 @@ class MoveNode extends Command {
             if (this.oldParent) {
                 this.oldParent.addChild(this.node, this.index);
             }
+            applyNumberingTextChanges(this.textChanges, false);
             this.node.mindmap.traverseBF((n) => {
                 n.boundingRect = null;
                 n.stroke = '';
@@ -9760,15 +9957,48 @@ class MoveNode extends Command {
             this.newParent.removeChild(this.node);
             this.dropNode.clearCacheData();
             this.oldParent.addChild(this.node, this.index);
+            applyNumberingTextChanges(this.textChanges, false);
             this.node.clearCacheData();
             this.refresh(this.node.mindmap);
             this.node.select();
         }
     }
+    getDestinationParent() {
+        return this.data.type.indexOf('child') > -1 ? this.parent : this.newParent;
+    }
+    captureNumbering() {
+        const parents = [this.oldParent, this.getDestinationParent()]
+            .filter((parent, index, values) => parent && values.indexOf(parent) === index);
+        this.numberingSnapshots = parents.map(captureParentNumbering);
+        this.movedGroups = getMovedOrderedGroups(this.numberingSnapshots, [this.node]);
+    }
+    initializeNumbering() {
+        if (this.numberingInitialized)
+            return;
+        const destinationParent = this.getDestinationParent();
+        const destinationSnapshot = this.numberingSnapshots.find(({ parent }) => parent === destinationParent);
+        const preferredGroup = destinationSnapshot
+            ? getDestinationOrderedGroup(destinationSnapshot, [this.node])
+            : undefined;
+        const changes = [];
+        this.numberingSnapshots.forEach((snapshot) => {
+            changes.push(...getNumberingTextChanges(snapshot, snapshot === destinationSnapshot ? {
+                additionalGroups: this.movedGroups.filter((group) => !snapshot.groups.includes(group)),
+                preferredGroup,
+                adoptNodes: preferredGroup ? [this.node] : [],
+            } : {}));
+        });
+        this.textChanges = mergeNumberingTextChanges(changes);
+        this.numberingInitialized = true;
+    }
 }
 class MoveNodes extends Command {
     constructor(data) {
         super('moveNodes');
+        this.numberingSnapshots = [];
+        this.movedGroups = [];
+        this.textChanges = [];
+        this.numberingInitialized = false;
         this.data = data;
         this.nodes = [...data.nodes];
         this.dropNode = data.dropNode;
@@ -9784,12 +10014,16 @@ class MoveNodes extends Command {
         const destinationParent = this.getDestinationParent();
         if (!destinationParent || !this.nodes.length || this.hasInvalidTarget())
             return false;
+        if (!this.numberingSnapshots.length)
+            this.captureNumbering(destinationParent);
         this.removeNodes();
         let insertionIndex = this.getInsertionIndex(destinationParent);
         this.nodes.forEach((node) => {
             destinationParent.addChild(node, insertionIndex);
             insertionIndex++;
         });
+        this.initializeNumbering(destinationParent);
+        applyNumberingTextChanges(this.textChanges, true);
         this.refreshAffectedTree(destinationParent);
         return true;
     }
@@ -9802,6 +10036,7 @@ class MoveNodes extends Command {
             .forEach(({ node, parent, index }) => {
             parent.addChild(node, index);
         });
+        applyNumberingTextChanges(this.textChanges, false);
         this.refreshAffectedTree(destinationParent);
     }
     getDestinationParent() {
@@ -9833,6 +10068,32 @@ class MoveNodes extends Command {
             }
             return false;
         });
+    }
+    captureNumbering(destinationParent) {
+        const parents = [
+            destinationParent,
+            ...this.locations.map(({ parent }) => parent),
+        ].filter((parent, index, values) => parent && values.indexOf(parent) === index);
+        this.numberingSnapshots = parents.map(captureParentNumbering);
+        this.movedGroups = getMovedOrderedGroups(this.numberingSnapshots, this.nodes);
+    }
+    initializeNumbering(destinationParent) {
+        if (this.numberingInitialized)
+            return;
+        const destinationSnapshot = this.numberingSnapshots.find(({ parent }) => parent === destinationParent);
+        const preferredGroup = destinationSnapshot
+            ? getDestinationOrderedGroup(destinationSnapshot, this.nodes)
+            : undefined;
+        const changes = [];
+        this.numberingSnapshots.forEach((snapshot) => {
+            changes.push(...getNumberingTextChanges(snapshot, snapshot === destinationSnapshot ? {
+                additionalGroups: this.movedGroups.filter((group) => !snapshot.groups.includes(group)),
+                preferredGroup,
+                adoptNodes: preferredGroup ? this.nodes : [],
+            } : {}));
+        });
+        this.textChanges = mergeNumberingTextChanges(changes);
+        this.numberingInitialized = true;
     }
     refreshAffectedTree(destinationParent) {
         const parents = new Set([
@@ -39172,6 +39433,7 @@ class MindMap {
         this.pendingInitialNodes = new Set();
         this.isBuildingInitialTree = false;
         this.isInitialLayoutReady = false;
+        this.focusInitialRoot = true;
         this.initialLayoutFrame = null;
         this.renderLayoutFrame = null;
         this.layoutLineWidth = 2;
@@ -39465,6 +39727,7 @@ class MindMap {
             });
             this.isInitialLayoutReady = true;
             this.performLayoutRefresh();
+            this.emit('initialLayoutReady');
         });
     }
     scheduleRenderedLayout() {
@@ -40384,7 +40647,7 @@ class MindMap {
         if (!this.mmLayout) {
             this.mmLayout = new Layout(this.root, this.setting.layoutDirect || 'mind map', this.colors, this.layoutLineWidth);
             // Select and center on the mindmap's root when opening it
-            this.root.select();
+            this.root.select(this.focusInitialRoot);
             this.centerOnNode(this.root);
             return;
         }
@@ -43503,6 +43766,8 @@ class MindMapView extends obsidian.TextFileView {
     constructor(leaf, plugin) {
         super(leaf);
         this.id = this.leaf.id;
+        this.stagingMindmap = null;
+        this.stagingMindmapContainerEl = null;
         this.currentStyleTemplateId = DEFAULT_MINDMAP_STYLE_TEMPLATE_ID;
         this.styleInspector = null;
         this.isStyleInspectorOpen = false;
@@ -43528,6 +43793,7 @@ class MindMapView extends obsidian.TextFileView {
             this.destroyStyleInspector();
             this.isShortcutInspectorOpen = false;
             this.destroyShortcutInspector();
+            this.clearStagingMindmap();
             if (this.mindmap) {
                 this.mindmap.clear();
                 this.contentEl.innerHTML = '';
@@ -43540,15 +43806,21 @@ class MindMapView extends obsidian.TextFileView {
     getViewData() {
         return this.data;
     }
-    setViewData(data) {
+    setViewData(data, clear) {
         var _a;
+        const viewState = this.pendingViewState;
+        this.pendingViewState = undefined;
+        const oldMindmap = viewState ? this.mindmap : null;
         this.insertController.endEdit();
-        this.destroyStyleInspector();
-        this.destroyShortcutInspector();
-        if (this.mindmap) {
-            this.mindmap.clear();
+        this.clearStagingMindmap();
+        if (!oldMindmap) {
+            this.destroyStyleInspector();
+            this.destroyShortcutInspector();
+            if (this.mindmap) {
+                this.mindmap.clear();
+            }
+            this.contentEl.innerHTML = '';
         }
-        this.contentEl.innerHTML = '';
         this.data = data;
         this.yamlString = this.getFrontMatterFromData(data);
         this.fileCache = this.file
@@ -43569,15 +43841,81 @@ class MindMapView extends obsidian.TextFileView {
         // }
         this.contentEl.addClass('mm-mindmap-view');
         const mindmapContainerEl = this.contentEl.createDiv({ cls: 'mm-mindmap-canvas' });
+        if (oldMindmap) {
+            this.prepareStagingMindmapContainer(mindmapContainerEl, oldMindmap.containerEL);
+        }
         const mindmap = new MindMap(mindData, mindmapContainerEl, this.plugin.settings);
-        this.mindmap = mindmap;
+        if (oldMindmap) {
+            this.stagingMindmap = mindmap;
+            this.stagingMindmapContainerEl = mindmapContainerEl;
+        }
+        else {
+            this.mindmap = mindmap;
+        }
         mindmap.path = ((_a = this.file) === null || _a === void 0 ? void 0 : _a.path) || '';
         mindmap.view = this;
-        const styleTemplate = this.prepareMindmapStyle();
+        const styleTemplate = this.prepareMindmapStyle(mindmap);
+        if (viewState) {
+            mindmap.focusInitialRoot = viewState.hadCanvasFocus;
+            const restoreViewState = () => {
+                mindmap.off('initialLayoutReady', restoreViewState);
+                if (this.stagingMindmap !== mindmap || !oldMindmap)
+                    return;
+                this.restoreMindMapViewState(mindmap, viewState);
+                this.swapStagingMindmap(mindmap, mindmapContainerEl, oldMindmap);
+                if (viewState.hadCanvasFocus) {
+                    if (mindmap.selectNode) {
+                        mindmap.selectNode.select();
+                    }
+                    else {
+                        mindmap.appEl.focus({ preventScroll: true });
+                    }
+                }
+            };
+            mindmap.on('initialLayoutReady', restoreViewState);
+        }
         mindmap.init();
         applyMindMapStyleTemplate(mindmap, styleTemplate);
+        if (!oldMindmap) {
+            this.restoreStyleInspector();
+            this.restoreShortcutInspector();
+        }
+    }
+    prepareStagingMindmapContainer(containerEl, visibleContainerEl) {
+        containerEl.style.position = 'absolute';
+        containerEl.style.left = `${visibleContainerEl.offsetLeft}px`;
+        containerEl.style.top = `${visibleContainerEl.offsetTop}px`;
+        containerEl.style.width = `${visibleContainerEl.clientWidth}px`;
+        containerEl.style.height = `${visibleContainerEl.clientHeight}px`;
+        containerEl.style.visibility = 'hidden';
+        containerEl.style.pointerEvents = 'none';
+    }
+    swapStagingMindmap(mindmap, containerEl, oldMindmap) {
+        if (this.stagingMindmap !== mindmap || this.stagingMindmapContainerEl !== containerEl)
+            return;
+        this.destroyStyleInspector();
+        this.destroyShortcutInspector();
+        this.mindmap = mindmap;
+        this.stagingMindmap = null;
+        this.stagingMindmapContainerEl = null;
+        containerEl.style.removeProperty('position');
+        containerEl.style.removeProperty('left');
+        containerEl.style.removeProperty('top');
+        containerEl.style.removeProperty('width');
+        containerEl.style.removeProperty('height');
+        containerEl.style.removeProperty('visibility');
+        containerEl.style.removeProperty('pointer-events');
+        oldMindmap.clear();
+        oldMindmap.containerEL.remove();
         this.restoreStyleInspector();
         this.restoreShortcutInspector();
+    }
+    clearStagingMindmap() {
+        var _a, _b;
+        (_a = this.stagingMindmap) === null || _a === void 0 ? void 0 : _a.clear();
+        (_b = this.stagingMindmapContainerEl) === null || _b === void 0 ? void 0 : _b.remove();
+        this.stagingMindmap = null;
+        this.stagingMindmapContainerEl = null;
     }
     onunload() {
         this.app.workspace.offref("quick-preview");
@@ -43587,6 +43925,7 @@ class MindMapView extends obsidian.TextFileView {
         this.destroyStyleInspector();
         this.isShortcutInspectorOpen = false;
         this.destroyShortcutInspector();
+        this.clearStagingMindmap();
         if (this.mindmap) {
             this.mindmap.clear();
             this.contentEl.innerHTML = '';
@@ -43602,16 +43941,16 @@ class MindMapView extends obsidian.TextFileView {
         this.scope.register(['Mod', 'Shift'], 's', () => this.formatEditingNode('~~'));
         this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
         this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
-        this.registerEvent(this.app.workspace.on("quick-preview", () => this.onQuickPreview, this));
+        this.registerEvent(this.app.workspace.on("quick-preview", (file, data) => this.onQuickPreview(file, data), this));
         //    this.registerEvent(
         //      this.app.workspace.on('resize', () => this.updateMindMap(), this)
         //    );
     }
-    prepareMindmapStyle() {
+    prepareMindmapStyle(mindmap = this.mindmap) {
         const template = resolveMindMapStyleTemplate(this.getCurrentStyleTemplateId());
         this.currentStyleTemplateId = template.id;
-        if (this.mindmap) {
-            this.mindmap.colors = template.branchPalette;
+        if (mindmap) {
+            mindmap.colors = template.branchPalette;
         }
         return template;
     }
@@ -43762,9 +44101,79 @@ class MindMapView extends obsidian.TextFileView {
         if (file === this.file && this.isApplyingStyleTemplate)
             return;
         if (file === this.file && data !== this.data) {
+            this.pendingViewState = this.captureMindMapViewState();
             this.fileCache = this.app.metadataCache.getFileCache(file);
-            this.setViewData(data);
+            this.setViewData(data, false);
         }
+    }
+    captureMindMapViewState() {
+        const mindmap = this.mindmap;
+        if (!mindmap)
+            return undefined;
+        const selectedNode = mindmap.selectNode;
+        return {
+            selectedNodeId: selectedNode === null || selectedNode === void 0 ? void 0 : selectedNode.getId(),
+            selectedNodeText: selectedNode === null || selectedNode === void 0 ? void 0 : selectedNode.data.text,
+            selectedNodePath: selectedNode ? this.getNodePath(selectedNode) : undefined,
+            hadCanvasFocus: mindmap.appEl.contains(document.activeElement),
+            scale: mindmap.mindScale,
+            scalePointer: [...mindmap.scalePointer],
+            scrollLeft: mindmap.containerEL.scrollLeft,
+            scrollTop: mindmap.containerEL.scrollTop,
+        };
+    }
+    restoreMindMapViewState(mindmap, state) {
+        var _a;
+        mindmap.scalePointer = [...state.scalePointer];
+        mindmap.scale(state.scale);
+        mindmap.containerEL.scrollLeft = state.scrollLeft;
+        mindmap.containerEL.scrollTop = state.scrollTop;
+        const selectedNode = this.findRestoredSelectedNode(mindmap, state);
+        if (!selectedNode) {
+            (_a = mindmap.root) === null || _a === void 0 ? void 0 : _a.unSelect();
+            mindmap.selectNode = null;
+            return;
+        }
+        if (mindmap.selectNode && mindmap.selectNode !== selectedNode) {
+            mindmap.selectNode.unSelect();
+        }
+        selectedNode.select(false);
+    }
+    findRestoredSelectedNode(mindmap, state) {
+        if (!state.selectedNodePath)
+            return undefined;
+        if (state.selectedNodeId) {
+            const idMatch = mindmap.getNodeById(state.selectedNodeId);
+            if (idMatch)
+                return idMatch;
+        }
+        const pathMatch = this.getNodeAtPath(mindmap.root, state.selectedNodePath);
+        if ((pathMatch === null || pathMatch === void 0 ? void 0 : pathMatch.data.text) === state.selectedNodeText)
+            return pathMatch;
+        const textMatches = [];
+        mindmap.traverseDF((node) => {
+            if (node.data.text === state.selectedNodeText)
+                textMatches.push(node);
+        });
+        return textMatches.length === 1 ? textMatches[0] : undefined;
+    }
+    getNodePath(node) {
+        const path = [];
+        let current = node;
+        while (current.parent) {
+            path.unshift(current.parent.children.indexOf(current));
+            current = current.parent;
+        }
+        return path;
+    }
+    getNodeAtPath(root, path) {
+        let current = root;
+        for (const index of path) {
+            current = current === null || current === void 0 ? void 0 : current.children[index];
+            if (!current)
+                return undefined;
+        }
+        return current;
     }
     updateMindMap() {
         if (this.mindmap) {
@@ -44586,18 +44995,24 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Collapse one level',
                 name: `${t('Collapse one level')}`,
-                callback: () => {
+                checkCallback: (checking) => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        var mindmap = mindmapView.mindmap;
-                        if (mindmap.nodeSelectionController.hasMultipleSelection())
-                            return;
-                        if (mindmap.selectNode) {
-                            mindmap.setDisplayedLevel(mindmap.selectNode.getLevel() - 1);
-                            mindmap.refresh();
-                            mindmap.selectNode.parent.select();
-                        }
+                    const mindmap = mindmapView === null || mindmapView === void 0 ? void 0 : mindmapView.mindmap;
+                    const node = mindmap === null || mindmap === void 0 ? void 0 : mindmap.selectNode;
+                    if (!mindmap ||
+                        !node ||
+                        node.data.isRoot ||
+                        !node.parent ||
+                        mindmap.nodeSelectionController.hasMultipleSelection())
+                        return false;
+                    if (!checking) {
+                        const parent = node.parent;
+                        mindmap.setDisplayedLevel(node.getLevel() - 1);
+                        mindmap.refresh();
+                        mindmap.clearSelectNode();
+                        parent.select();
                     }
+                    return true;
                 }
             });
             // Alt + PgUp:
