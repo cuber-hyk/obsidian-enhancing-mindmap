@@ -11,8 +11,10 @@ import ExternalLinkModal, {
 } from './ExternalLinkModal';
 import {
   createVaultImageMarkdown,
+  DEFAULT_NODE_IMAGE_WIDTH,
   parseNodeImages,
 } from '../image/NodeImageMarkdown';
+import { getNodeImageWidthLimits } from '../NodeWidthSettings';
 import { createExternalMarkdownLink } from '../link/NodeLinkMarkdown';
 import NodeMarkdownInsertion from './NodeMarkdownInsertion';
 import VaultFileSuggestModal from './VaultFileSuggestModal';
@@ -234,7 +236,13 @@ export default class NodeInsertController {
       '',
       alias,
     );
-    const markdown = embed ? createVaultImageMarkdown(file.path) : link;
+    const markdown = embed
+      ? createVaultImageMarkdown(
+        file.path,
+        DEFAULT_NODE_IMAGE_WIDTH,
+        getNodeImageWidthLimits(node.mindmap?.setting),
+      )
+      : link;
     if (embed) {
       await this.insertImage(node, insertion, markdown, () => this.isActiveSession(node, insertion));
     } else {
@@ -308,7 +316,11 @@ export default class NodeInsertController {
     }
 
     try {
-      const markdown = createVaultImageMarkdown(attachment.path);
+      const markdown = createVaultImageMarkdown(
+        attachment.path,
+        DEFAULT_NODE_IMAGE_WIDTH,
+        getNodeImageWidthLimits(node.mindmap?.setting),
+      );
       const inserted = await this.insertImage(
         node,
         pasteInsertion,

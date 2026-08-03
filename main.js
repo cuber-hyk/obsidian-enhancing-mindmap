@@ -132,6 +132,15 @@ var en = {
     "Max level of node to markdown head desc": "Specify which Node Level creates a seperate Heading instead of a List-Item",
     "Font size": "Font Size",
     "Font size desc": "Specify the Font Size",
+    "Text node minimum width": "Minimum text node width",
+    "Text node minimum width desc": "Smallest width allowed when resizing plain text nodes, in px",
+    "Text node maximum width": "Maximum text node width",
+    "Text node maximum width desc": "Largest width allowed when resizing plain text nodes, in px",
+    "Node image minimum width": "Minimum node image width",
+    "Node image minimum width desc": "Smallest width used for node images, in px",
+    "Node image maximum width": "Maximum node image width",
+    "Node image maximum width desc": "Largest width used for node images, in px",
+    "Invalid node width range": "Enter positive integers and keep the maximum width greater than or equal to the minimum width",
     "Mind map layout direct": "Mindmap Layout",
     "Mind map layout direct desc": "Specify the direction the nodes are placed in your Mindmap",
     "Right": "Right",
@@ -425,6 +434,15 @@ var zhCN = {
     "Max level of node to markdown head desc": "将小于该层级的节点文字转为markdown标题，最大层级为6，因为HTML标题支持最大为6级",
     "Font size": "文字大小",
     "Font size desc": "思维导图文字默认大小，单位px",
+    "Text node minimum width": "文本节点最小宽度",
+    "Text node minimum width desc": "拖动普通文本节点时允许的最小宽度，单位 px",
+    "Text node maximum width": "文本节点最大宽度",
+    "Text node maximum width desc": "拖动普通文本节点时允许的最大宽度，单位 px",
+    "Node image minimum width": "节点图片最小宽度",
+    "Node image minimum width desc": "节点图片显示和缩放允许的最小宽度，单位 px",
+    "Node image maximum width": "节点图片最大宽度",
+    "Node image maximum width desc": "节点图片显示和缩放允许的最大宽度，单位 px",
+    "Invalid node width range": "请输入正整数，并确保最大宽度不小于最小宽度",
     "Mind map layout direct": "思维导图布局方向",
     "Mind map layout direct desc": "思维导图的布局方向，分为向两侧发散、仅右侧、仅左侧三个方向",
     // wait to use
@@ -809,9 +827,58 @@ function unescapeValue$1(value) {
     return value.replace(/\\([\\[\]|])/g, '$1');
 }
 
+const DEFAULT_TEXT_NODE_WIDTH_LIMITS = {
+    min: 32,
+    max: 1600,
+};
+const DEFAULT_NODE_IMAGE_WIDTH_LIMITS = {
+    min: 80,
+    max: 960,
+};
+const DEFAULT_NODE_WIDTH_SETTINGS = {
+    textNodeMinWidth: DEFAULT_TEXT_NODE_WIDTH_LIMITS.min,
+    textNodeMaxWidth: DEFAULT_TEXT_NODE_WIDTH_LIMITS.max,
+    nodeImageMinWidth: DEFAULT_NODE_IMAGE_WIDTH_LIMITS.min,
+    nodeImageMaxWidth: DEFAULT_NODE_IMAGE_WIDTH_LIMITS.max,
+};
+function normalizeNodeWidthSettings(settings) {
+    const textLimits = normalizeWidthLimits(settings.textNodeMinWidth, settings.textNodeMaxWidth, DEFAULT_TEXT_NODE_WIDTH_LIMITS);
+    const imageLimits = normalizeWidthLimits(settings.nodeImageMinWidth, settings.nodeImageMaxWidth, DEFAULT_NODE_IMAGE_WIDTH_LIMITS);
+    return {
+        textNodeMinWidth: textLimits.min,
+        textNodeMaxWidth: textLimits.max,
+        nodeImageMinWidth: imageLimits.min,
+        nodeImageMaxWidth: imageLimits.max,
+    };
+}
+function getTextNodeWidthLimits(settings) {
+    return normalizeWidthLimits(settings === null || settings === void 0 ? void 0 : settings.textNodeMinWidth, settings === null || settings === void 0 ? void 0 : settings.textNodeMaxWidth, DEFAULT_TEXT_NODE_WIDTH_LIMITS);
+}
+function getNodeImageWidthLimits(settings) {
+    return normalizeWidthLimits(settings === null || settings === void 0 ? void 0 : settings.nodeImageMinWidth, settings === null || settings === void 0 ? void 0 : settings.nodeImageMaxWidth, DEFAULT_NODE_IMAGE_WIDTH_LIMITS);
+}
+function normalizeWidthLimits(min, max, defaults) {
+    const normalizedMin = toPositiveInteger(min);
+    const normalizedMax = toPositiveInteger(max);
+    if (normalizedMin === null || normalizedMax === null || normalizedMin > normalizedMax) {
+        return Object.assign({}, defaults);
+    }
+    return { min: normalizedMin, max: normalizedMax };
+}
+function clampWidth(width, limits, fallback) {
+    const value = Number.isFinite(width) ? Math.round(width) : fallback;
+    return Math.max(limits.min, Math.min(limits.max, value));
+}
+function toPositiveInteger(value) {
+    const number = typeof value === 'number' ? value : Number(value);
+    if (!Number.isSafeInteger(number) || number <= 0)
+        return null;
+    return number;
+}
+
 const DEFAULT_NODE_IMAGE_WIDTH = 320;
-const MIN_NODE_IMAGE_WIDTH = 80;
-const MAX_NODE_IMAGE_WIDTH = 960;
+DEFAULT_NODE_IMAGE_WIDTH_LIMITS.min;
+DEFAULT_NODE_IMAGE_WIDTH_LIMITS.max;
 function parseNodeImages(markdown) {
     const images = [];
     let index = 0;
@@ -862,21 +929,20 @@ function moveNodeImageToPosition(markdown, imageIndex, position) {
         return `${image.markdown} ${inlineRemaining}`;
     return `${inlineRemaining} ${image.markdown}`;
 }
-function createVaultImageMarkdown(target, width = DEFAULT_NODE_IMAGE_WIDTH) {
+function createVaultImageMarkdown(target, width = DEFAULT_NODE_IMAGE_WIDTH, limits = DEFAULT_NODE_IMAGE_WIDTH_LIMITS) {
     const safeTarget = target.replace(/\|/g, '\\|');
-    return `![[${safeTarget}|${clampNodeImageWidth(width)}]]`;
+    return `![[${safeTarget}|${clampNodeImageWidth(width, limits)}]]`;
 }
-function createNodeImageMarkdown(image) {
-    const width = clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH);
+function createNodeImageMarkdown(image, limits = DEFAULT_NODE_IMAGE_WIDTH_LIMITS) {
+    const width = clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH, limits);
     if (image.kind === 'vault') {
         const safeTarget = image.target.replace(/\|/g, '\\|');
         return `![[${safeTarget}|${width}]]`;
     }
     return `![${escapeMarkdownLabel(image.alt)}|${width}](${image.target})`;
 }
-function clampNodeImageWidth(width) {
-    const value = Number.isFinite(width) ? Math.round(width) : DEFAULT_NODE_IMAGE_WIDTH;
-    return Math.max(MIN_NODE_IMAGE_WIDTH, Math.min(MAX_NODE_IMAGE_WIDTH, value));
+function clampNodeImageWidth(width, limits = DEFAULT_NODE_IMAGE_WIDTH_LIMITS) {
+    return clampWidth(width, limits, DEFAULT_NODE_IMAGE_WIDTH);
 }
 function readImage(markdown, start) {
     if (markdown[start] !== '!')
@@ -989,8 +1055,11 @@ function splitUnescaped(value, separator) {
 function readWidth(value) {
     if (!value)
         return null;
-    const match = value.trim().match(/^(\d{2,4})(?:px)?$/i);
-    return match ? clampNodeImageWidth(Number(match[1])) : null;
+    const match = value.trim().match(/^(\d+)(?:px)?$/i);
+    if (!match)
+        return null;
+    const width = Number(match[1]);
+    return Number.isSafeInteger(width) && width > 0 ? width : null;
 }
 function stripAngleBrackets(value) {
     if (value.startsWith('<') && value.endsWith('>')) {
@@ -1581,8 +1650,6 @@ function setNodeAutoWrapWidth(markdown, width) {
     return `${getNodeAutoWrapContent(markdown)}<!-- enhancing-mindmap:width=${Math.round(width)} -->`;
 }
 
-const MIN_NODE_WIDTH = 32;
-const MAX_NODE_WIDTH = 1600;
 class NodeAutoWrapController {
     constructor(options) {
         this.drag = null;
@@ -1609,7 +1676,7 @@ class NodeAutoWrapController {
             event.preventDefault();
             event.stopPropagation();
             const delta = (event.clientX - this.drag.startX) / this.getScale();
-            const width = clamp(this.drag.startWidth + delta, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+            const width = clampWidth(this.drag.startWidth + delta, this.getLimits(), this.drag.startWidth);
             this.drag.width = width;
             this.applyWidth(width);
             this.onLayoutChange();
@@ -1630,6 +1697,7 @@ class NodeAutoWrapController {
         this.contentEl = options.contentEl;
         this.getMarkdown = options.getMarkdown;
         this.getWidth = options.getWidth;
+        this.getLimits = options.getLimits;
         this.getScale = options.getScale;
         this.onCommit = options.onCommit;
         this.onLayoutChange = options.onLayoutChange;
@@ -1686,14 +1754,11 @@ class NodeAutoWrapController {
             this.contentEl.style.removeProperty('max-width');
             return;
         }
-        const clampedWidth = clamp(width, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+        const clampedWidth = clampWidth(width, this.getLimits(), width);
         this.contentEl.style.width = `${clampedWidth}px`;
         this.contentEl.style.minWidth = `${clampedWidth}px`;
         this.contentEl.style.maxWidth = `${clampedWidth}px`;
     }
-}
-function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
 }
 
 function keepLastIndex(dom) {
@@ -1762,6 +1827,7 @@ class Node$1 {
             contentEl: this.contentEl,
             getMarkdown: () => this.data.text,
             getWidth: () => getNodeAutoWrapWidth(this.data.text),
+            getLimits: () => { var _a; return getTextNodeWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting); },
             getScale: () => { var _a; return (((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.mindScale) || 100) / 100; },
             onCommit: (width) => {
                 const text = setNodeAutoWrapWidth(this.data.text, width);
@@ -1926,10 +1992,11 @@ class Node$1 {
             if (target instanceof obsidian.TFile && target.extension !== "md" && this.mindmap) {
                 el.innerText = "";
                 el.createEl("img", { attr: { src: this.mindmap.view.app.vault.getResourcePath(target) } }, (img) => {
+                    var _a;
                     if (el.hasAttribute("width"))
                         img.setAttribute("width", el.getAttribute("width"));
                     else
-                        img.setAttribute("width", `${DEFAULT_NODE_IMAGE_WIDTH}`);
+                        img.setAttribute("width", `${clampNodeImageWidth(DEFAULT_NODE_IMAGE_WIDTH, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting))}`);
                     if (el.hasAttribute("alt"))
                         img.setAttribute("alt", el.getAttribute("alt"));
                     this.bindRenderedImage(img);
@@ -1971,9 +2038,10 @@ class Node$1 {
         });
     }
     reserveImageSpace(image) {
+        var _a;
         if (image.naturalWidth <= 0 || image.naturalHeight <= 0)
             return;
-        const width = Number(image.getAttribute('width')) || image.width || DEFAULT_NODE_IMAGE_WIDTH;
+        const width = clampNodeImageWidth(Number(image.getAttribute('width')) || image.width || DEFAULT_NODE_IMAGE_WIDTH, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting));
         image.width = width;
         image.height = Math.round(width * image.naturalHeight / image.naturalWidth);
     }
@@ -2470,6 +2538,7 @@ class Node$1 {
         });
     }
     createEditableImage(image) {
+        var _a;
         const wrapper = this.contentEl.ownerDocument.createElement('span');
         wrapper.classList.add('mm-node-image-attachment');
         wrapper.setAttribute('contenteditable', 'false');
@@ -2480,7 +2549,7 @@ class Node$1 {
         wrapper.dataset.imageKind = image.kind;
         wrapper.dataset.imageTarget = image.target;
         wrapper.dataset.imageAlt = image.alt;
-        wrapper.dataset.imageWidth = `${clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH)}`;
+        wrapper.dataset.imageWidth = `${clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting))}`;
         const img = this.contentEl.ownerDocument.createElement('img');
         img.draggable = false;
         img.alt = image.alt;
@@ -2711,7 +2780,8 @@ class Node$1 {
         const startWidth = Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH;
         const doc = imageEl.ownerDocument;
         const move = (moveEvent) => {
-            const width = clampNodeImageWidth(startWidth + moveEvent.clientX - startX);
+            var _a;
+            const width = clampNodeImageWidth(startWidth + moveEvent.clientX - startX, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting));
             imageEl.dataset.imageWidth = `${width}`;
             const img = imageEl.querySelector('img');
             if (img instanceof HTMLImageElement) {
@@ -2731,6 +2801,7 @@ class Node$1 {
     getEditedContentMarkdown() {
         const parts = [];
         this.contentEl.childNodes.forEach((child) => {
+            var _a;
             if (child instanceof Text) {
                 parts.push(child.textContent || '');
                 return;
@@ -2744,7 +2815,7 @@ class Node$1 {
             if (child.classList.contains('mm-node-image-attachment')) {
                 const image = this.readEditedImage(child);
                 if (image)
-                    parts.push(createNodeImageMarkdown(image));
+                    parts.push(createNodeImageMarkdown(image, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting)));
                 return;
             }
             parts.push(child.innerText || '');
@@ -2752,11 +2823,12 @@ class Node$1 {
         return parts.join('');
     }
     readEditedImage(imageEl) {
+        var _a;
         const target = imageEl.dataset.imageTarget || '';
         if (!target)
             return null;
         const kind = imageEl.dataset.imageKind === 'markdown' ? 'markdown' : 'vault';
-        const width = clampNodeImageWidth(Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH);
+        const width = clampNodeImageWidth(Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting));
         return {
             markdown: '',
             target,
@@ -2776,6 +2848,32 @@ class Node$1 {
         this.clearTreeCacheData();
         this.refreshBox();
         this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
+    }
+    refreshWidthSettings() {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            (_a = this.autoWrapController) === null || _a === void 0 ? void 0 : _a.refresh();
+            if (this.data.isEdit) {
+                const limits = getNodeImageWidthLimits((_b = this.mindmap) === null || _b === void 0 ? void 0 : _b.setting);
+                this.contentEl.querySelectorAll('.mm-node-image-attachment').forEach((wrapper) => {
+                    const width = clampNodeImageWidth(Number(wrapper.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH, limits);
+                    wrapper.dataset.imageWidth = `${width}`;
+                    const image = wrapper.querySelector('img');
+                    if (image instanceof HTMLImageElement) {
+                        image.width = width;
+                        this.reserveImageSpace(image);
+                    }
+                });
+                this.refreshEditingLayout();
+                return;
+            }
+            if (parseNodeImages(getNodeAutoWrapContent(this.data.text)).length > 0) {
+                yield this.setText(this.data.text);
+                return;
+            }
+            this.clearCacheData();
+            this.refreshBox();
+        });
     }
     destroy() {
         var _a, _b;
@@ -39470,17 +39568,9 @@ class MindMap {
         this.timeOut = null;
         this._dragType = '';
         this.isComposing = false;
-        this.setting = Object.assign({
+        this.setting = Object.assign(Object.assign({ 
             //canvasSize: 8000,
-            canvasSize: 36000,
-            fontSize: 16,
-            background: 'transparent',
-            color: 'inherit',
-            exportMdModel: 'default',
-            headLevel: 2,
-            layoutDirect: '',
-            showLinkTitle: false
-        }, setting || {});
+            canvasSize: 36000, fontSize: 16, background: 'transparent', color: 'inherit', exportMdModel: 'default', headLevel: 2, layoutDirect: '', showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), setting || {});
         this.data = data;
         this.appEl = document.createElement('div');
         this.appEl.classList.add('mm-mindmap');
@@ -39540,6 +39630,9 @@ class MindMap {
         //  this.contentEL.style.color=`${this.setting.color};`;
         this.contentEL.style.background = `${this.setting.background}`;
         this.contentEL.style.fontSize = `${this.setting.fontSize}px`;
+        const textLimits = getTextNodeWidthLimits(this.setting);
+        this.appEl.style.setProperty('--mm-text-node-min-width', `${textLimits.min}px`);
+        this.appEl.style.setProperty('--mm-text-node-max-width', `${textLimits.max}px`);
     }
     //create node
     init(collapsedIds) {
@@ -41360,12 +41453,15 @@ class NodeInsertController {
         this.refreshNode(node);
     }
     insertVaultFile(node, insertion, file, embed) {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.isActiveSession(node, insertion))
                 return;
             const alias = embed ? '' : insertion.getSelectedText().trim();
             const link = this.app.fileManager.generateMarkdownLink(file, this.getSourcePath(node), '', alias);
-            const markdown = embed ? createVaultImageMarkdown(file.path) : link;
+            const markdown = embed
+                ? createVaultImageMarkdown(file.path, DEFAULT_NODE_IMAGE_WIDTH, getNodeImageWidthLimits((_a = node.mindmap) === null || _a === void 0 ? void 0 : _a.setting))
+                : link;
             if (embed) {
                 yield this.insertImage(node, insertion, markdown, () => this.isActiveSession(node, insertion));
             }
@@ -41402,6 +41498,7 @@ class NodeInsertController {
         });
     }
     importPastedImage(node, sessionInsertion, pasteInsertion, image) {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             let attachment;
             try {
@@ -41421,7 +41518,7 @@ class NodeInsertController {
                 return;
             }
             try {
-                const markdown = createVaultImageMarkdown(attachment.path);
+                const markdown = createVaultImageMarkdown(attachment.path, DEFAULT_NODE_IMAGE_WIDTH, getNodeImageWidthLimits((_a = node.mindmap) === null || _a === void 0 ? void 0 : _a.setting));
                 const inserted = yield this.insertImage(node, pasteInsertion, markdown, () => this.isActiveSession(node, sessionInsertion) && pasteInsertion.hasUsableRange());
                 if (!inserted && this.isActiveSession(node, sessionInsertion))
                     pasteInsertion.restore();
@@ -44408,6 +44505,10 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                 });
             });
         });
+        this.renderWidthSetting(containerEl, 'Text node minimum width', 'Text node minimum width desc', 'textNodeMinWidth', 'textNodeMinWidth', 'textNodeMaxWidth');
+        this.renderWidthSetting(containerEl, 'Text node maximum width', 'Text node maximum width desc', 'textNodeMaxWidth', 'textNodeMinWidth', 'textNodeMaxWidth');
+        this.renderWidthSetting(containerEl, 'Node image minimum width', 'Node image minimum width desc', 'nodeImageMinWidth', 'nodeImageMinWidth', 'nodeImageMaxWidth');
+        this.renderWidthSetting(containerEl, 'Node image maximum width', 'Node image maximum width desc', 'nodeImageMaxWidth', 'nodeImageMinWidth', 'nodeImageMaxWidth');
         new obsidian.Setting(containerEl)
             .setName(`${t('Default mindmap style')}`)
             .setDesc(`${t('Default mindmap style desc')}`)
@@ -44470,6 +44571,53 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         }));
         this.renderShortcutCatalog(containerEl);
+    }
+    renderWidthSetting(containerEl, nameKey, descKey, field, minField, maxField) {
+        new obsidian.Setting(containerEl)
+            .setName(t(nameKey))
+            .setDesc(t(descKey))
+            .addText((text) => {
+            text.setValue(`${this.plugin.settings[field]}`);
+            text.inputEl.type = 'number';
+            text.inputEl.min = '1';
+            text.inputEl.step = '1';
+            text.inputEl.addEventListener('change', () => {
+                void this.updateWidthSetting(text.inputEl, field, minField, maxField);
+            });
+        });
+    }
+    updateWidthSetting(inputEl, field, minField, maxField) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const value = Number(inputEl.value);
+            const min = field === minField ? value : this.plugin.settings[minField];
+            const max = field === maxField ? value : this.plugin.settings[maxField];
+            if (!Number.isSafeInteger(value) || value <= 0 || min > max) {
+                inputEl.value = `${this.plugin.settings[field]}`;
+                new obsidian.Notice(t('Invalid node width range'));
+                return;
+            }
+            this.plugin.settings[field] = value;
+            yield this.plugin.saveSettings();
+            yield this.refreshOpenMindmapWidths();
+        });
+    }
+    refreshOpenMindmapWidths() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const widthSettings = normalizeNodeWidthSettings(this.plugin.settings);
+            yield Promise.all(this.app.workspace.getLeavesOfType(mindmapViewType).map((leaf) => __awaiter(this, void 0, void 0, function* () {
+                const view = leaf.view;
+                if (!view.mindmap)
+                    return;
+                Object.assign(view.mindmap.setting, widthSettings);
+                view.mindmap.setAppSetting();
+                const refreshes = [];
+                view.mindmap.traverseBF((node) => {
+                    refreshes.push(node.refreshWidthSettings());
+                });
+                yield Promise.all(refreshes);
+                view.mindmap.refresh();
+            })));
+        });
     }
     renderShortcutCatalog(containerEl) {
         const detailsEl = containerEl.createEl('details', {
@@ -45519,17 +45667,8 @@ class MindMapPlugin extends obsidian.Plugin {
     }
     loadSettings() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.settings = Object.assign({
-                canvasSize: 8000,
-                headLevel: 2,
-                fontSize: 16,
-                background: 'transparent',
-                layout: 'mindmap',
-                layoutDirect: 'mindmap',
-                defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
-                showLinkTitle: false,
-                nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts(),
-            }, yield this.loadData());
+            this.settings = Object.assign(Object.assign(Object.assign({ canvasSize: 8000, headLevel: 2, fontSize: 16, background: 'transparent', layout: 'mindmap', layoutDirect: 'mindmap', defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), { nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts() }), yield this.loadData());
+            Object.assign(this.settings, normalizeNodeWidthSettings(this.settings));
             this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(this.settings.nodeKeyboardShortcuts);
         });
     }

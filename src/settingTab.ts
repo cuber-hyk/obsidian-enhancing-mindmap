@@ -1,5 +1,6 @@
 import {
     App,
+    Notice,
     PluginSettingTab,
     Setting,
 } from 'obsidian';
@@ -9,6 +10,12 @@ import { MindMapView, mindmapViewType } from './MindMapView';
 import MyNode from './mindmap/INode';
 import { MINDMAP_STYLE_TEMPLATES, resolveMindMapStyleTemplate } from './mindmap/style/MindMapStyle';
 import { getPluginShortcutCatalog } from './mindmap/interaction/PluginShortcutCatalog';
+import {
+    NodeWidthSettings,
+    normalizeNodeWidthSettings,
+} from './mindmap/NodeWidthSettings';
+
+type NodeWidthSettingKey = keyof NodeWidthSettings;
 
 export class MindMapSettingsTab extends PluginSettingTab {
     plugin: MindMap;
@@ -119,6 +126,39 @@ export class MindMapSettingsTab extends PluginSettingTab {
                         });
                     }));
 
+        this.renderWidthSetting(
+            containerEl,
+            'Text node minimum width',
+            'Text node minimum width desc',
+            'textNodeMinWidth',
+            'textNodeMinWidth',
+            'textNodeMaxWidth',
+        );
+        this.renderWidthSetting(
+            containerEl,
+            'Text node maximum width',
+            'Text node maximum width desc',
+            'textNodeMaxWidth',
+            'textNodeMinWidth',
+            'textNodeMaxWidth',
+        );
+        this.renderWidthSetting(
+            containerEl,
+            'Node image minimum width',
+            'Node image minimum width desc',
+            'nodeImageMinWidth',
+            'nodeImageMinWidth',
+            'nodeImageMaxWidth',
+        );
+        this.renderWidthSetting(
+            containerEl,
+            'Node image maximum width',
+            'Node image maximum width desc',
+            'nodeImageMaxWidth',
+            'nodeImageMinWidth',
+            'nodeImageMaxWidth',
+        );
+
         new Setting(containerEl)
             .setName(`${t('Default mindmap style')}`)
             .setDesc(`${t('Default mindmap style desc')}`)
@@ -193,6 +233,65 @@ export class MindMapSettingsTab extends PluginSettingTab {
             );
 
         this.renderShortcutCatalog(containerEl);
+    }
+
+    private renderWidthSetting(
+        containerEl: HTMLElement,
+        nameKey: Parameters<typeof t>[0],
+        descKey: Parameters<typeof t>[0],
+        field: NodeWidthSettingKey,
+        minField: NodeWidthSettingKey,
+        maxField: NodeWidthSettingKey,
+    ): void {
+        new Setting(containerEl)
+            .setName(t(nameKey))
+            .setDesc(t(descKey))
+            .addText((text) => {
+                text.setValue(`${this.plugin.settings[field]}`);
+                text.inputEl.type = 'number';
+                text.inputEl.min = '1';
+                text.inputEl.step = '1';
+                text.inputEl.addEventListener('change', () => {
+                    void this.updateWidthSetting(text.inputEl, field, minField, maxField);
+                });
+            });
+    }
+
+    private async updateWidthSetting(
+        inputEl: HTMLInputElement,
+        field: NodeWidthSettingKey,
+        minField: NodeWidthSettingKey,
+        maxField: NodeWidthSettingKey,
+    ): Promise<void> {
+        const value = Number(inputEl.value);
+        const min = field === minField ? value : this.plugin.settings[minField];
+        const max = field === maxField ? value : this.plugin.settings[maxField];
+        if (!Number.isSafeInteger(value) || value <= 0 || min > max) {
+            inputEl.value = `${this.plugin.settings[field]}`;
+            new Notice(t('Invalid node width range'));
+            return;
+        }
+
+        this.plugin.settings[field] = value;
+        await this.plugin.saveSettings();
+        await this.refreshOpenMindmapWidths();
+    }
+
+    private async refreshOpenMindmapWidths(): Promise<void> {
+        const widthSettings = normalizeNodeWidthSettings(this.plugin.settings);
+        await Promise.all(this.app.workspace.getLeavesOfType(mindmapViewType).map(async (leaf) => {
+            const view = leaf.view as MindMapView;
+            if (!view.mindmap) return;
+
+            Object.assign(view.mindmap.setting, widthSettings);
+            view.mindmap.setAppSetting();
+            const refreshes: Promise<void>[] = [];
+            view.mindmap.traverseBF((node: MyNode) => {
+                refreshes.push(node.refreshWidthSettings());
+            });
+            await Promise.all(refreshes);
+            view.mindmap.refresh();
+        }));
     }
 
     private renderShortcutCatalog(containerEl: HTMLElement): void {

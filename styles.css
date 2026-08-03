@@ -226,6 +226,11 @@
   overflow-x: auto;
 }
 
+.mm-node.mm-node-auto-wrap-supported .mm-node-content {
+  min-width: var(--mm-text-node-min-width, 32px);
+  max-width: var(--mm-text-node-max-width, 1600px);
+}
+
 .mm-node-auto-wrap-handle {
   position: absolute;
   z-index: 3;

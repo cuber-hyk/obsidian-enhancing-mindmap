@@ -29,6 +29,10 @@ import {
     getNodeAutoWrapWidth,
     setNodeAutoWrapWidth,
 } from './wrap/NodeAutoWrapMarkdown'
+import {
+    getNodeImageWidthLimits,
+    getTextNodeWidthLimits,
+} from './NodeWidthSettings'
 
 
 export function keepLastIndex(dom:HTMLElement) {
@@ -148,6 +152,7 @@ export default class Node {
             contentEl: this.contentEl,
             getMarkdown: () => this.data.text,
             getWidth: () => getNodeAutoWrapWidth(this.data.text),
+            getLimits: () => getTextNodeWidthLimits(this.mindmap?.setting),
             getScale: () => (this.mindmap?.mindScale || 100) / 100,
             onCommit: (width) => {
                 const text = setNodeAutoWrapWidth(this.data.text, width);
@@ -327,7 +332,10 @@ export default class Node {
                       if (el.hasAttribute("width"))
                         img.setAttribute("width", el.getAttribute("width"));
                       else
-                        img.setAttribute("width", `${DEFAULT_NODE_IMAGE_WIDTH}`);
+                        img.setAttribute("width", `${clampNodeImageWidth(
+                            DEFAULT_NODE_IMAGE_WIDTH,
+                            getNodeImageWidthLimits(this.mindmap?.setting),
+                        )}`);
                       if (el.hasAttribute("alt"))
                         img.setAttribute("alt", el.getAttribute("alt"));
                       this.bindRenderedImage(img);
@@ -369,7 +377,10 @@ export default class Node {
 
     reserveImageSpace(image: HTMLImageElement) {
         if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
-        const width = Number(image.getAttribute('width')) || image.width || DEFAULT_NODE_IMAGE_WIDTH;
+        const width = clampNodeImageWidth(
+            Number(image.getAttribute('width')) || image.width || DEFAULT_NODE_IMAGE_WIDTH,
+            getNodeImageWidthLimits(this.mindmap?.setting),
+        );
         image.width = width;
         image.height = Math.round(width * image.naturalHeight / image.naturalWidth);
     }
@@ -935,7 +946,10 @@ export default class Node {
         wrapper.dataset.imageKind = image.kind;
         wrapper.dataset.imageTarget = image.target;
         wrapper.dataset.imageAlt = image.alt;
-        wrapper.dataset.imageWidth = `${clampNodeImageWidth(image.width || DEFAULT_NODE_IMAGE_WIDTH)}`;
+        wrapper.dataset.imageWidth = `${clampNodeImageWidth(
+            image.width || DEFAULT_NODE_IMAGE_WIDTH,
+            getNodeImageWidthLimits(this.mindmap?.setting),
+        )}`;
 
         const img = this.contentEl.ownerDocument.createElement('img');
         img.draggable = false;
@@ -1180,7 +1194,10 @@ export default class Node {
         const doc = imageEl.ownerDocument;
 
         const move = (moveEvent: MouseEvent) => {
-            const width = clampNodeImageWidth(startWidth + moveEvent.clientX - startX);
+            const width = clampNodeImageWidth(
+                startWidth + moveEvent.clientX - startX,
+                getNodeImageWidthLimits(this.mindmap?.setting),
+            );
             imageEl.dataset.imageWidth = `${width}`;
             const img = imageEl.querySelector('img');
             if (img instanceof HTMLImageElement) {
@@ -1213,7 +1230,10 @@ export default class Node {
             if (!(child instanceof HTMLElement)) return;
             if (child.classList.contains('mm-node-image-attachment')) {
                 const image = this.readEditedImage(child);
-                if (image) parts.push(createNodeImageMarkdown(image));
+                if (image) parts.push(createNodeImageMarkdown(
+                    image,
+                    getNodeImageWidthLimits(this.mindmap?.setting),
+                ));
                 return;
             }
             parts.push(child.innerText || '');
@@ -1225,7 +1245,10 @@ export default class Node {
         const target = imageEl.dataset.imageTarget || '';
         if (!target) return null;
         const kind = imageEl.dataset.imageKind === 'markdown' ? 'markdown' : 'vault';
-        const width = clampNodeImageWidth(Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH);
+        const width = clampNodeImageWidth(
+            Number(imageEl.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH,
+            getNodeImageWidthLimits(this.mindmap?.setting),
+        );
         return {
             markdown: '',
             target,
@@ -1247,6 +1270,34 @@ export default class Node {
         this.clearTreeCacheData();
         this.refreshBox();
         this.mindmap&&this.mindmap.emit('renderEditNode',{node:this});
+    }
+
+    async refreshWidthSettings(): Promise<void> {
+        this.autoWrapController?.refresh();
+        if (this.data.isEdit) {
+            const limits = getNodeImageWidthLimits(this.mindmap?.setting);
+            this.contentEl.querySelectorAll<HTMLElement>('.mm-node-image-attachment').forEach((wrapper) => {
+                const width = clampNodeImageWidth(
+                    Number(wrapper.dataset.imageWidth) || DEFAULT_NODE_IMAGE_WIDTH,
+                    limits,
+                );
+                wrapper.dataset.imageWidth = `${width}`;
+                const image = wrapper.querySelector('img');
+                if (image instanceof HTMLImageElement) {
+                    image.width = width;
+                    this.reserveImageSpace(image);
+                }
+            });
+            this.refreshEditingLayout();
+            return;
+        }
+
+        if (parseNodeImages(getNodeAutoWrapContent(this.data.text)).length > 0) {
+            await this.setText(this.data.text);
+            return;
+        }
+        this.clearCacheData();
+        this.refreshBox();
     }
 
     destroy() {

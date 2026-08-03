@@ -1,15 +1,17 @@
 import {
   canAutoWrapNodeMarkdown,
 } from './NodeAutoWrapMarkdown';
-
-const MIN_NODE_WIDTH = 32;
-const MAX_NODE_WIDTH = 1600;
+import {
+  clampWidth,
+  NodeWidthLimits,
+} from '../NodeWidthSettings';
 
 type NodeAutoWrapControllerOptions = {
   containEl: HTMLElement;
   contentEl: HTMLElement;
   getMarkdown: () => string;
   getWidth: () => number | undefined;
+  getLimits: () => NodeWidthLimits;
   getScale: () => number;
   onCommit: (width: number) => void;
   onLayoutChange: () => void;
@@ -27,6 +29,7 @@ export default class NodeAutoWrapController {
   private contentEl: HTMLElement;
   private getMarkdown: () => string;
   private getWidth: () => number | undefined;
+  private getLimits: () => NodeWidthLimits;
   private getScale: () => number;
   private onCommit: (width: number) => void;
   private onLayoutChange: () => void;
@@ -38,6 +41,7 @@ export default class NodeAutoWrapController {
     this.contentEl = options.contentEl;
     this.getMarkdown = options.getMarkdown;
     this.getWidth = options.getWidth;
+    this.getLimits = options.getLimits;
     this.getScale = options.getScale;
     this.onCommit = options.onCommit;
     this.onLayoutChange = options.onLayoutChange;
@@ -96,7 +100,11 @@ export default class NodeAutoWrapController {
     event.stopPropagation();
 
     const delta = (event.clientX - this.drag.startX) / this.getScale();
-    const width = clamp(this.drag.startWidth + delta, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+    const width = clampWidth(
+      this.drag.startWidth + delta,
+      this.getLimits(),
+      this.drag.startWidth,
+    );
     this.drag.width = width;
     this.applyWidth(width);
     this.onLayoutChange();
@@ -143,14 +151,10 @@ export default class NodeAutoWrapController {
       return;
     }
 
-    const clampedWidth = clamp(width, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+    const clampedWidth = clampWidth(width, this.getLimits(), width);
     this.contentEl.style.width = `${clampedWidth}px`;
     this.contentEl.style.minWidth = `${clampedWidth}px`;
     this.contentEl.style.maxWidth = `${clampedWidth}px`;
   }
 
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

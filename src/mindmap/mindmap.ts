@@ -18,10 +18,15 @@ import MindMapNavigatorController from './navigation/MindMapNavigatorController'
 import { NodeKeyboardShortcuts } from './interaction/NodeKeyboardShortcuts'
 import { getNodeTableMarkdown } from './table/NodeTableMarkdown'
 import { escapeLeadingOrderedNodeMarker } from './interaction/OrderedSiblingNumbering'
+import {
+    DEFAULT_NODE_WIDTH_SETTINGS,
+    getTextNodeWidthLimits,
+    NodeWidthSettings,
+} from './NodeWidthSettings'
 
 let tempDispLevel = 0;
 
-interface Setting {
+interface Setting extends Partial<NodeWidthSettings> {
     canvasSize?: number;
     background?: string;
     fontSize?: number;
@@ -92,7 +97,8 @@ export default class MindMap {
             exportMdModel: 'default',
             headLevel: 2,
             layoutDirect: '',
-            showLinkTitle: false
+            showLinkTitle: false,
+            ...DEFAULT_NODE_WIDTH_SETTINGS
         }, setting || {});
 
 
@@ -170,6 +176,9 @@ export default class MindMap {
         //  this.contentEL.style.color=`${this.setting.color};`;
         this.contentEL.style.background = `${this.setting.background}`;
         this.contentEL.style.fontSize = `${this.setting.fontSize}px`;
+        const textLimits = getTextNodeWidthLimits(this.setting);
+        this.appEl.style.setProperty('--mm-text-node-min-width', `${textLimits.min}px`);
+        this.appEl.style.setProperty('--mm-text-node-max-width', `${textLimits.max}px`);
     }
     //create node
     init(collapsedIds?: string[]) {
