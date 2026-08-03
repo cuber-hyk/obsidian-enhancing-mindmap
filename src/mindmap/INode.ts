@@ -401,12 +401,12 @@ export default class Node {
         return true;
     }
 
-    select(){
+    select(focus: boolean = true){
         this.isSelect = true;
         this.containEl.setAttribute('draggable', this.data.isEdit ? 'false' : 'true');
-        //if(this.mindmap.view.plugin.settings.focusOnMove) {
+        if (focus) {
             this.containEl.focus(); // set the dom to be focused
-        //}
+        }
         Object.assign(window,{
             myNode:this
         });

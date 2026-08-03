@@ -59,6 +59,7 @@ export default class MindMap {
     pendingInitialNodes: Set<INode> = new Set();
     isBuildingInitialTree = false;
     isInitialLayoutReady = false;
+    focusInitialRoot = true;
     initialLayoutFrame: number | null = null;
     renderLayoutFrame: number | null = null;
     layoutLineWidth = 2;
@@ -407,6 +408,7 @@ export default class MindMap {
             });
             this.isInitialLayoutReady = true;
             this.performLayoutRefresh();
+            this.emit('initialLayoutReady');
         });
     }
 
@@ -1421,7 +1423,7 @@ export default class MindMap {
                 this.layoutLineWidth,
             );
             // Select and center on the mindmap's root when opening it
-            this.root.select();
+            this.root.select(this.focusInitialRoot);
             this.centerOnNode(this.root);
             return;
         }
