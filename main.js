@@ -3313,12 +3313,14 @@ class Layout {
         }
     }
     _setDirect(n, direct) {
+        var _a;
         n.stroke = '';
         n.direct = direct;
         var flag = n.containEl.classList.contains('mm-node-second');
         n.containEl.setAttribute('class', '');
         n.containEl.classList.add('mm-node');
         n.containEl.classList.add('mm-node-' + direct);
+        (_a = n.autoWrapController) === null || _a === void 0 ? void 0 : _a.refresh();
         if (n._linkCount > 0) {
             n.containEl.classList.add('mm-node-has-link');
             if (n.shouldShowLinkTitle()) {
