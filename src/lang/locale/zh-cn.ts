@@ -92,6 +92,11 @@ export default {
   "Toggle markdown/mindmap":"切换为 markdown 或 mindmap 模式",
   "Copy node":"复制",
   "Paste node":"粘贴",
+  "Clipboard actions require a single selected node":"请选择单个节点后再复制、剪切或粘贴",
+  "Failed to copy node":"复制节点失败",
+  "Failed to cut node":"剪切节点失败",
+  "Failed to paste node":"粘贴节点失败",
+  "Unsupported node clipboard content":"剪贴板中没有可识别的节点数据或 Markdown 内容",
   "Export to html":"导出为 html",
 
   "Node insert toolbar":"节点插入工具栏",

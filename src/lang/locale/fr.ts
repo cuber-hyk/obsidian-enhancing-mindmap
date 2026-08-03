@@ -45,7 +45,6 @@ export default {
 
     "Undo":"Annuler",
     "Redo":"Rétablir",
-    'Replace by the previous text':'Remplacer par le texte précédent',
     'Edit node':'Modifier le nœud',
     'Delete node & child':'Supprimer le nœud (et ses enfants)',
     'Select the node\'s text':'Sélectionner le texte du nœud',

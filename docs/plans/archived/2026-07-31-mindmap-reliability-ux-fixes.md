@@ -40,7 +40,7 @@ owner: Codex
 
 ## 事实来源
 
-- 来源审查：`docs/audits/2026-07-31-mindmap-ux-exploratory-review.md`
+- 来源审查：`docs/audits/archived/2026-07-31-mindmap-ux-exploratory-review.md`
 - 编辑事实：`docs/capabilities/mindmap-editing.md`
 - UI 合同：`DESIGN.md`
 - 编辑与键盘入口：`src/main.ts`、`src/mindmap/mindmap.ts`、`src/mindmap/interaction/NodeSelectionController.ts`、`src/mindmap/interaction/NodeKeyboardController.ts`
@@ -94,7 +94,7 @@ owner: Codex
 ## 产物路由
 
 - Plan：`docs/plans/archived/2026-07-31-mindmap-reliability-ux-fixes.md`
-- Source audit：`docs/audits/2026-07-31-mindmap-ux-exploratory-review.md`
+- Source audit：`docs/audits/archived/2026-07-31-mindmap-ux-exploratory-review.md`
 - Covered findings：UX-01、UX-02
 - Deferred findings：UX-03、UX-04、UX-05、UX-06、UX-07、UX-08、UX-09
 - Capability docs：实现完成后更新 `docs/capabilities/mindmap-editing.md`

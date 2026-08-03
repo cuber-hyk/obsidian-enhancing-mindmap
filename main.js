@@ -193,9 +193,13 @@ var en = {
     "Copy node": "Copy node(s)",
     "Cut node": "Cut node(s)",
     "Paste node": "Paste node(s)",
+    "Clipboard actions require a single selected node": "Select one node to use copy, cut, or paste",
+    "Failed to copy node": "Failed to copy node",
+    "Failed to cut node": "Failed to cut node",
+    "Failed to paste node": "Failed to paste node",
+    "Unsupported node clipboard content": "Clipboard does not contain supported node data or Markdown",
     "Undo": "Undo",
     "Redo": "Redo",
-    'Replace by the previous text': 'Replace by the previous text',
     'Edit node': 'Edit node',
     'Delete node & child': 'Delete node & child',
     'Select the node\'s text': 'Select the node\'s text',
@@ -325,7 +329,6 @@ var fr = {
     "Paste node": "Coller le nœud",
     "Undo": "Annuler",
     "Redo": "Rétablir",
-    'Replace by the previous text': 'Remplacer par le texte précédent',
     'Edit node': 'Modifier le nœud',
     'Delete node & child': 'Supprimer le nœud (et ses enfants)',
     'Select the node\'s text': 'Sélectionner le texte du nœud',
@@ -489,6 +492,11 @@ var zhCN = {
     "Toggle markdown/mindmap": "切换为 markdown 或 mindmap 模式",
     "Copy node": "复制",
     "Paste node": "粘贴",
+    "Clipboard actions require a single selected node": "请选择单个节点后再复制、剪切或粘贴",
+    "Failed to copy node": "复制节点失败",
+    "Failed to cut node": "剪切节点失败",
+    "Failed to paste node": "粘贴节点失败",
+    "Unsupported node clipboard content": "剪贴板中没有可识别的节点数据或 Markdown 内容",
     "Export to html": "导出为 html",
     "Node insert toolbar": "节点插入工具栏",
     "Insert external link": "插入外部链接",
@@ -37974,6 +37982,7 @@ class NodeClipboardController {
             return false;
         if (this.mindmap.nodeSelectionController.hasMultipleSelection()) {
             this.consume(event);
+            new obsidian.Notice(t('Clipboard actions require a single selected node'));
             return true;
         }
         if (!this.getOperableNode())
@@ -37993,14 +38002,19 @@ class NodeClipboardController {
             if (!context)
                 return false;
             const text = this.mindmap.copyNode(context.node);
-            if (!text)
+            if (!text) {
+                new obsidian.Notice(t('Failed to copy node'));
                 return false;
+            }
             try {
                 yield navigator.clipboard.writeText(text);
                 return true;
             }
             catch (error) {
                 console.error('Failed to copy mindmap node', error);
+                if (this.isOperationContextCurrent(context)) {
+                    new obsidian.Notice(t('Failed to copy node'));
+                }
                 return false;
             }
         });
@@ -38011,13 +38025,18 @@ class NodeClipboardController {
             if (!context)
                 return false;
             const text = this.mindmap.copyNode(context.node);
-            if (!text)
+            if (!text) {
+                new obsidian.Notice(t('Failed to cut node'));
                 return false;
+            }
             try {
                 yield navigator.clipboard.writeText(text);
             }
             catch (error) {
                 console.error('Failed to cut mindmap node', error);
+                if (this.isOperationContextCurrent(context)) {
+                    new obsidian.Notice(t('Failed to cut node'));
+                }
                 return false;
             }
             if (!context.node.data.isRoot && this.isOperationContextCurrent(context)) {
@@ -38038,8 +38057,10 @@ class NodeClipboardController {
                 if (this.mindmap.pasteNode(text))
                     return true;
                 const forest = parseMarkdownNodeForest(text);
-                if (!(forest === null || forest === void 0 ? void 0 : forest.length))
+                if (!(forest === null || forest === void 0 ? void 0 : forest.length)) {
+                    new obsidian.Notice(t('Unsupported node clipboard content'));
                     return false;
+                }
                 this.mindmap.execute('pasteNodeForest', {
                     node: context.node,
                     data: forest,
@@ -38048,9 +38069,15 @@ class NodeClipboardController {
             }
             catch (error) {
                 console.error('Failed to paste mindmap node', error);
+                if (this.isOperationContextCurrent(context)) {
+                    new obsidian.Notice(t('Failed to paste node'));
+                }
                 return false;
             }
         });
+    }
+    canOperateSelectedNode() {
+        return Boolean(this.getOperationContext());
     }
     getOperableNode() {
         var _a;
@@ -39966,8 +39993,6 @@ class MindMap {
             text: text,
             oldText: node.data.text
         });
-        // node.data.oldText = node.data.text;
-        // node.setText(text);
         node.select();
     }
     _moveAsParent(node) {
@@ -44547,31 +44572,43 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Copy Node',
                 name: `${t('Copy node')}`,
-                callback: () => {
+                checkCallback: (checking) => {
+                    var _a;
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        void mindmapView.mindmap.nodeClipboardController.copySelectedNode();
-                    }
+                    const controller = (_a = mindmapView === null || mindmapView === void 0 ? void 0 : mindmapView.mindmap) === null || _a === void 0 ? void 0 : _a.nodeClipboardController;
+                    if (!(controller === null || controller === void 0 ? void 0 : controller.canOperateSelectedNode()))
+                        return false;
+                    if (!checking)
+                        void controller.copySelectedNode();
+                    return true;
                 }
             });
             this.addCommand({
                 id: 'Cut Node',
                 name: `${t('Cut node')}`,
-                callback: () => {
+                checkCallback: (checking) => {
+                    var _a;
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        void mindmapView.mindmap.nodeClipboardController.cutSelectedNode();
-                    }
+                    const controller = (_a = mindmapView === null || mindmapView === void 0 ? void 0 : mindmapView.mindmap) === null || _a === void 0 ? void 0 : _a.nodeClipboardController;
+                    if (!(controller === null || controller === void 0 ? void 0 : controller.canOperateSelectedNode()))
+                        return false;
+                    if (!checking)
+                        void controller.cutSelectedNode();
+                    return true;
                 }
             });
             this.addCommand({
                 id: 'Paste Node',
                 name: `${t('Paste node')}`,
-                callback: () => {
+                checkCallback: (checking) => {
+                    var _a;
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        void mindmapView.mindmap.nodeClipboardController.pasteToSelectedNode();
-                    }
+                    const controller = (_a = mindmapView === null || mindmapView === void 0 ? void 0 : mindmapView.mindmap) === null || _a === void 0 ? void 0 : _a.nodeClipboardController;
+                    if (!(controller === null || controller === void 0 ? void 0 : controller.canOperateSelectedNode()))
+                        return false;
+                    if (!checking)
+                        void controller.pasteToSelectedNode();
+                    return true;
                 }
             });
             this.addCommand({
@@ -44605,24 +44642,6 @@ class MindMapPlugin extends obsidian.Plugin {
                     if (!checking)
                         mindmap.redo();
                     return true;
-                }
-            });
-            // Alt + Ctrl + Shift + Z
-            this.addCommand({
-                id: 'Replace by the previous text',
-                name: `${t('Replace by the previous text')}`,
-                callback: () => {
-                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    if (mindmapView) {
-                        var mindmap = mindmapView.mindmap;
-                        var node = mindmap.selectNode;
-                        if (node) {
-                            // var text = (node.data.oldText as string);
-                            var text = (node.data.oldText);
-                            node.setText(text);
-                            console.log(text + " / " + node.data.text);
-                        }
-                    }
                 }
             });
             // Shift + F2
@@ -44771,8 +44790,6 @@ class MindMapPlugin extends obsidian.Plugin {
                                     text: text,
                                     oldText: node.data.text
                                 });
-                                // node.data.oldText = node.data.text;
-                                // node.setText(text);
                             }
                             mindmap.refresh();
                             mindmap.scale(mindmap.mindScale);

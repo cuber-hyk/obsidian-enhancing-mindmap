@@ -101,33 +101,36 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Copy Node',
       name: `${t('Copy node')}`,
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          void mindmapView.mindmap.nodeClipboardController.copySelectedNode();
-        }
+        const controller = mindmapView?.mindmap?.nodeClipboardController;
+        if (!controller?.canOperateSelectedNode()) return false;
+        if (!checking) void controller.copySelectedNode();
+        return true;
       }
     });
 
     this.addCommand({
       id: 'Cut Node',
       name: `${t('Cut node')}`,
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          void mindmapView.mindmap.nodeClipboardController.cutSelectedNode();
-        }
+        const controller = mindmapView?.mindmap?.nodeClipboardController;
+        if (!controller?.canOperateSelectedNode()) return false;
+        if (!checking) void controller.cutSelectedNode();
+        return true;
       }
     });
 
     this.addCommand({
       id: 'Paste Node',
       name: `${t('Paste node')}`,
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          void mindmapView.mindmap.nodeClipboardController.pasteToSelectedNode();
-        }
+        const controller = mindmapView?.mindmap?.nodeClipboardController;
+        if (!controller?.canOperateSelectedNode()) return false;
+        if (!checking) void controller.pasteToSelectedNode();
+        return true;
       }
     });
 
@@ -163,25 +166,6 @@ export default class MindMapPlugin extends Plugin {
         if (!mindmap) return false;
         if (!checking) mindmap.redo();
         return true;
-      }
-    });
-
-    // Alt + Ctrl + Shift + Z
-    this.addCommand({
-      id: 'Replace by the previous text',
-      name: `${t('Replace by the previous text')}`,
-      callback: () => {
-        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
-          var mindmap = mindmapView.mindmap;
-          var node = mindmap.selectNode;
-          if(node) {
-              // var text = (node.data.oldText as string);
-              var text = (node.data.oldText);
-              node.setText(text);
-              console.log(text+" / "+node.data.text);
-          }
-  }
       }
     });
 
@@ -346,8 +330,6 @@ export default class MindMapPlugin extends Plugin {
                   text:text,
                   oldText:node.data.text
               });
-              // node.data.oldText = node.data.text;
-              // node.setText(text);
             }
 
             mindmap.refresh();

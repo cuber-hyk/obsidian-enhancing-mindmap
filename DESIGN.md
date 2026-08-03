@@ -1,7 +1,7 @@
 ---
 artifact_type: design_system
 status: current
-updated: 2026-08-01
+updated: 2026-08-03
 token_source: design-tokens.json
 ---
 
@@ -16,6 +16,7 @@ token_source: design-tokens.json
 - 只记录已确认的可复用规则；未确认场景写入“已知缺口”。
 - 精确基础值存放在 `design-tokens.json`。
 - 组件行为以组件代码和视觉示例为准。
+- 产品体验优化以桌面端为目标，不规划移动端专用 UI 或触摸手势适配；保持现有移动端可安装性，但不承诺与桌面端一致的交互体验。
 
 <!--
 ## Sources
@@ -135,7 +136,6 @@ token_source: design-tokens.json
 -->
 ## 已知缺口
 
-- 尚未设计移动端和触摸设备专用的工具栏定位。
 - 画布边缘的工具栏避让尚未实现。
 - 行内代码与 KaTeX 插入控件不属于第一版范围。
 - 不支持内嵌视频播放；视频仅显示为可点击链接。

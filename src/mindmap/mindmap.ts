@@ -656,8 +656,6 @@ export default class MindMap {
             text:text,
             oldText:node.data.text
         });
-        // node.data.oldText = node.data.text;
-        // node.setText(text);
         node.select();
     }
 
