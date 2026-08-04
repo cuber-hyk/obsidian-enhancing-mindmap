@@ -36,6 +36,7 @@ export default {
   "Copy selected node":"複製選取節點",
   "Cut selected node":"剪下選取節點",
   "Paste as child node":"貼上為子節點",
+  "Number child nodes":"批次編號子節點",
   "Undo mindmap action":"復原心智圖操作",
   "Bold selected text":"粗體選取文字",
   "Italicize selected text":"斜體選取文字",

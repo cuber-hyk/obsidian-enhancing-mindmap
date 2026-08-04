@@ -59,6 +59,7 @@ export default {
     "Add sibling below": "Add sibling below",
     "Add sibling above": "Add sibling above",
     "Add child node": "Add child node",
+    "Number child nodes": "Number child nodes",
     "Enter edit mode": "Enter edit mode",
     "Delete selected node": "Delete selected node",
     "Finish editing": "Finish editing",

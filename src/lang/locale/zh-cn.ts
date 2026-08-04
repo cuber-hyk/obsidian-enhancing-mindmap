@@ -71,6 +71,7 @@ export default {
   "Manage shortcuts":"管理快捷键",
   "Add sibling below":"在下方新增同级节点",
   "Add sibling above":"在上方新增同级节点",
+  "Number child nodes":"批量编号子节点",
   "Enter edit mode":"进入编辑",
   "Delete selected node":"删除选中节点",
   "Finish editing":"完成编辑",
