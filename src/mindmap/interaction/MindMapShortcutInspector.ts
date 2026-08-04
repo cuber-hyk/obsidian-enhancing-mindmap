@@ -169,6 +169,15 @@ export default class MindMapShortcutInspector {
       fixedShortcuts.forEach(({ label, shortcut }) => {
         this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
       });
+      const numberChildNodes = this.pluginShortcuts()
+        .find((shortcut) => shortcut.id === 'Number child nodes');
+      this.createFixedShortcutRow(
+        section,
+        t('Number child nodes'),
+        numberChildNodes?.shortcuts.length
+          ? numberChildNodes.shortcuts.join(' / ')
+          : t('Shortcut not assigned'),
+      );
     });
 
     this.createSection(contentEl, t('Clipboard and history'), (section) => {

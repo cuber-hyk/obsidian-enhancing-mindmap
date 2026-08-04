@@ -89,6 +89,18 @@ export function getOrderedSiblingNumbering(
   };
 }
 
+export function getNumberedChildTextUpdates<T>(
+  entries: OrderedSiblingEntry<T>[],
+): OrderedSiblingTextUpdate<T>[] {
+  return entries.map((entry, index) => {
+    const parsed = parseOrderedNodeText(entry.text);
+    return {
+      item: entry.item,
+      text: `${index + 1}. ${parsed?.content ?? entry.text}`,
+    };
+  }).filter(({text}, index) => text !== entries[index].text);
+}
+
 export function captureOrderedSiblingGroups<T>(
   entries: OrderedSiblingEntry<T>[],
 ): OrderedSiblingGroupSnapshot<T>[] {

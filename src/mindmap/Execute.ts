@@ -83,6 +83,12 @@ export default class Exec{
                     this.history.execute(new cmd.ChangeNodeText(data.node, data.oldText, data.text));
                 }
                 break;
+            case 'numberChildNodes':
+                if(data?.parent){
+                    const command = new cmd.NumberChildNodes(data.parent);
+                    if (command.hasChanges()) this.history.execute(command);
+                }
+                break;
             case 'moveNode':
                 console.log("inHistory:");
                 console.log(data.inHistory);

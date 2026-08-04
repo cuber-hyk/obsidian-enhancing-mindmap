@@ -1359,6 +1359,7 @@ export default class MindMap {
             'deleteNodeAndChild',
             'deleteNodeExcludeChild',
             'changeNodeText',
+            'numberChildNodes',
             'moveNode',
         ];
         if (

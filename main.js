@@ -167,6 +167,7 @@ var en = {
     "Add sibling below": "Add sibling below",
     "Add sibling above": "Add sibling above",
     "Add child node": "Add child node",
+    "Number child nodes": "Number child nodes",
     "Enter edit mode": "Enter edit mode",
     "Delete selected node": "Delete selected node",
     "Finish editing": "Finish editing",
@@ -480,6 +481,7 @@ var zhCN = {
     "Manage shortcuts": "管理快捷键",
     "Add sibling below": "在下方新增同级节点",
     "Add sibling above": "在上方新增同级节点",
+    "Number child nodes": "批量编号子节点",
     "Enter edit mode": "进入编辑",
     "Delete selected node": "删除选中节点",
     "Finish editing": "完成编辑",
@@ -600,6 +602,7 @@ var zhTW = {
     "Copy selected node": "複製選取節點",
     "Cut selected node": "剪下選取節點",
     "Paste as child node": "貼上為子節點",
+    "Number child nodes": "批次編號子節點",
     "Undo mindmap action": "復原心智圖操作",
     "Bold selected text": "粗體選取文字",
     "Italicize selected text": "斜體選取文字",
@@ -9501,6 +9504,16 @@ function getOrderedSiblingNumbering(siblingTexts, referenceIndex, insertionIndex
         selectionOffset: `${startNumber + insertedOffset}${reference.delimiter} `.length,
     };
 }
+function getNumberedChildTextUpdates(entries) {
+    return entries.map((entry, index) => {
+        var _a;
+        const parsed = parseOrderedNodeText(entry.text);
+        return {
+            item: entry.item,
+            text: `${index + 1}. ${(_a = parsed === null || parsed === void 0 ? void 0 : parsed.content) !== null && _a !== void 0 ? _a : entry.text}`,
+        };
+    }).filter(({ text }, index) => text !== entries[index].text);
+}
 function captureOrderedSiblingGroups(entries) {
     const groups = [];
     let index = 0;
@@ -9690,6 +9703,50 @@ function applyNumberingTextChanges(changes, useNewText) {
         node.clearCacheData();
         node.refreshBox();
     });
+}
+class NumberChildNodes extends Command {
+    constructor(parent) {
+        super('numberChildNodes');
+        this.parent = parent;
+        this.mind = parent.mindmap;
+        this.textChanges = getNumberedChildTextUpdates(parent.children.map((node) => ({ item: node, text: node.data.text }))).map(({ item, text }) => ({
+            node: item,
+            oldText: item.data.text,
+            text,
+        }));
+    }
+    execute() {
+        if (!this.hasChanges() ||
+            this.textChanges.some(({ node }) => node.parent !== this.parent)) {
+            return false;
+        }
+        this.applyTextChanges(true);
+        return true;
+    }
+    undo() {
+        this.applyTextChanges(false);
+    }
+    hasChanges() {
+        return this.textChanges.length > 0;
+    }
+    applyTextChanges(useNewText) {
+        const expectedTexts = new Map();
+        const renders = this.textChanges.map(({ node, oldText, text }) => {
+            const expectedText = useNewText ? text : oldText;
+            expectedTexts.set(node, expectedText);
+            return node.setText(expectedText);
+        });
+        void Promise.all(renders).then(() => {
+            this.parent.clearCacheData();
+            this.textChanges.forEach(({ node }) => {
+                if (node.data.text !== expectedTexts.get(node))
+                    return;
+                node.clearCacheData();
+                node.refreshBox();
+            });
+            this.refresh(this.mind);
+        });
+    }
 }
 function getMovedOrderedGroups(snapshots, movedNodes) {
     const movedGroups = [];
@@ -10438,6 +10495,13 @@ class Exec {
             case 'changeNodeText':
                 if (data) {
                     this.history.execute(new ChangeNodeText(data.node, data.oldText, data.text));
+                }
+                break;
+            case 'numberChildNodes':
+                if (data === null || data === void 0 ? void 0 : data.parent) {
+                    const command = new NumberChildNodes(data.parent);
+                    if (command.hasChanges())
+                        this.history.execute(command);
                 }
                 break;
             case 'moveNode':
@@ -40709,6 +40773,7 @@ class MindMap {
             'deleteNodeAndChild',
             'deleteNodeExcludeChild',
             'changeNodeText',
+            'numberChildNodes',
             'moveNode',
         ];
         if (((_a = this.nodeSelectionController) === null || _a === void 0 ? void 0 : _a.hasMultipleSelection()) &&
@@ -42014,6 +42079,11 @@ class MindMapShortcutInspector {
             fixedShortcuts.forEach(({ label, shortcut }) => {
                 this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
             });
+            const numberChildNodes = this.pluginShortcuts()
+                .find((shortcut) => shortcut.id === 'Number child nodes');
+            this.createFixedShortcutRow(section, t('Number child nodes'), (numberChildNodes === null || numberChildNodes === void 0 ? void 0 : numberChildNodes.shortcuts.length)
+                ? numberChildNodes.shortcuts.join(' / ')
+                : t('Shortcut not assigned'));
         });
         this.createSection(contentEl, t('Clipboard and history'), (section) => {
             clipboardAndHistoryShortcuts.forEach(({ label, shortcut }) => {
@@ -44758,6 +44828,25 @@ class MindMapPlugin extends obsidian.Plugin {
                         return false;
                     if (!checking)
                         void controller.pasteToSelectedNode();
+                    return true;
+                }
+            });
+            this.addCommand({
+                id: 'Number child nodes',
+                name: `${t('Number child nodes')}`,
+                checkCallback: (checking) => {
+                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+                    const mindmap = mindmapView === null || mindmapView === void 0 ? void 0 : mindmapView.mindmap;
+                    const parent = mindmap === null || mindmap === void 0 ? void 0 : mindmap.selectNode;
+                    if (!mindmap ||
+                        !parent ||
+                        parent.data.isEdit ||
+                        mindmap.nodeSelectionController.hasMultipleSelection() ||
+                        !parent.children.length) {
+                        return false;
+                    }
+                    if (!checking)
+                        mindmap.execute('numberChildNodes', { parent });
                     return true;
                 }
             });

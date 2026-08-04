@@ -138,6 +138,27 @@ export default class MindMapPlugin extends Plugin {
       }
     });
 
+    this.addCommand({
+      id: 'Number child nodes',
+      name: `${t('Number child nodes')}`,
+      checkCallback: (checking: boolean) => {
+        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+        const mindmap = mindmapView?.mindmap;
+        const parent = mindmap?.selectNode;
+        if (
+          !mindmap ||
+          !parent ||
+          parent.data.isEdit ||
+          mindmap.nodeSelectionController.hasMultipleSelection() ||
+          !parent.children.length
+        ) {
+          return false;
+        }
+        if (!checking) mindmap.execute('numberChildNodes', { parent });
+        return true;
+      }
+    });
+
 
 
 

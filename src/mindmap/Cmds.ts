@@ -3,6 +3,7 @@ import MindMap  from './mindmap';
 import {
     captureOrderedSiblingGroups,
     findOrderedSiblingGroup,
+    getNumberedChildTextUpdates,
     getOrderedSiblingNumbering,
     getOrderedSiblingTextUpdates,
     OrderedSiblingGroupSnapshot,
@@ -127,6 +128,62 @@ function applyNumberingTextChanges(changes:NodeTextChange[], useNewText:boolean)
         node.clearCacheData();
         node.refreshBox();
     });
+}
+
+export class NumberChildNodes extends Command {
+    parent:INode;
+    mind:MindMap;
+    textChanges:NodeTextChange[];
+
+    constructor(parent:INode) {
+        super('numberChildNodes');
+        this.parent = parent;
+        this.mind = parent.mindmap;
+        this.textChanges = getNumberedChildTextUpdates(
+            parent.children.map((node) => ({item: node, text: node.data.text}))
+        ).map(({item, text}) => ({
+            node: item,
+            oldText: item.data.text,
+            text,
+        }));
+    }
+
+    execute():boolean {
+        if (
+            !this.hasChanges() ||
+            this.textChanges.some(({node}) => node.parent !== this.parent)
+        ) {
+            return false;
+        }
+        this.applyTextChanges(true);
+        return true;
+    }
+
+    undo() {
+        this.applyTextChanges(false);
+    }
+
+    hasChanges():boolean {
+        return this.textChanges.length > 0;
+    }
+
+    private applyTextChanges(useNewText:boolean) {
+        const expectedTexts = new Map<INode, string>();
+        const renders = this.textChanges.map(({node, oldText, text}) => {
+            const expectedText = useNewText ? text : oldText;
+            expectedTexts.set(node, expectedText);
+            return node.setText(expectedText);
+        });
+        void Promise.all(renders).then(() => {
+            this.parent.clearCacheData();
+            this.textChanges.forEach(({node}) => {
+                if (node.data.text !== expectedTexts.get(node)) return;
+                node.clearCacheData();
+                node.refreshBox();
+            });
+            this.refresh(this.mind);
+        });
+    }
 }
 
 function getMovedOrderedGroups(
