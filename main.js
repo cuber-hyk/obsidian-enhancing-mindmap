@@ -2471,7 +2471,7 @@ class Node$1 {
         this._editText = '';
         this._editLinks = [];
         this._editStructureChanged = false;
-        this._selectedEditImageEl = undefined;
+        this.clearSelectedEditImage();
         if (this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.remove('mm-edit-node');
         }
@@ -2625,12 +2625,13 @@ class Node$1 {
         this.clearSelectedEditImage();
         this._selectedEditImageEl = imageEl;
         imageEl.classList.add('is-selected');
+        this.contentEl.classList.add('mm-node-image-selected');
         imageEl.focus();
     }
     clearSelectedEditImage() {
-        if (!this._selectedEditImageEl)
-            return;
-        this._selectedEditImageEl.classList.remove('is-selected');
+        var _a;
+        this.contentEl.classList.remove('mm-node-image-selected');
+        (_a = this._selectedEditImageEl) === null || _a === void 0 ? void 0 : _a.classList.remove('is-selected');
         this._selectedEditImageEl = undefined;
     }
     deleteEditImageByKeyboard(key) {
@@ -2673,8 +2674,8 @@ class Node$1 {
         return null;
     }
     deleteEditImageElement(imageEl) {
+        this.clearSelectedEditImage();
         imageEl.remove();
-        this._selectedEditImageEl = undefined;
         this._editStructureChanged = true;
         this.normalizeEditContentAfterImageDelete();
         this.refreshEditingLayout();

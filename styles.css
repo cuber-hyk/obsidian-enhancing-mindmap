@@ -528,6 +528,10 @@
   outline-offset: 2px;
 }
 
+.mm-node-content.mm-node-image-selected {
+  overflow: visible;
+}
+
 .mm-node-image-attachment.is-selected:not(.is-reordering) {
   cursor: grab;
 }

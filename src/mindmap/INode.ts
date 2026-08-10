@@ -857,7 +857,7 @@ export default class Node {
         this._editText = '';
         this._editLinks = [];
         this._editStructureChanged = false;
-        this._selectedEditImageEl = undefined;
+        this.clearSelectedEditImage();
 
         if(this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.remove('mm-edit-node')
@@ -1027,12 +1027,13 @@ export default class Node {
         this.clearSelectedEditImage();
         this._selectedEditImageEl = imageEl;
         imageEl.classList.add('is-selected');
+        this.contentEl.classList.add('mm-node-image-selected');
         imageEl.focus();
     }
 
     clearSelectedEditImage() {
-        if (!this._selectedEditImageEl) return;
-        this._selectedEditImageEl.classList.remove('is-selected');
+        this.contentEl.classList.remove('mm-node-image-selected');
+        this._selectedEditImageEl?.classList.remove('is-selected');
         this._selectedEditImageEl = undefined;
     }
 
@@ -1079,8 +1080,8 @@ export default class Node {
     }
 
     deleteEditImageElement(imageEl: HTMLElement) {
+        this.clearSelectedEditImage();
         imageEl.remove();
-        this._selectedEditImageEl = undefined;
         this._editStructureChanged = true;
         this.normalizeEditContentAfterImageDelete();
         this.refreshEditingLayout();
