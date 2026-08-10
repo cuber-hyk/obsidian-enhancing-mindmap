@@ -16,7 +16,7 @@ export default {
 
     //setting
     "Canvas size":"Taille de l'espace de travail",
-    "Canvas size desc":"Largeur et hauteur de l'espace de travail",
+    "Canvas size desc":"Largeur et hauteur minimales de l'espace de travail ; extension automatique si nécessaire",
     "Canvas background":"Arrière-plan de l'espace de travail",
     "Canvas background desc":"Couleur d'arrière-plan de l'espace de travail",
     "Max level of node to markdown head":"Niveau max. de nœud pour créer un titre",

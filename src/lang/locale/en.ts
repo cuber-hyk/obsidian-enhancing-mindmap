@@ -17,7 +17,7 @@ export default {
 
     //setting
     "Canvas size":"Canvas size",
-    "Canvas size desc":"Width and height of the canvas",
+    "Canvas size desc":"Minimum canvas width and height; expands automatically when content exceeds it",
     "Canvas background":"Canvas background",
     "Canvas background desc":"Background color of canvas",
     "Max level of node to markdown head":"Max level of node to create a Heading",

@@ -256,13 +256,11 @@ export class MindMapView extends TextFileView implements HoverParent {
       return;
     }
 
-    var size = this.plugin.settings.canvasSize;
-    this.mindmap.contentEL.style.width = size + 'px';
-    this.mindmap.contentEL.style.height = size + 'px';
-    this.mindmap.containerEL.scrollTop = top;
-    this.mindmap.containerEL.scrollLeft = left;
+    this.mindmap.restoreRuntimeCanvasBounds();
     this.mindmap.root.setPosition(rootBox.x, rootBox.y);
     this.mindmap.refresh();
+    this.mindmap.containerEL.scrollTop = top;
+    this.mindmap.containerEL.scrollLeft = left;
   }
 
   dataURLtoBlob(dataUrl: string) {
