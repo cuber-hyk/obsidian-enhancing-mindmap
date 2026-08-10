@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-08-03
+updated: 2026-08-08
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -44,6 +44,8 @@ adr_reviewed: not_required
 - `ChangeNodeText` 等待 `setText()` 的 Markdown 渲染完成后再刷新节点尺寸与布局，避免保存链接时出现图标闪烁或空节点宽度。
 - 加载脑图 Markdown 时，文本为空或严格等于 `Sub title`、属于列表项且恰好只有一个子节点的默认占位包装节点不会进入运行时节点树，其唯一子节点会提升一级；无子节点、多子节点、非列表节点或带其他内容的同名节点保持不变。节点文本以 `数字.` 或 `数字)` 开头时，保存到外层无序列表会转义其有序标记，加载时再恢复，避免 CommonMark 将其解析为一个空包装节点和内嵌有序列表；旧版未转义内容产生的空包装层也会在加载时提升。节点正文最外层的有序、无序列表使用紧凑的块间距和缩进，避免 Markdown 默认列表外边距使文字与节点下划线分离。
 - 脑图首次和后续装载使用同一条当前 `MindMap` 实例初始化路径，不使用固定时间延迟，也不在视图关闭后保留初始化回调。首次打开时以待就绪节点集合跟踪每个节点的基础 Markdown 渲染和尺寸测量；样式模板及其他提前刷新请求不会在集合清空前创建布局缓存。全部节点就绪后统一重新测量、清除子树几何缓存并在下一动画帧完成首次布局和根节点居中。表格、图片、MathJax 与 Markdown 嵌入的后续尺寸变化使用独立事件并按动画帧合并刷新，不再参与首次就绪状态。
+- 插件设置的 `canvasSize` 是画布最小宽高，不是内容上限。`CanvasBoundsController` 在每次最终布局后根据可见节点 box 和 60px 安全边距扩展运行时画布与 SVG 连线层；左侧或顶部越界时平移根节点、按当前缩放比补偿滚动，并最多补做一次布局。
+- 自动画布尺寸只属于当前视图生命周期，不写入 Markdown 或插件设置；折叠、删除或内容缩短后不自动收缩。新建视图或显式修改画布尺寸时从新的最小值重新计算；导出临时改变内容尺寸后，恢复运行时画布和原滚动位置。
 - 同一文件的 Obsidian `quick-preview` 内容变化会触发脑图实时同步，样式模板自身写入和内容未变化事件不会重复重建。同步时旧画布保持可见，新实例在同尺寸隐藏容器中完成节点渲染和首次布局，再于同一帧替换旧实例；连续变化只保留最新后台实例。替换前恢复原选中节点、缩放中心、缩放比例和滚动位置；只有原焦点位于脑图时才重新聚焦节点，不抢占相邻 Markdown 编辑器的焦点。
 - “Collapse one level”只在当前脑图具有父节点的非根单选节点上可用；执行后收缩到父层级并选择父节点。根节点、无选择和多选状态不改变显示层级，也不写入无效操作。
 - 首次布局完成后动态创建的节点仍复用基础 Markdown 渲染完成事件重新测量尺寸、清除祖先几何缓存并按动画帧合并布局；批量粘贴的节点底部连线会按最终文本宽度对齐，无需折叠后重新展开。
@@ -99,6 +101,7 @@ adr_reviewed: not_required
 - 节点宽度元数据与拖拽：`src/mindmap/wrap/NodeAutoWrapMarkdown.ts`、`src/mindmap/wrap/NodeAutoWrapController.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
+- 画布边界：`src/mindmap/CanvasBoundsController.ts`
 - 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 视图生命周期：`src/MindMapView.ts`
 - 样式模板：`src/mindmap/style/MindMapStyle.ts`、`src/mindmap/style/MindMapStyleInspector.ts`
@@ -125,5 +128,6 @@ adr_reviewed: not_required
 - 多选批量删除与节点快捷键已于 2026-07-14 在授权测试 Vault 中验证；回归需覆盖同父、跨父和父子同时选择的删除与一次撤销/重做、连续粘贴、剪切写入后删除、多选不执行单节点剪贴板，以及节点编辑态和 Markdown 视图的原生剪贴板与撤销。
 - 键盘焦点与 History 回归需覆盖空白画布撤销/重做、Windows/Linux `Ctrl+Y`、macOS `Cmd+Shift+Z`、四向与 `Home` 导航、叶节点及已展开节点不新增 History，以及导航器、快捷键检查器、设置页和其他交互控件保留宿主键盘行为；快捷键展示需验证右侧面板的简洁 `Undo`/`Redo` 名称、设置页完整命令目录和宿主改绑后的即时一致性。
 - 外部同步回归需在分栏和外部文件修改场景验证实时内容更新、连续快速变化只采用最新内容、选中节点与视口保持、相邻 Markdown 编辑器不失焦、样式检查器保持打开，以及关闭视图后不存在后台画布或延迟回调。
+- 画布边界回归需在大型及小型脑图中验证：四种布局方向、`20%`/`100%`/`300%` 缩放、导航器点击与拖拽定位、`4000`/`8000`/`16000`/`36000` 最小画布修改、折叠展开、新增删除、外部同步和 PNG/JPEG/SVG 导出恢复；所有可见节点和连线应位于实际画布内，只有越界时扩展且不产生持续增长或视口跳动。
 - Markdown 层级粘贴需在测试 Vault 中验证标题、无序列表、有序列表、单行及多行普通文本、空行忽略、混合普通段落、前导正文、引用、围栏代码块、表格、YAML frontmatter、水平分隔线、`\(...\)`、`\[...\]`、`$...$` 与 `$$...$$` 公式、代码内公式定界符不转换、未闭合块拒绝、多个顶层节点、深层嵌套、新 ID、最终文本宽度与底部连线对齐、折叠目标、连续粘贴、一次撤销/重做、异步期间切换节点或 leaf，以及内部 `copyNode` JSON 的优先级回归。
 - 仓库当前没有自动化测试框架；生产构建与测试 Vault 交互矩阵是本能力的主要回归门禁。

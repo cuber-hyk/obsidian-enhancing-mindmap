@@ -16,7 +16,7 @@ export default {
 
     //setting
     "Canvas size": "Leinwandgröße",
-    "Canvas size desc": "Breite und Höhe der Leinwand",
+    "Canvas size desc": "Mindestbreite und -höhe der Leinwand; wird bei Bedarf automatisch erweitert",
     "Canvas background": "Leinwand Hintergrund",
     "Canvas background desc": "Hintergrundfarbe der Leinwand",
     "Max level of node to markdown head": "Maximale Knotenebene welche eine Überschrift erstellt",

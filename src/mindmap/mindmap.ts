@@ -23,6 +23,7 @@ import {
     getTextNodeWidthLimits,
     NodeWidthSettings,
 } from './NodeWidthSettings'
+import CanvasBoundsController from './CanvasBoundsController'
 
 let tempDispLevel = 0;
 
@@ -77,6 +78,7 @@ export default class MindMap {
     nodeSelectionController: NodeSelectionController;
     nodeLinkController: NodeLinkController;
     navigatorController: MindMapNavigatorController;
+    canvasBoundsController?: CanvasBoundsController;
     scalePointer: number[] = [];
     mindScale = 100;
     timeOut: any = null;
@@ -135,6 +137,7 @@ export default class MindMap {
         this.nodeKeyboardController = new NodeKeyboardController(this);
         this.nodeSelectionController = new NodeSelectionController(this);
         this.nodeLinkController = new NodeLinkController(this);
+        this.canvasBoundsController = new CanvasBoundsController(this, this.setting.canvasSize);
         this.navigatorController = new MindMapNavigatorController(this);
 
         // link line
@@ -169,10 +172,14 @@ export default class MindMap {
     }
 
     setAppSetting() {
-        this.appEl.style.width = `${this.setting.canvasSize}px`;
-        this.appEl.style.height = `${this.setting.canvasSize}px`;
-        this.contentEL.style.width = `100%`;
-        this.contentEL.style.height = `100%`;
+        if (this.canvasBoundsController) {
+            this.canvasBoundsController.setMinimumSize(this.setting.canvasSize);
+        } else {
+            this.appEl.style.width = `${this.setting.canvasSize}px`;
+            this.appEl.style.height = `${this.setting.canvasSize}px`;
+            this.contentEL.style.width = `100%`;
+            this.contentEL.style.height = `100%`;
+        }
         //  this.contentEL.style.color=`${this.setting.color};`;
         this.contentEL.style.background = `${this.setting.background}`;
         this.contentEL.style.fontSize = `${this.setting.fontSize}px`;
@@ -1430,14 +1437,11 @@ export default class MindMap {
                 this.colors,
                 this.layoutLineWidth,
             );
-            // Select and center on the mindmap's root when opening it
-            this.root.select(this.focusInitialRoot);
-            this.centerOnNode(this.root);
-            return;
+            return true;
         }
 
         this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
-
+        return false;
     }
 
     refresh() {
@@ -1449,8 +1453,28 @@ export default class MindMap {
     }
 
     performLayoutRefresh() {
-        this.layout();
+        const isInitialLayout = this.layout();
+        const visibleNodes = this.root?.getShowNodeList?.() || [];
+        const boundsResult = this.canvasBoundsController?.ensureVisibleNodes(visibleNodes);
+        if (boundsResult?.shifted) {
+            this.mmLayout?.layout(
+                this.root,
+                this.setting.layoutDirect || this.mmLayout.direct || 'mind map',
+            );
+            this.canvasBoundsController?.ensureVisibleNodes(
+                this.root?.getShowNodeList?.() || [],
+                false,
+            );
+        }
+        if (isInitialLayout) {
+            this.root.select(this.focusInitialRoot);
+            this.centerOnNode(this.root);
+        }
         this.navigatorController?.scheduleUpdate();
+    }
+
+    restoreRuntimeCanvasBounds() {
+        this.canvasBoundsController?.applyCurrentDimensions();
     }
 
     emit(name: string, data?: any) {
@@ -1471,17 +1495,7 @@ export default class MindMap {
     }
 
     center() {
-        //console.log("Center mindmap")
-        this._setMindScalePointer(this.root);
-        var oldScale = this.mindScale;
-        this.scale(100);
-
-        var w = this.containerEL.clientWidth;
-        var h = this.containerEL.clientHeight;
-        this.containerEL.scrollTop = this.setting.canvasSize / 2 - h / 2 - 60;
-        this.containerEL.scrollLeft = this.setting.canvasSize / 2 - w / 2 + 30;
-
-        this.scale(oldScale);
+        this.centerOnNode(this.root);
     }
 
 

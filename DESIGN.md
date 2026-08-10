@@ -1,7 +1,7 @@
 ---
 artifact_type: design_system
 status: current
-updated: 2026-08-03
+updated: 2026-08-08
 token_source: design-tokens.json
 ---
 
@@ -29,7 +29,7 @@ token_source: design-tokens.json
 - 链接操作 UI：`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/link/EditNodeLinkModal.ts`
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/image/NodeImageReorderController.ts`、`src/mindmap/INode.ts`
 - 节点表格：`src/mindmap/table/NodeTableMarkdown.ts`、`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`、`src/mindmap/INode.ts`、`styles.css`
-- 画布导航控件：`src/mindmap/navigation/MindMapNavigatorController.ts`
+- 画布边界与导航：`src/mindmap/CanvasBoundsController.ts`、`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
 - 脑图样式与快捷键检查器：`src/mindmap/style/`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/mindmap/interaction/PluginShortcutCatalog.ts`、`src/MindMapView.ts`、`src/settingTab.ts`、`styles.css`
 - 已确认视觉示例：`docs/assets/node-insert-toolbar-concept.png`
@@ -51,6 +51,7 @@ token_source: design-tokens.json
 
 - 插入工具栏位于当前编辑节点正上方。
 - 工具栏作为节点子元素，随节点移动、画布滚动和缩放。
+- 画布尺寸设置表示当前视图的最小宽高；可见节点接近或超出边界时，运行时画布和 SVG 连线层使用 60px 安全边距自动向外扩展。当前视图只扩展不自动收缩，避免折叠、删除或异步渲染导致视口跳动。
 
 <!--
 ## Component Rules
@@ -106,7 +107,7 @@ token_source: design-tokens.json
 
 - 新插入行为放入 `src/mindmap/insert/` 下按职责命名的模块。
 - 节点键盘状态机放入 `src/mindmap/interaction/`，链接解析、菜单和编辑弹窗放入 `src/mindmap/link/`，图片 Markdown 解析放入 `src/mindmap/image/`。
-- 画布导航和缩放控件放入 `src/mindmap/navigation/`，`src/mindmap/mindmap.ts` 只保留生命周期、缩放状态和刷新通知接线。
+- 画布边界由 `src/mindmap/CanvasBoundsController.ts` 统一计算并应用，导航和缩放控件放入 `src/mindmap/navigation/`；`src/mindmap/mindmap.ts` 只保留生命周期、缩放状态和刷新通知接线，不重复实现画布边界策略。
 - 节点多选集合、框选几何、选择视觉和多选手势放入 `src/mindmap/interaction/NodeSelectionController.ts`；`src/mindmap/mindmap.ts` 只保留事件委托和生命周期接线。
 - `src/mindmap/mindmap.ts` 和 `src/mindmap/INode.ts` 仅保留生命周期与编辑接线。
 - 节点表格的识别、保护和 Markdown 序列化放入 `src/mindmap/table/NodeTableMarkdown.ts`；预览交互和编辑 Modal 分别由 `src/mindmap/table/NodeTablePreviewController.ts` 和 `src/mindmap/table/NodeTableEditorModal.ts` 负责，视图、节点和脑图模块不得重复实现表格语法解析或表格 UI。

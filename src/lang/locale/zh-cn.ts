@@ -16,7 +16,7 @@ export default {
 
   //setting
   "Canvas size":"画布尺寸",
-  "Canvas size desc":"绘制思维导图画布的宽度和高度",
+  "Canvas size desc":"思维导图画布的最小宽度和高度，内容超出时会自动扩展",
   "Canvas background":"背景颜色",
   "Canvas background desc":"画布的背景颜色",
   "Max level of node to markdown head":"节点文字转为markdown标题的最大层级",
