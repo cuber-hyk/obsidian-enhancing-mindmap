@@ -6,11 +6,13 @@ import {
     DEFAULT_NODE_WIDTH_SETTINGS,
     NodeWidthSettings,
 } from './mindmap/NodeWidthSettings';
+import { DEFAULT_NODE_CODE_FONT_SIZE } from './mindmap/code/NodeCodeSettings';
 
 export class MindMapSettings implements NodeWidthSettings {
     canvasSize:number = 8000;
     background:string = 'transparent';
     fontSize:number = 16;
+    codeFontSize:number = DEFAULT_NODE_CODE_FONT_SIZE;
     headLevel:number = 2;
     layout:string="mindmap";
     layoutDirect:string = 'mindmap'

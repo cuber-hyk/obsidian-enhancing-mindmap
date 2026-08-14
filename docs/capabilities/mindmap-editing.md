@@ -1,7 +1,7 @@
 ---
 artifact_type: capability
 status: current
-updated: 2026-08-10
+updated: 2026-08-14
 source_of_truth: code
 adr_reviewed: not_required
 ---
@@ -20,6 +20,11 @@ adr_reviewed: not_required
 - 节点可包含标题后的标准 Markdown 表格；加载脑图前会保护表格块，使其不会被 Markmap 拆成节点树；保存时恢复为原 Markdown 表格。表格标题只作为 Markdown 结构锚点保留，不在脑图阅读态或网格编辑器中显示。
 - 表格阅读态使用受限且默认自动适应的预览框；静止时不显示操作控件，悬停、选中或键盘聚焦时才显示缩放、适应、重置、展开和编辑图标。展开预览使用全宽 Modal，表格自动撑满可用宽度；局部缩放不写入 Markdown。
 - 表格节点进入编辑时打开网格 Modal，支持单元格、行列增删和 TSV 粘贴；保存通过一条 `ChangeNodeText` History 命令写回标准 Markdown，源码编辑只作为复杂内容的兜底入口。
+- 节点可按原始 Markdown 顺序混合普通文字与一个或多个反引号或波浪线围栏代码块；`NodeCodeMarkdown` 是围栏识别、安全序列化及完整文档保护恢复的单一事实来源，未闭合围栏保持普通文本，代码内表格、公式、Wikilink 和列表符号不参与其他节点语法转换。
+- 节点插入工具栏通过独立 `NodeCodeEditorModal` 插入代码，已有代码在编辑态显示为不可直接改写的代码卡片并复用同一 Modal 编辑或删除。Modal 在同一编辑面叠加原生 `textarea` 与 Obsidian Markdown 高亮层，输入时实时刷新并同步滚动；IME 组合期间显示原生文字，结束后恢复高亮。Tab 插入两个空格，`Ctrl`/`Cmd+Enter` 保存。代码卡片与普通文字、图片及其他代码块按 DOM 顺序恢复为 Markdown，修改通过节点现有 `ChangeNodeText` History 保存。
+- 阅读态代码卡片、节点编辑态代码卡片、展开预览和代码编辑 Modal 统一通过 `NodeCodeRenderer` 复用 Obsidian MarkdownRenderer 的语法高亮。卡片常驻低强调语言标签，悬停或键盘聚焦时显示复制和溢出时的展开操作；复制只写入代码正文。卡片默认限制为紧凑视口，长行不折行并在内部双向滚动，展开 Modal 不改变节点尺寸或数据。
+- 插件设置 `codeFontSize` 在 `10–24px` 内统一控制代码卡片、代码编辑 Modal 和展开预览，默认 `14px`；非法持久值回退默认值，合法修改立即同步所有已打开脑图并重新测量布局，不写入节点 Markdown。
+- 编辑态选中代码卡片后显示右下角缩放手柄，可在 `280–900px` 宽度和 `120–600px` 高度内拖拽，画布缩放会得到补偿；方向键按 20px 调整，`Shift` 方向键按 5px 细调，双击或 `Enter` 恢复默认。自定义尺寸以紧邻围栏的 `<!-- mm-code-size: WIDTHxHEIGHT -->` 注释保存，重置移除该注释；取消拖拽恢复原值，完成节点编辑时与其他正文变化合并为一次 History。
 - `NodeKeyboardController` 是单节点键盘新增、删除和方向导航的入口：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点；编辑态 `Enter` 保存并回到选中态，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 保存并新增子节点；选中态默认 `Enter` 在下方新增同级节点，`Shift+Enter` 在上方新增同级节点，根节点的下方新增快捷键例外为新增一级子节点，上方新增不执行操作，选中态 `Tab` 新增子节点。普通新节点立即进入编辑态并全选默认文案；当前节点以 `数字.` 或 `数字)` 开头时，同级新增会继承该格式，对包含当前节点的连续编号组按实际兄弟顺序重排，并只选中新节点的默认正文以保留编号前缀。删除、批量删除、单节点移动和多节点移动也会重排实际发生结构变化的连续同级编号组；移入现有编号组时采用目标组的起始值与 `.` 或 `)` 分隔符，普通节点、不同分隔符和无关编号组不被改写。每条结构 History 命令保存变更前后的文字快照，一次撤销或重做会同时精确恢复结构与编号。已有节点的普通编辑仍保留原光标行为。编辑态 `Ctrl`/`Cmd+B`、`Ctrl`/`Cmd+I` 和 `Ctrl`/`Cmd+Shift+S` 只通过 Markdown 标记切换选区的加粗、斜体和删除线，空选区插入标记对并将光标置中。编辑态 Escape 不结束编辑，也不触发脑图 History。无修饰方向键和 `Home` 仅在单选、非编辑且事件目标属于画布时导航；只有存在子节点且当前折叠时才执行展开并写入 History。
 - “批量编号子节点”命令以当前单选、非编辑节点为父节点，将全部直接子节点按现有顺序规范化为从 `1. ` 开始的连续有序节点；已有 `数字. ` 或 `数字) ` 前缀只替换前缀并保留正文，不递归处理后代。整组文本变更使用一条 History 命令撤销或重做，无实际文本变化时不进入 History；转换后继续复用新增、删除和移动的现有自动重排规则。命令不设置默认热键，Obsidian 中的用户绑定会显示在右侧快捷键检查器的高频节点操作中。
 - 手动 `<br>` 在编辑态以真正的 DOM 换行元素渲染，保存时再序列化为 Markdown；节点宽度拖拽仅改变 CSS 自动换行，不增删手动 `<br>`，松开时通过一条 `ChangeNodeText` 命令写回宽度注释。
@@ -98,6 +103,7 @@ adr_reviewed: not_required
 - 链接解析与交互：`src/mindmap/link/*.ts`
 - 节点表格 Markdown 与模型：`src/mindmap/table/NodeTableMarkdown.ts`
 - 节点表格预览与编辑：`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`
+- 节点代码解析、卡片、编辑与设置：`src/mindmap/code/*.ts`
 - 节点宽度元数据与拖拽：`src/mindmap/wrap/NodeAutoWrapMarkdown.ts`、`src/mindmap/wrap/NodeAutoWrapController.ts`
 - 图片解析与编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/INode.ts`
 - 插入工作流：`src/mindmap/insert/*.ts`
@@ -115,6 +121,7 @@ adr_reviewed: not_required
 - 最低支持 Obsidian 1.5.7；不保留旧版附件路径兼容分支。
 - 交互变更需在测试 Vault 中验证 Markdown/脑图往返、撤销/重做和链接打开行为。
 - 表格变更需在测试 Vault 中验证标题锚点隐藏、列对齐、节点预览缩放、展开预览全宽、网格编辑、TSV 粘贴、保存/取消、Markdown/脑图往返、关闭重开及撤销/重做。
+- 代码块变更需验证普通文字与多个代码块顺序、Python 缩进、未知语言、复制、展开、插入/编辑/删除、单区实时高亮、光标与选区对齐、长行双向滚动、IME 组合输入、全局字号、卡片宽高拖拽、非 100% 画布缩放、键盘缩放与重置、尺寸注释、完整 Markdown 加载、层级粘贴、关闭重开及撤销/重做。
 - 新插入功能不得把渲染 HTML 保存为节点数据。
 - IME 组合输入、弹窗输入和脑图失焦状态不得触发节点新增。
 

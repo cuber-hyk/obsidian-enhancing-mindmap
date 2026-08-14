@@ -29,7 +29,7 @@ export default class NodeKeyboardController {
     if (
       node.data.isEdit &&
       (event.key === 'Backspace' || event.key === 'Delete') &&
-      node.deleteEditImageByKeyboard(event.key)
+      node.deleteEditAttachmentByKeyboard(event.key)
     ) {
       this.consume(event);
       return true;

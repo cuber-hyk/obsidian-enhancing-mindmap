@@ -29,6 +29,7 @@ token_source: design-tokens.json
 - 链接操作 UI：`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/link/EditNodeLinkModal.ts`
 - 图片附件编辑：`src/mindmap/image/NodeImageMarkdown.ts`、`src/mindmap/image/NodeImagePreviewModal.ts`、`src/mindmap/image/NodeImageReorderController.ts`、`src/mindmap/INode.ts`
 - 节点表格：`src/mindmap/table/NodeTableMarkdown.ts`、`src/mindmap/table/NodeTablePreviewController.ts`、`src/mindmap/table/NodeTableEditorModal.ts`、`src/mindmap/INode.ts`、`styles.css`
+- 节点代码块：`src/mindmap/code/NodeCodeMarkdown.ts`、`src/mindmap/code/NodeCodeController.ts`、`src/mindmap/code/NodeCodeEditorModal.ts`、`src/mindmap/code/NodeCodeRenderer.ts`、`src/mindmap/code/NodeCodeSettings.ts`、`styles.css`
 - 画布边界与导航：`src/mindmap/CanvasBoundsController.ts`、`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
 - 脑图样式与快捷键检查器：`src/mindmap/style/`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/mindmap/interaction/PluginShortcutCatalog.ts`、`src/MindMapView.ts`、`src/settingTab.ts`、`styles.css`
@@ -58,7 +59,7 @@ token_source: design-tokens.json
 -->
 ## 组件规则
 
-- 第一版节点插入工具栏仅提供三个入口：外部链接、Vault 文件和图片。
+- 节点插入工具栏提供外部链接、Vault 文件、图片和代码块入口；代码通过独立 Modal 输入，不在节点编辑面直接暴露围栏 Markdown。
 - Vault 文件选择器支持 Markdown、视频、PDF、音频等非图片文件。
 - 图片入口提供“选择 Vault 图片”和“导入本地图片”两个选项。
 - 图片插入必须写入默认节点图片宽度，避免原图尺寸直接撑开脑图。
@@ -89,6 +90,9 @@ token_source: design-tokens.json
 - 编辑态双击图片打开只读大图预览；双击不得冒泡为节点编辑手势，关闭预览后仅在原编辑会话仍有效时恢复图片焦点。预览不修改节点 Markdown、图片宽度或撤销历史。
 - 节点只保存 Markdown 源文本，渲染后的 HTML 不得成为第二数据源。
 - 节点内表格以内容优先：标题仅作为 Markdown 结构锚点保留，不在脑图表格节点或网格编辑器中显示；阅读态默认自动适应最大约 760px 的受限预览框，静止时不显示操作控件；悬停、选中或工具条获得焦点时，右上角浮现带提示的图标工具条，提供缩放、适应、重置、展开和编辑。展开预览使用最大约 90vw × 85vh 的 Modal，表格自动撑满可用宽度。表格节点默认进入 Modal 网格编辑，源码编辑仅作为兜底入口。
+- 节点代码块使用紧凑卡片纵向嵌入普通正文，保留围栏语言、缩进、空行和多个代码块顺序；长行不折行，长内容在卡片内双向滚动。阅读态仅在卡片悬停或聚焦时浮现复制和按需展开操作；编辑态额外提供独立编辑操作，不因节点被选中而常驻显示工具栏。
+- 代码编辑 Modal 使用单一编辑面，不并排重复的源码与预览面板。原生 `textarea` 负责输入、光标、选区、撤销和 Tab 缩进，同位的 Obsidian Markdown 高亮层负责实时显示；两层必须共用字体、字号、行高、内边距和滚动位置。IME 组合输入期间显示原生文字并暂停高亮刷新，组合结束后立即恢复高亮。
+- 代码字号是插件级显示设置，统一作用于卡片、代码编辑 Modal 和展开预览，不写入节点 Markdown。每个代码卡片的自定义可视宽高通过编辑态选中后出现的右下角手柄调整；拖拽不得触发节点移动，选中描边与手柄不得被正文滚动区域裁剪，重置恢复默认紧凑视口。
 - 右下角导航控件固定在脑图视图容器内，不随画布缩放；滑动条、加减按钮和 Ctrl/Meta 滚轮缩放共享同一个 `mindScale` 状态。
 - 小视图点击定位主画布视口；拖拽视口框不得触发节点拖拽、文本编辑或画布平移。
 - 点击标题栏调色板操作后打开或关闭当前导图的右侧样式检查器；除用户显式切换入口或点击关闭按钮外，检查器在模板应用与视图同步后保持打开，画布始终可见。
@@ -111,6 +115,7 @@ token_source: design-tokens.json
 - 节点多选集合、框选几何、选择视觉和多选手势放入 `src/mindmap/interaction/NodeSelectionController.ts`；`src/mindmap/mindmap.ts` 只保留事件委托和生命周期接线。
 - `src/mindmap/mindmap.ts` 和 `src/mindmap/INode.ts` 仅保留生命周期与编辑接线。
 - 节点表格的识别、保护和 Markdown 序列化放入 `src/mindmap/table/NodeTableMarkdown.ts`；预览交互和编辑 Modal 分别由 `src/mindmap/table/NodeTablePreviewController.ts` 和 `src/mindmap/table/NodeTableEditorModal.ts` 负责，视图、节点和脑图模块不得重复实现表格语法解析或表格 UI。
+- 节点代码围栏、尺寸元数据和文档保护放入 `src/mindmap/code/NodeCodeMarkdown.ts`；Obsidian 高亮渲染由 `src/mindmap/code/NodeCodeRenderer.ts` 统一提供；卡片交互、独立编辑 Modal 和显示设置分别由同目录的 Controller、Modal 和 Settings 模块负责，`INode` 与 `MindMapView` 只保留生命周期和保护恢复接线。
 - 验证 Obsidian 深色、浅色主题以及活动节点的焦点和选区行为。
 
 ## 可访问性
@@ -123,6 +128,7 @@ token_source: design-tokens.json
 - 导航控件的缩放按钮和滑动条必须提供可访问名称，百分比文本必须反映当前缩放状态，节点数统计必须反映当前可见节点数与总节点数。
 - 取消弹窗后焦点返回编辑节点，且不得改变节点文本。
 - 工具栏控件必须可通过键盘聚焦和操作。
+- 代码卡片操作必须具有可访问名称和提示；缩放手柄支持方向键调整，`Shift` 方向键细调，`Enter` 恢复默认尺寸。
 - 编辑态节点必须保留当前样式模板的节点背景，让原生文本光标使用对应节点的文字色，并以该色的弱化描边标识编辑边界；这些规则可使用 `!important` 覆盖主题的通用 `contenteditable` 样式，保证深浅主题下均可辨识节点边界和输入位置。
 - 普通文本节点在选中且非编辑态时，可在右侧边界悬停显示窄竖向宽度手柄；手柄仅负责宽度拖拽，不常驻占用画布，也不适用于表格、代码、图片或含链接附件节点。拖拽中的内容以实际 CSS 宽度实时自动换行，不使用额外虚线替代预览。
 - 节点内的 `Shift+Enter` 是持久化的手动换行，宽度造成的自动换行只由当前 CSS 宽度计算；进入编辑态时手动 `<br>` 必须显示为真实换行，不能显示 Markdown 字面文本或改变节点有效宽度。

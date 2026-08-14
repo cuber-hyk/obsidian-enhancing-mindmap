@@ -2,12 +2,15 @@ import { Transformer } from '../../markmapLib/markmap-lib';
 import { INodeData } from '../INode';
 import { uuid } from '../NodeId';
 import { isMindMapTableDivider } from '../table/NodeTableMarkdown';
+import {
+  isNodeCodeFenceOpening,
+  readFencedCodeBlock,
+} from '../code/NodeCodeMarkdown';
 
 const transformer = new Transformer();
 const headingPattern = /^\s{0,3}#{1,6}\s+\S/;
 const listItemPattern = /^\s*(?:[-+*]|\d+[.)])\s+\S/;
 const horizontalRulePattern = /^\s{0,3}(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$/;
-const fencePattern = /^\s{0,3}(`{3,}|~{3,})/;
 const blockquotePattern = /^\s{0,3}>\s?/;
 const blockIdPattern = /\s+\^([a-z0-9-]+)$/i;
 
@@ -119,7 +122,7 @@ function isMarkdownBodySyntax(line: string): boolean {
   const value = line.trim();
   return Boolean(
     horizontalRulePattern.test(line) ||
-    fencePattern.test(line) ||
+    isNodeCodeFenceOpening(line) ||
     blockquotePattern.test(line) ||
     isMindMapTableDivider(line) ||
     value === '\\[' ||
@@ -151,12 +154,8 @@ function readBodyBlock(
   lines: string[],
   start: number,
 ): {text: string; end: number} | null {
-  const fence = lines[start].match(fencePattern)?.[1];
-  if (fence) {
-    const end = findClosingFence(lines, start + 1, fence);
-    return end < 0
-      ? null
-      : {text: lines.slice(start, end + 1).join('\n'), end: end + 1};
+  if (isNodeCodeFenceOpening(lines[start])) {
+    return readFencedCodeBlock(lines, start);
   }
 
   if (lines[start].trim() === '\\[') {
@@ -182,7 +181,7 @@ function readBodyBlock(
     lines[end].trim() &&
     !horizontalRulePattern.test(lines[end]) &&
     !isStructuredLine(lines[end]) &&
-    !fencePattern.test(lines[end]) &&
+    !isNodeCodeFenceOpening(lines[end]) &&
     lines[end].trim() !== '\\[' &&
     lines[end].trim() !== '$$'
   ) {
@@ -253,16 +252,6 @@ function isEscaped(text: string, index: number): boolean {
     slashCount++;
   }
   return slashCount % 2 === 1;
-}
-
-function findClosingFence(lines: string[], start: number, opening: string): number {
-  const character = opening[0];
-  const minimumLength = opening.length;
-  const closingPattern = new RegExp(`^\\s{0,3}${character}{${minimumLength},}\\s*$`);
-  for (let index = start; index < lines.length; index++) {
-    if (closingPattern.test(lines[index])) return index;
-  }
-  return -1;
 }
 
 function findExactLine(lines: string[], start: number, value: string): number {

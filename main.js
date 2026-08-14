@@ -22,6 +22,18 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
 
+function __rest(s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+}
+
 function __awaiter(thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -132,6 +144,9 @@ var en = {
     "Max level of node to markdown head desc": "Specify which Node Level creates a seperate Heading instead of a List-Item",
     "Font size": "Font Size",
     "Font size desc": "Specify the Font Size",
+    "Code font size": "Code font size",
+    "Code font size desc": "Font size used by code blocks and code panels, from 10 to 24 px",
+    "Invalid code font size": "Enter an integer from 10 to 24",
     "Text node minimum width": "Minimum text node width",
     "Text node minimum width desc": "Smallest width allowed when resizing plain text nodes, in px",
     "Text node maximum width": "Maximum text node width",
@@ -290,6 +305,22 @@ var en = {
     "Edit source": "Edit source",
     "Table header": "Table header",
     "Table cell": "Table cell",
+    "Insert code block": "Insert code block",
+    "Edit code block": "Edit code block",
+    "Delete code block": "Delete code block",
+    "Code language": "Language",
+    "Code": "Code",
+    "Plain text": "Plain text",
+    "Code cannot be empty": "Enter code before saving",
+    "Node code block": "Node code block",
+    "Code block controls": "Code block controls",
+    "Copy code": "Copy code",
+    "Code copied": "Code copied",
+    "Failed to copy code": "Failed to copy code",
+    "Expand code": "Expand code",
+    "Code preview": "Code preview",
+    "Resize code block": "Resize code block",
+    "Resize code block hint": "Drag to resize; double-click or press Enter to reset",
 };
 
 // British English
@@ -435,6 +466,9 @@ var zhCN = {
     "Max level of node to markdown head desc": "将小于该层级的节点文字转为markdown标题，最大层级为6，因为HTML标题支持最大为6级",
     "Font size": "文字大小",
     "Font size desc": "思维导图文字默认大小，单位px",
+    "Code font size": "代码字体大小",
+    "Code font size desc": "代码块和代码面板使用的字体大小，范围 10–24 px",
+    "Invalid code font size": "请输入 10–24 之间的整数",
     "Text node minimum width": "文本节点最小宽度",
     "Text node minimum width desc": "拖动普通文本节点时允许的最小宽度，单位 px",
     "Text node maximum width": "文本节点最大宽度",
@@ -562,7 +596,23 @@ var zhCN = {
     "Remove column": "删除列",
     "Edit source": "编辑源码",
     "Table header": "表头单元格",
-    "Table cell": "表格单元格"
+    "Table cell": "表格单元格",
+    "Insert code block": "插入代码块",
+    "Edit code block": "编辑代码块",
+    "Delete code block": "删除代码块",
+    "Code language": "代码语言",
+    "Code": "代码",
+    "Plain text": "纯文本",
+    "Code cannot be empty": "请输入代码后再保存",
+    "Node code block": "节点代码块",
+    "Code block controls": "代码块操作",
+    "Copy code": "复制代码",
+    "Code copied": "代码已复制",
+    "Failed to copy code": "复制代码失败",
+    "Expand code": "展开代码",
+    "Code preview": "代码预览",
+    "Resize code block": "调整代码块大小",
+    "Resize code block hint": "拖动调整大小；双击或按 Enter 恢复默认"
 };
 
 // 繁體中文
@@ -1224,7 +1274,7 @@ class NodeImageReorderController {
 
 const TABLE_MARKER_PREFIX = '__MM_NODE_TABLE_';
 const TABLE_MARKER_SUFFIX = '__';
-const COLLAPSED_NODE_ID = /\s\^[a-z0-9-]+$/i;
+const COLLAPSED_NODE_ID$1 = /\s\^[a-z0-9-]+$/i;
 function protectMindMapTables(markdown) {
     const lines = markdown.split(/\r?\n/);
     const tables = new Map();
@@ -1241,8 +1291,8 @@ function protectMindMapTables(markdown) {
             continue;
         const end = findTableEnd(lines, index);
         const marker = `${TABLE_MARKER_PREFIX}${tables.size}${TABLE_MARKER_SUFFIX}`;
-        tables.set(marker, removeSharedIndent(lines.slice(index, end)).join('\n').trim());
-        lines[ownerIndex] = appendMarker$1(lines[ownerIndex], marker);
+        tables.set(marker, removeSharedIndent$1(lines.slice(index, end)).join('\n').trim());
+        lines[ownerIndex] = appendMarker$2(lines[ownerIndex], marker);
         lines.splice(index, end - index);
         index--;
     }
@@ -1251,7 +1301,7 @@ function protectMindMapTables(markdown) {
 function restoreProtectedMindMapTables(text, tables) {
     let restored = text;
     tables.forEach((table, marker) => {
-        restored = restored.replace(new RegExp(`[ \\t]*${escapeRegExp(marker)}[ \\t]*`), `\n\n${table}`);
+        restored = restored.replace(new RegExp(`[ \\t]*${escapeRegExp$1(marker)}[ \\t]*`), `\n\n${table}`);
     });
     return restored.trim();
 }
@@ -1267,7 +1317,7 @@ function getNodeTableMarkdown(markdown) {
             return null;
         return {
             title,
-            markdown: removeSharedIndent(lines.slice(index, end)).join('\n').trim(),
+            markdown: removeSharedIndent$1(lines.slice(index, end)).join('\n').trim(),
         };
     }
     return null;
@@ -1329,20 +1379,20 @@ function findTableOwner(lines, tableStart) {
     for (let index = tableStart - 1; index >= 0; index--) {
         if (!lines[index].trim())
             continue;
-        return isNodeLine(lines[index]) ? index : null;
+        return isNodeLine$1(lines[index]) ? index : null;
     }
     return null;
 }
-function isNodeLine(line) {
+function isNodeLine$1(line) {
     return /^\s{0,3}#{1,6}\s+/.test(line) || /^\s*(?:[-+*]|\d+[.)])\s+/.test(line);
 }
-function appendMarker$1(line, marker) {
+function appendMarker$2(line, marker) {
     var _a;
-    const collapsedId = ((_a = line.match(COLLAPSED_NODE_ID)) === null || _a === void 0 ? void 0 : _a[0]) || '';
+    const collapsedId = ((_a = line.match(COLLAPSED_NODE_ID$1)) === null || _a === void 0 ? void 0 : _a[0]) || '';
     const content = collapsedId ? line.slice(0, -collapsedId.length) : line;
     return `${content} ${marker}${collapsedId}`;
 }
-function removeSharedIndent(lines) {
+function removeSharedIndent$1(lines) {
     const indents = lines
         .filter((line) => line.trim())
         .map((line) => { var _a; return ((_a = line.match(/^\s*/)) === null || _a === void 0 ? void 0 : _a[0].length) || 0; });
@@ -1394,7 +1444,7 @@ function serializeAlignment(alignment) {
 function normalizeRow(row, width) {
     return Array.from({ length: width }, (_, index) => { var _a; return (_a = row[index]) !== null && _a !== void 0 ? _a : ''; });
 }
-function escapeRegExp(value) {
+function escapeRegExp$1(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
@@ -1764,6 +1814,937 @@ class NodeAutoWrapController {
     }
 }
 
+const CODE_MARKER_PREFIX = '__MM_NODE_CODE_';
+const CODE_MARKER_SUFFIX = '__';
+const COLLAPSED_NODE_ID = /\s\^[a-z0-9-]+$/i;
+const CODE_SIZE_PATTERN = /^[ \t]*<!--\s*mm-code-size:\s*(\d+)x(\d+)\s*-->[ \t]*$/i;
+const MIN_NODE_CODE_WIDTH = 280;
+const MAX_NODE_CODE_WIDTH = 900;
+const MIN_NODE_CODE_HEIGHT = 120;
+const MAX_NODE_CODE_HEIGHT = 600;
+const NODE_CODE_ANCHOR = '&#8203;';
+function parseNodeCodeBlocks(markdown) {
+    return parseFences(markdown).map((_a) => {
+        var block = __rest(_a, ["startLine", "endLine"]);
+        return block;
+    });
+}
+function isNodeCodeFenceOpening(line) {
+    return Boolean(readOpeningFence(line) || readNodeCodeSize(line));
+}
+function readFencedCodeBlock(lines, start) {
+    if (!isNodeCodeFenceOpening(lines[start] || ''))
+        return null;
+    const source = lines.slice(start).join('\n');
+    const block = parseFences(source)[0];
+    if (!block || block.start !== 0)
+        return null;
+    return {
+        text: block.markdown,
+        end: start + block.endLine + 1,
+    };
+}
+function createNodeCodeMarkdown(language, code, size) {
+    const normalizedLanguage = normalizeNodeCodeLanguage(language);
+    const normalizedCode = normalizeCode(code);
+    const fenceLength = Math.max(3, longestRun(normalizedCode, '`') + 1);
+    const fence = '`'.repeat(fenceLength);
+    const body = normalizedCode.endsWith('\n') || !normalizedCode
+        ? normalizedCode
+        : `${normalizedCode}\n`;
+    const codeMarkdown = `${fence}${normalizedLanguage}\n${body}${fence}`;
+    const normalizedSize = normalizeNodeCodeSize(size);
+    return normalizedSize
+        ? `<!-- mm-code-size: ${normalizedSize.width}x${normalizedSize.height} -->\n${codeMarkdown}`
+        : codeMarkdown;
+}
+function normalizeNodeCodeSize(size) {
+    if (!size || !Number.isFinite(size.width) || !Number.isFinite(size.height))
+        return undefined;
+    return {
+        width: Math.round(Math.max(MIN_NODE_CODE_WIDTH, Math.min(MAX_NODE_CODE_WIDTH, size.width))),
+        height: Math.round(Math.max(MIN_NODE_CODE_HEIGHT, Math.min(MAX_NODE_CODE_HEIGHT, size.height))),
+    };
+}
+function serializeMindMapNodeWithCode(markdown, ownerPrefix, continuationIndent, ending = '') {
+    const content = markdown.trim();
+    const firstCode = parseNodeCodeBlocks(content)[0];
+    if (!firstCode)
+        return null;
+    const leadingText = content.slice(0, firstCode.start).trim();
+    const ownerText = leadingText
+        ? leadingText.replace(/(?:\r?\n)+/g, '<br>')
+        : NODE_CODE_ANCHOR;
+    const body = content.slice(firstCode.start).replace(/\r\n/g, '\n');
+    const bodyLines = body.split('\n').map((line) => `${continuationIndent}${line}`);
+    return `${ownerPrefix}${ownerText}${ending}\n${bodyLines.join('\n')}\n`;
+}
+function normalizeNodeCodeLanguage(language) {
+    var _a;
+    return ((_a = language.trim().split(/\s+/)[0]) === null || _a === void 0 ? void 0 : _a.replace(/[^A-Za-z0-9_+#.\-]/g, '')) || '';
+}
+function protectMindMapCodeBlocks(markdown) {
+    const lines = markdown.split(/\r?\n/);
+    const source = lines.join('\n');
+    const fences = parseFences(source);
+    const blocks = new Map();
+    if (!fences.length)
+        return { markdown, blocks };
+    const fenceLines = new Set();
+    fences.forEach((fence) => {
+        for (let index = fence.startLine; index <= fence.endLine; index++)
+            fenceLines.add(index);
+    });
+    const nodeLines = lines
+        .map((line, index) => ({ line, index }))
+        .filter(({ line, index }) => !fenceLines.has(index) && isNodeLine(line))
+        .map(({ index }) => index);
+    const sections = nodeLines.map((ownerIndex, index) => {
+        var _a;
+        return ({
+            ownerIndex,
+            end: (_a = nodeLines[index + 1]) !== null && _a !== void 0 ? _a : lines.length,
+        });
+    }).filter(({ ownerIndex, end }) => (fences.some((fence) => fence.startLine > ownerIndex && fence.startLine < end)));
+    sections.reverse().forEach(({ ownerIndex, end }) => {
+        const bodyLines = trimOuterBlankLines$1(lines.slice(ownerIndex + 1, end));
+        if (!bodyLines.length)
+            return;
+        const marker = createMarker(blocks, markdown);
+        blocks.set(marker, removeSharedIndent(bodyLines).join('\n'));
+        lines[ownerIndex] = appendMarker$1(lines[ownerIndex], marker);
+        lines.splice(ownerIndex + 1, end - ownerIndex - 1);
+    });
+    return { markdown: lines.join('\n'), blocks };
+}
+function restoreProtectedMindMapCodeBlocks(text, blocks) {
+    let restored = text;
+    blocks.forEach((body, marker) => {
+        restored = restored.replace(new RegExp(`[ \\t]*${escapeRegExp(marker)}[ \\t]*`), `\n\n${body}`);
+    });
+    return restored.replace(NODE_CODE_ANCHOR, '').trim();
+}
+function parseFences(markdown) {
+    const lines = splitMarkdownLines(markdown);
+    const blocks = [];
+    let index = 0;
+    while (index < lines.length) {
+        const opening = readOpeningFence(lines[index].text);
+        if (!opening) {
+            index++;
+            continue;
+        }
+        const closingIndex = findClosingFence(lines, index + 1, opening.character, opening.length);
+        if (closingIndex < 0) {
+            break;
+        }
+        const closing = lines[closingIndex];
+        const size = index > 0 ? readNodeCodeSize(lines[index - 1].text) : undefined;
+        const startLine = size ? index - 1 : index;
+        const contentStart = lines[index].fullEnd;
+        const contentEnd = closing.start;
+        const rawCode = markdown.slice(contentStart, contentEnd).replace(/\r\n/g, '\n');
+        const code = rawCode.endsWith('\n') ? rawCode.slice(0, -1) : rawCode;
+        blocks.push({
+            markdown: markdown.slice(lines[startLine].start, closing.end),
+            language: normalizeNodeCodeLanguage(opening.info),
+            code,
+            fenceCharacter: opening.character,
+            fenceLength: opening.length,
+            start: lines[startLine].start,
+            end: closing.end,
+            size,
+            startLine,
+            endLine: closingIndex,
+        });
+        index = closingIndex + 1;
+    }
+    return blocks;
+}
+function readNodeCodeSize(line) {
+    const match = line.match(CODE_SIZE_PATTERN);
+    if (!match)
+        return undefined;
+    return normalizeNodeCodeSize({ width: Number(match[1]), height: Number(match[2]) });
+}
+function splitMarkdownLines(markdown) {
+    const lines = [];
+    const pattern = /.*?(?:\r\n|\n|$)/g;
+    let match;
+    while ((match = pattern.exec(markdown)) && match[0]) {
+        const full = match[0];
+        const text = full.replace(/\r?\n$/, '');
+        lines.push({
+            text,
+            start: match.index,
+            end: match.index + text.length,
+            fullEnd: match.index + full.length,
+        });
+    }
+    return lines;
+}
+function readOpeningFence(line) {
+    const match = line.match(/^[ \t]*(`{3,}|~{3,})([^\r\n]*)$/);
+    if (!match)
+        return null;
+    if (match[1][0] === '`' && match[2].includes('`'))
+        return null;
+    return {
+        character: match[1][0],
+        length: match[1].length,
+        info: match[2].trim(),
+    };
+}
+function findClosingFence(lines, start, character, minimumLength) {
+    const pattern = new RegExp(`^[ \\t]*${escapeRegExp(character)}{${minimumLength},}[ \\t]*$`);
+    for (let index = start; index < lines.length; index++) {
+        if (pattern.test(lines[index].text))
+            return index;
+    }
+    return -1;
+}
+function normalizeCode(code) {
+    return code.replace(/\r\n?/g, '\n');
+}
+function longestRun(value, character) {
+    const matches = value.match(new RegExp(`${escapeRegExp(character)}+`, 'g')) || [];
+    return matches.reduce((longest, match) => Math.max(longest, match.length), 0);
+}
+function isNodeLine(line) {
+    return /^\s{0,3}#{1,6}\s+/.test(line) || /^\s*(?:[-+*]|\d+[.)])(?:\s+|$)/.test(line);
+}
+function appendMarker$1(line, marker) {
+    var _a;
+    const collapsedId = ((_a = line.match(COLLAPSED_NODE_ID)) === null || _a === void 0 ? void 0 : _a[0]) || '';
+    const content = collapsedId ? line.slice(0, -collapsedId.length) : line;
+    return `${content} ${marker}${collapsedId}`;
+}
+function createMarker(blocks, markdown) {
+    let index = blocks.size;
+    let marker = '';
+    do {
+        marker = `${CODE_MARKER_PREFIX}${index++}${CODE_MARKER_SUFFIX}`;
+    } while (blocks.has(marker) || markdown.includes(marker));
+    return marker;
+}
+function trimOuterBlankLines$1(lines) {
+    const trimmed = [...lines];
+    while (trimmed.length && !trimmed[0].trim())
+        trimmed.shift();
+    while (trimmed.length && !trimmed[trimmed.length - 1].trim())
+        trimmed.pop();
+    return trimmed;
+}
+function removeSharedIndent(lines) {
+    const indents = lines
+        .filter((line) => line.trim())
+        .map((line) => { var _a; return ((_a = line.match(/^[ \t]*/)) === null || _a === void 0 ? void 0 : _a[0].length) || 0; });
+    const indent = indents.length ? Math.min(...indents) : 0;
+    return lines.map((line) => line.slice(indent));
+}
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const DEFAULT_NODE_CODE_FONT_SIZE = 14;
+const MIN_NODE_CODE_FONT_SIZE = 10;
+const MAX_NODE_CODE_FONT_SIZE = 24;
+function normalizeNodeCodeFontSize(value) {
+    const fontSize = Number(value);
+    if (!Number.isSafeInteger(fontSize)
+        || fontSize < MIN_NODE_CODE_FONT_SIZE
+        || fontSize > MAX_NODE_CODE_FONT_SIZE) {
+        return DEFAULT_NODE_CODE_FONT_SIZE;
+    }
+    return fontSize;
+}
+
+function createHighlightedCodePre(ownerDocument, language, code, sourcePath, component) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const staged = ownerDocument.createElement('div');
+        yield obsidian.MarkdownRenderer.renderMarkdown(createNodeCodeMarkdown(language, code), staged, sourcePath, component);
+        const pre = staged.querySelector('pre');
+        if (!(pre instanceof HTMLElement)) {
+            throw new Error('Obsidian did not render the node code block');
+        }
+        pre.querySelectorAll('.copy-code-button').forEach((button) => button.remove());
+        return pre;
+    });
+}
+
+const COMMON_CODE_LANGUAGES = [
+    'text',
+    'python',
+    'javascript',
+    'typescript',
+    'java',
+    'c',
+    'cpp',
+    'csharp',
+    'go',
+    'rust',
+    'shell',
+    'powershell',
+    'sql',
+    'json',
+    'yaml',
+    'html',
+    'css',
+    'markdown',
+];
+class NodeCodeEditorModal extends obsidian.Modal {
+    constructor(app, options) {
+        super(app);
+        this.previewTimer = null;
+        this.previewVersion = 0;
+        this.previewComponent = null;
+        this.composing = false;
+        this.settled = false;
+        this.handleCodeKeydown = (event) => {
+            if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                event.preventDefault();
+                const start = this.codeInput.selectionStart;
+                const end = this.codeInput.selectionEnd;
+                this.codeInput.setRangeText('  ', start, end, 'end');
+                this.schedulePreview();
+                return;
+            }
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                this.submit();
+            }
+        };
+        this.handleCodeInput = () => {
+            if (!this.composing)
+                this.schedulePreview();
+        };
+        this.handleLanguageInput = () => this.schedulePreview();
+        this.handleCompositionStart = () => {
+            var _a;
+            this.composing = true;
+            (_a = this.codeInput.parentElement) === null || _a === void 0 ? void 0 : _a.classList.add('is-composing');
+        };
+        this.handleCompositionEnd = () => {
+            var _a;
+            this.composing = false;
+            (_a = this.codeInput.parentElement) === null || _a === void 0 ? void 0 : _a.classList.remove('is-composing');
+            this.schedulePreview(0);
+        };
+        this.syncPreviewScroll = () => {
+            if (!this.previewEl)
+                return;
+            this.previewEl.scrollTop = this.codeInput.scrollTop;
+            this.previewEl.scrollLeft = this.codeInput.scrollLeft;
+        };
+        this.shouldRestoreSelection = false;
+        this.options = options;
+    }
+    onOpen() {
+        var _a, _b;
+        this.setTitle(this.options.value ? t('Edit code block') : t('Insert code block'));
+        this.modalEl.classList.add('mm-node-code-editor-modal');
+        this.modalEl.style.setProperty('--mm-code-font-size', `${normalizeNodeCodeFontSize(this.options.fontSize)}px`);
+        const languageField = this.contentEl.createDiv({ cls: 'mm-node-code-editor-field' });
+        languageField.createEl('label', { text: t('Code language') });
+        this.languageInput = languageField.createEl('input', {
+            type: 'text',
+            value: ((_a = this.options.value) === null || _a === void 0 ? void 0 : _a.language) || '',
+            attr: {
+                placeholder: t('Plain text'),
+                autocomplete: 'off',
+                list: 'mm-node-code-language-list',
+            },
+        });
+        const languageList = languageField.createEl('datalist', { attr: { id: 'mm-node-code-language-list' } });
+        COMMON_CODE_LANGUAGES.forEach((language) => languageList.createEl('option', { value: language }));
+        const codeField = this.contentEl.createDiv({ cls: 'mm-node-code-editor-field' });
+        codeField.createEl('label', { text: t('Code') });
+        const workspace = codeField.createDiv({ cls: 'mm-node-code-editor-workspace' });
+        this.previewEl = workspace.createDiv({ cls: 'mm-node-code-editor-preview' });
+        this.previewEl.setAttribute('aria-hidden', 'true');
+        this.codeInput = workspace.createEl('textarea', {
+            text: ((_b = this.options.value) === null || _b === void 0 ? void 0 : _b.code) || '',
+            attr: {
+                rows: '16',
+                spellcheck: 'false',
+                'aria-label': t('Code'),
+            },
+        });
+        this.codeInput.addEventListener('keydown', this.handleCodeKeydown);
+        this.codeInput.addEventListener('input', this.handleCodeInput);
+        this.codeInput.addEventListener('scroll', this.syncPreviewScroll);
+        this.codeInput.addEventListener('compositionstart', this.handleCompositionStart);
+        this.codeInput.addEventListener('compositionend', this.handleCompositionEnd);
+        this.languageInput.addEventListener('input', this.handleLanguageInput);
+        const actions = this.contentEl.createDiv({ cls: 'mm-insert-actions mm-node-code-editor-actions' });
+        if (this.options.onDelete) {
+            const remove = actions.createEl('button', { text: t('Delete code block') });
+            remove.classList.add('mod-warning', 'mm-node-code-delete');
+            remove.addEventListener('click', () => {
+                var _a, _b;
+                this.settled = true;
+                (_b = (_a = this.options).onDelete) === null || _b === void 0 ? void 0 : _b.call(_a);
+                this.close();
+            });
+        }
+        const spacer = actions.createDiv({ cls: 'mm-node-code-action-spacer' });
+        spacer.setAttribute('aria-hidden', 'true');
+        const cancel = actions.createEl('button', { text: t('Cancel') });
+        cancel.addEventListener('click', () => this.close());
+        const save = actions.createEl('button', {
+            text: this.options.value ? t('Save') : t('Insert'),
+        });
+        save.classList.add('mod-cta');
+        save.addEventListener('click', () => this.submit());
+        this.schedulePreview(0);
+        requestAnimationFrame(() => this.codeInput.focus());
+    }
+    onClose() {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+        (_a = this.codeInput) === null || _a === void 0 ? void 0 : _a.removeEventListener('keydown', this.handleCodeKeydown);
+        (_b = this.codeInput) === null || _b === void 0 ? void 0 : _b.removeEventListener('input', this.handleCodeInput);
+        (_c = this.codeInput) === null || _c === void 0 ? void 0 : _c.removeEventListener('scroll', this.syncPreviewScroll);
+        (_d = this.codeInput) === null || _d === void 0 ? void 0 : _d.removeEventListener('compositionstart', this.handleCompositionStart);
+        (_e = this.codeInput) === null || _e === void 0 ? void 0 : _e.removeEventListener('compositionend', this.handleCompositionEnd);
+        (_f = this.languageInput) === null || _f === void 0 ? void 0 : _f.removeEventListener('input', this.handleLanguageInput);
+        if (this.previewTimer !== null)
+            window.clearTimeout(this.previewTimer);
+        this.previewVersion++;
+        (_g = this.previewComponent) === null || _g === void 0 ? void 0 : _g.unload();
+        this.previewComponent = null;
+        this.contentEl.empty();
+        if (!this.settled)
+            (_j = (_h = this.options).onCancel) === null || _j === void 0 ? void 0 : _j.call(_h);
+    }
+    schedulePreview(delay = 24) {
+        if (this.previewTimer !== null)
+            window.clearTimeout(this.previewTimer);
+        this.previewTimer = window.setTimeout(() => {
+            this.previewTimer = null;
+            void this.renderPreview();
+        }, delay);
+    }
+    renderPreview() {
+        var _a, _b, _c;
+        return __awaiter(this, void 0, void 0, function* () {
+            const version = ++this.previewVersion;
+            const component = new obsidian.Component();
+            component.load();
+            try {
+                const pre = yield createHighlightedCodePre(this.previewEl.ownerDocument, normalizeNodeCodeLanguage(this.languageInput.value), this.codeInput.value, this.options.sourcePath || '', component);
+                if (!this.previewEl.isConnected || version !== this.previewVersion) {
+                    component.unload();
+                    return;
+                }
+                (_a = this.previewComponent) === null || _a === void 0 ? void 0 : _a.unload();
+                this.previewComponent = component;
+                this.previewEl.replaceChildren(pre);
+                (_b = this.codeInput.parentElement) === null || _b === void 0 ? void 0 : _b.classList.remove('has-render-error');
+                this.syncPreviewScroll();
+            }
+            catch (error) {
+                component.unload();
+                if (this.previewEl.isConnected && version === this.previewVersion) {
+                    (_c = this.codeInput.parentElement) === null || _c === void 0 ? void 0 : _c.classList.add('has-render-error');
+                }
+                console.error('Failed to render node code preview', error);
+            }
+        });
+    }
+    submit() {
+        if (!this.codeInput.value.trim()) {
+            new obsidian.Notice(t('Code cannot be empty'));
+            this.codeInput.focus();
+            return;
+        }
+        this.settled = true;
+        this.options.onSubmit({
+            language: normalizeNodeCodeLanguage(this.languageInput.value),
+            code: this.codeInput.value,
+        });
+        this.close();
+    }
+}
+
+class NodeCodeController {
+    constructor(options) {
+        this.selectedEditEl = null;
+        this.previewCards = [];
+        this.resizeState = null;
+        this.layoutFrame = null;
+        this.highlightVersions = new WeakMap();
+        this.handleContentPointerDown = (event) => {
+            const target = event.target;
+            if (target instanceof Element && !target.closest('.mm-node-code-attachment')) {
+                this.clearEditSelection();
+            }
+        };
+        this.moveResize = (event) => {
+            const state = this.resizeState;
+            if (!state || event.pointerId !== state.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const scale = Math.max(0.01, this.options.getScale());
+            const size = normalizeNodeCodeSize({
+                width: state.startWidth + (event.clientX - state.startX) / scale,
+                height: state.startHeight + (event.clientY - state.startY) / scale,
+            });
+            if (!size)
+                return;
+            const moved = Math.abs(event.clientX - state.startX) > 1
+                || Math.abs(event.clientY - state.startY) > 1;
+            if (!moved)
+                return;
+            state.moved = true;
+            this.applyCardSize(state.card, size);
+            this.requestLayout();
+        };
+        this.commitResize = (event) => {
+            if (!this.resizeState || event.pointerId !== this.resizeState.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.finishResize(true);
+        };
+        this.cancelResize = (event) => {
+            if (!this.resizeState || event.pointerId !== this.resizeState.pointerId)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.finishResize(false);
+        };
+        this.options = options;
+        this.options.contentEl.addEventListener('pointerdown', this.handleContentPointerDown);
+    }
+    destroy() {
+        this.finishResize(false);
+        if (this.layoutFrame !== null)
+            cancelAnimationFrame(this.layoutFrame);
+        this.clearPreview();
+        this.clearEditSelection();
+        this.options.contentEl.removeEventListener('pointerdown', this.handleContentPointerDown);
+    }
+    attachPreview(blocks) {
+        this.clearPreview();
+        const renderedBlocks = Array.from(this.options.contentEl.querySelectorAll('pre'));
+        renderedBlocks.slice(0, blocks.length).forEach((pre, index) => {
+            if (!(pre instanceof HTMLElement) || pre.closest('.mm-node-code-card'))
+                return;
+            pre.querySelectorAll('.copy-code-button').forEach((button) => button.remove());
+            const card = this.options.contentEl.ownerDocument.createElement('div');
+            card.classList.add('mm-node-code-card');
+            pre.before(card);
+            card.appendChild(pre);
+            this.decorateCard(card, pre, blocks[index]);
+            this.applyCardSize(card, blocks[index].size);
+            this.previewCards.push(card);
+        });
+    }
+    clearPreview() {
+        this.previewCards.forEach((card) => {
+            const pre = card.querySelector(':scope > pre');
+            if (pre && card.parentElement) {
+                card.before(pre);
+                card.remove();
+            }
+        });
+        this.previewCards = [];
+    }
+    createEditable(block) {
+        const card = this.options.contentEl.ownerDocument.createElement('div');
+        card.classList.add('mm-node-code-card', 'mm-node-code-attachment');
+        card.setAttribute('contenteditable', 'false');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('role', 'group');
+        card.setAttribute('aria-label', t('Node code block'));
+        this.writeEditableData(card, { language: block.language, code: block.code }, block.markdown);
+        const pre = card.createEl('pre');
+        const code = pre.createEl('code');
+        this.renderEditableCode(code, block.language, block.code);
+        this.decorateCard(card, pre, block, {
+            onEdit: () => this.openEditAttachment(card),
+        });
+        this.applyCardSize(card, block.size);
+        this.attachResizeHandle(card);
+        card.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.selectEditCode(card);
+        });
+        card.addEventListener('dblclick', (event) => {
+            if (event.target instanceof Element && event.target.closest('.mm-node-code-resize-handle'))
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.selectEditCode(card);
+            this.openEditAttachment(card);
+        });
+        return card;
+    }
+    readEditable(card) {
+        if (!card.classList.contains('mm-node-code-attachment'))
+            return null;
+        const code = card.dataset.codeValue;
+        if (code === undefined)
+            return null;
+        return {
+            language: card.dataset.codeLanguage || '',
+            code,
+        };
+    }
+    serializeEditable(card) {
+        const value = this.readEditable(card);
+        if (!value)
+            return null;
+        if (card.dataset.codeDirty !== 'true' && card.dataset.codeMarkdown !== undefined) {
+            return card.dataset.codeMarkdown;
+        }
+        return createNodeCodeMarkdown(value.language, value.code, this.readCardSize(card));
+    }
+    clearEditSelection() {
+        var _a;
+        (_a = this.selectedEditEl) === null || _a === void 0 ? void 0 : _a.classList.remove('is-selected');
+        this.options.contentEl.classList.remove('mm-node-code-selected');
+        this.selectedEditEl = null;
+    }
+    deleteEditCodeByKeyboard() {
+        const card = this.selectedEditEl;
+        if (!card || !this.options.contentEl.contains(card))
+            return false;
+        this.deleteEditAttachment(card);
+        return true;
+    }
+    refreshOverflowActions() {
+        requestAnimationFrame(() => {
+            if (!this.options.contentEl.isConnected)
+                return;
+            this.options.contentEl.querySelectorAll('.mm-node-code-card').forEach((card) => {
+                this.updateExpandVisibility(card);
+            });
+        });
+    }
+    attachResizeHandle(card) {
+        const handle = card.ownerDocument.createElement('button');
+        handle.type = 'button';
+        handle.classList.add('mm-node-code-resize-handle');
+        handle.setAttribute('aria-label', t('Resize code block'));
+        obsidian.setTooltip(handle, t('Resize code block hint'));
+        handle.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+        handle.addEventListener('dblclick', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.resetCardSize(card);
+        });
+        handle.addEventListener('keydown', (event) => this.handleResizeKeydown(event, card));
+        handle.addEventListener('pointerdown', (event) => this.startResize(event, card, handle));
+        handle.addEventListener('pointermove', this.moveResize);
+        handle.addEventListener('pointerup', this.commitResize);
+        handle.addEventListener('pointercancel', this.cancelResize);
+        card.appendChild(handle);
+    }
+    startResize(event, card, handle) {
+        var _a;
+        if (event.button !== 0 || this.resizeState)
+            return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.selectEditCode(card);
+        const pre = card.querySelector(':scope > pre');
+        if (!(pre instanceof HTMLElement))
+            return;
+        this.resizeState = {
+            pointerId: event.pointerId,
+            card,
+            handle,
+            startX: event.clientX,
+            startY: event.clientY,
+            startWidth: card.offsetWidth,
+            startHeight: pre.offsetHeight,
+            initialSize: this.readCardSize(card),
+            moved: false,
+        };
+        card.classList.add('is-resizing');
+        (_a = handle.setPointerCapture) === null || _a === void 0 ? void 0 : _a.call(handle, event.pointerId);
+    }
+    finishResize(commit) {
+        var _a, _b, _c, _d;
+        const state = this.resizeState;
+        if (!state)
+            return;
+        this.resizeState = null;
+        state.card.classList.remove('is-resizing');
+        if ((_b = (_a = state.handle).hasPointerCapture) === null || _b === void 0 ? void 0 : _b.call(_a, state.pointerId)) {
+            (_d = (_c = state.handle).releasePointerCapture) === null || _d === void 0 ? void 0 : _d.call(_c, state.pointerId);
+        }
+        if (!commit) {
+            this.applyCardSize(state.card, state.initialSize);
+        }
+        else if (state.moved) {
+            state.card.dataset.codeDirty = 'true';
+            this.options.onEditChange();
+        }
+        this.requestLayout();
+    }
+    handleResizeKeydown(event, card) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            event.stopPropagation();
+            this.resetCardSize(card);
+            return;
+        }
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key))
+            return;
+        event.preventDefault();
+        event.stopPropagation();
+        const pre = card.querySelector(':scope > pre');
+        if (!(pre instanceof HTMLElement))
+            return;
+        const current = this.readCardSize(card) || {
+            width: card.offsetWidth,
+            height: pre.offsetHeight,
+        };
+        const step = event.shiftKey ? 5 : 20;
+        const size = normalizeNodeCodeSize({
+            width: current.width + (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0),
+            height: current.height + (event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0),
+        });
+        if (!size)
+            return;
+        this.applyCardSize(card, size);
+        card.dataset.codeDirty = 'true';
+        this.options.onEditChange();
+    }
+    resetCardSize(card) {
+        if (!this.readCardSize(card))
+            return;
+        this.applyCardSize(card, undefined);
+        card.dataset.codeDirty = 'true';
+        this.options.onEditChange();
+    }
+    readCardSize(card) {
+        return normalizeNodeCodeSize({
+            width: Number(card.dataset.codeWidth),
+            height: Number(card.dataset.codeHeight),
+        });
+    }
+    applyCardSize(card, size) {
+        const normalized = normalizeNodeCodeSize(size);
+        card.classList.toggle('has-custom-size', Boolean(normalized));
+        if (!normalized) {
+            delete card.dataset.codeWidth;
+            delete card.dataset.codeHeight;
+            card.style.removeProperty('--mm-code-card-width');
+            card.style.removeProperty('--mm-code-card-height');
+            return;
+        }
+        card.dataset.codeWidth = `${normalized.width}`;
+        card.dataset.codeHeight = `${normalized.height}`;
+        card.style.setProperty('--mm-code-card-width', `${normalized.width}px`);
+        card.style.setProperty('--mm-code-card-height', `${normalized.height}px`);
+    }
+    requestLayout() {
+        if (this.layoutFrame !== null)
+            return;
+        this.layoutFrame = requestAnimationFrame(() => {
+            this.layoutFrame = null;
+            this.options.contentEl.querySelectorAll('.mm-node-code-card').forEach((card) => {
+                this.updateExpandVisibility(card);
+            });
+            this.options.onLayoutChange();
+        });
+    }
+    decorateCard(card, pre, block, actions) {
+        const header = card.ownerDocument.createElement('div');
+        header.classList.add('mm-node-code-header');
+        const language = header.createEl('span', {
+            cls: 'mm-node-code-language',
+            text: block.language || t('Plain text'),
+        });
+        language.setAttribute('aria-hidden', 'true');
+        const controls = header.createDiv({ cls: 'mm-node-code-controls' });
+        controls.setAttribute('role', 'toolbar');
+        controls.setAttribute('aria-label', t('Code block controls'));
+        const copy = this.createIconButton(controls, 'copy', t('Copy code'), () => {
+            const value = this.readEditable(card) || block;
+            void this.copyCode(value.code, copy);
+        });
+        const expand = this.createIconButton(controls, 'expand', t('Expand code'), () => {
+            const value = this.readEditable(card) || block;
+            new NodeCodeExpandedModal(this.options.app, value.language, value.code, this.options.getSourcePath(), this.options.getFontSize()).open();
+        });
+        expand.classList.add('mm-node-code-expand');
+        expand.hidden = true;
+        if (actions) {
+            this.createIconButton(controls, 'pencil', t('Edit code block'), actions.onEdit);
+        }
+        card.prepend(header);
+        requestAnimationFrame(() => {
+            if (!card.isConnected)
+                return;
+            this.updateExpandVisibility(card);
+            this.options.onLayoutChange();
+        });
+    }
+    updateExpandVisibility(card) {
+        const pre = card.querySelector(':scope > pre');
+        const expand = card.querySelector('.mm-node-code-expand');
+        if (!(pre instanceof HTMLElement) || !(expand instanceof HTMLButtonElement))
+            return;
+        expand.hidden = !(pre.scrollHeight > pre.clientHeight + 1 || pre.scrollWidth > pre.clientWidth + 1);
+    }
+    createIconButton(parent, icon, label, onClick) {
+        const button = parent.ownerDocument.createElement('button');
+        button.type = 'button';
+        button.setAttribute('aria-label', label);
+        obsidian.setIcon(button, icon);
+        obsidian.setTooltip(button, label);
+        button.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onClick();
+        });
+        parent.appendChild(button);
+        return button;
+    }
+    copyCode(code, button) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield navigator.clipboard.writeText(code);
+                obsidian.setIcon(button, 'check');
+                button.setAttribute('aria-label', t('Code copied'));
+                setTimeout(() => {
+                    if (!button.isConnected)
+                        return;
+                    obsidian.setIcon(button, 'copy');
+                    button.setAttribute('aria-label', t('Copy code'));
+                }, 1200);
+            }
+            catch (error) {
+                new obsidian.Notice(t('Failed to copy code'));
+            }
+        });
+    }
+    openEditAttachment(card) {
+        const value = this.readEditable(card);
+        if (!value)
+            return;
+        new NodeCodeEditorModal(this.options.app, {
+            value,
+            fontSize: this.options.getFontSize(),
+            sourcePath: this.options.getSourcePath(),
+            onSubmit: (nextValue) => {
+                if (!this.options.contentEl.contains(card))
+                    return;
+                this.writeEditableData(card, nextValue);
+                card.dataset.codeDirty = 'true';
+                const code = card.querySelector('code');
+                if (code instanceof HTMLElement) {
+                    this.renderEditableCode(code, nextValue.language, nextValue.code);
+                }
+                const language = card.querySelector('.mm-node-code-language');
+                if (language instanceof HTMLElement)
+                    language.innerText = nextValue.language || t('Plain text');
+                this.options.onEditChange();
+                this.refreshOverflowActions();
+                this.selectEditCode(card);
+            },
+            onDelete: () => {
+                if (this.options.contentEl.contains(card))
+                    this.deleteEditAttachment(card);
+            },
+            onCancel: () => {
+                if (card.isConnected)
+                    this.selectEditCode(card);
+            },
+        }).open();
+    }
+    deleteEditAttachment(card) {
+        if (this.selectedEditEl === card)
+            this.clearEditSelection();
+        card.remove();
+        this.options.onEditDelete();
+    }
+    selectEditCode(card) {
+        this.clearEditSelection();
+        this.options.onSelectEditCode();
+        this.selectedEditEl = card;
+        card.classList.add('is-selected');
+        this.options.contentEl.classList.add('mm-node-code-selected');
+        card.focus();
+    }
+    writeEditableData(card, value, originalMarkdown) {
+        card.dataset.codeLanguage = value.language;
+        card.dataset.codeValue = value.code;
+        if (originalMarkdown !== undefined)
+            card.dataset.codeMarkdown = originalMarkdown;
+    }
+    renderEditableCode(codeEl, language, code) {
+        codeEl.className = language ? `language-${language}` : '';
+        codeEl.textContent = code;
+        const version = (this.highlightVersions.get(codeEl) || 0) + 1;
+        this.highlightVersions.set(codeEl, version);
+        void createHighlightedCodePre(codeEl.ownerDocument, language, code, this.options.getSourcePath(), this.options.component).then((renderedPre) => {
+            if (!codeEl.isConnected || this.highlightVersions.get(codeEl) !== version)
+                return;
+            const renderedCode = renderedPre.querySelector('code');
+            if (!(renderedCode instanceof HTMLElement))
+                return;
+            codeEl.className = renderedCode.className;
+            codeEl.replaceChildren(...Array.from(renderedCode.childNodes));
+            this.refreshOverflowActions();
+            this.options.onLayoutChange();
+        }).catch((error) => {
+            console.error('Failed to highlight node code block', error);
+        });
+    }
+}
+class NodeCodeExpandedModal extends obsidian.Modal {
+    constructor(app, language, code, sourcePath, fontSize) {
+        super(app);
+        this.renderComponent = null;
+        this.shouldRestoreSelection = false;
+        this.language = language;
+        this.code = code;
+        this.sourcePath = sourcePath;
+        this.fontSize = fontSize;
+    }
+    onOpen() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.setTitle(this.language ? `${t('Code preview')} · ${this.language}` : t('Code preview'));
+            this.modalEl.classList.add('mm-node-code-expanded-modal');
+            this.modalEl.style.setProperty('--mm-code-font-size', `${normalizeNodeCodeFontSize(this.fontSize)}px`);
+            const component = new obsidian.Component();
+            component.load();
+            this.renderComponent = component;
+            try {
+                const pre = yield createHighlightedCodePre(this.contentEl.ownerDocument, this.language, this.code, this.sourcePath, component);
+                if (this.contentEl.isConnected && this.renderComponent === component) {
+                    this.contentEl.appendChild(pre);
+                }
+            }
+            catch (error) {
+                component.unload();
+                if (this.renderComponent === component)
+                    this.renderComponent = null;
+                console.error('Failed to render expanded node code block', error);
+            }
+        });
+    }
+    onClose() {
+        var _a;
+        (_a = this.renderComponent) === null || _a === void 0 ? void 0 : _a.unload();
+        this.renderComponent = null;
+        this.contentEl.empty();
+    }
+}
+
 function keepLastIndex(dom) {
     if (window.getSelection) { //ie11 10 9 ff safari
         dom.focus(); //ff
@@ -1823,6 +2804,29 @@ class Node$1 {
             contentEl: this.contentEl,
             onMove: (imageEl, boundary) => this.moveEditImageToBoundary(imageEl, boundary),
         });
+        this.codeController = new NodeCodeController({
+            app: this.mindmap.view.app,
+            component: this.mindmap.view,
+            contentEl: this.contentEl,
+            getSourcePath: () => this.mindmap.path || '',
+            getFontSize: () => this.mindmap.setting.codeFontSize,
+            getScale: () => (this.mindmap.mindScale || 100) / 100,
+            onEditChange: () => {
+                this._editStructureChanged = true;
+                this.refreshEditingLayout();
+            },
+            onEditDelete: () => {
+                this._editStructureChanged = true;
+                this.normalizeEditContentAfterAttachmentDelete();
+                this.refreshEditingLayout();
+            },
+            onSelectEditCode: () => this.clearSelectedEditImage(),
+            onLayoutChange: () => {
+                this.clearCacheData();
+                this.refreshBox();
+                this.mindmap && this.mindmap.emit('renderEditNode', { node: this });
+            },
+        });
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
         this.autoWrapController = new NodeAutoWrapController({
@@ -1860,7 +2864,7 @@ class Node$1 {
         this.containEl.appendChild(this._barDom);
     }
     parseText() {
-        var _a, _b;
+        var _a, _b, _c, _d;
         return __awaiter(this, void 0, void 0, function* () {
             if (this.data.text.length === 0) {
                 this.data.text = "Sub title";
@@ -1882,10 +2886,12 @@ class Node$1 {
             if (renderVersion !== this._renderVersion)
                 return;
             (_a = this.tablePreview) === null || _a === void 0 ? void 0 : _a.destroy();
+            (_b = this.codeController) === null || _b === void 0 ? void 0 : _b.clearPreview();
             this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
             this.data.mdText = this.contentEl.innerHTML;
             this.attachTablePreview();
-            (_b = this.autoWrapController) === null || _b === void 0 ? void 0 : _b.refresh();
+            (_c = this.codeController) === null || _c === void 0 ? void 0 : _c.attachPreview(parseNodeCodeBlocks(text));
+            (_d = this.autoWrapController) === null || _d === void 0 ? void 0 : _d.refresh();
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', { node: this });
             this._delay();
@@ -2115,14 +3121,16 @@ class Node$1 {
         this._oldText = this.data.text;
         const markdown = getNodeAutoWrapContent(this.data.text);
         var editData = parseNodeMarkdown(markdown);
+        const codeBlocks = parseNodeCodeBlocks(markdown);
+        const editableLinks = editData.links.filter((link) => !this.isRangeInsideCodeBlock(link.start, link.end, codeBlocks));
         this._editText = editData.text;
-        this._editLinks = editData.links;
+        this._editLinks = editableLinks;
         this._editStructureChanged = false;
         //var _t =  this.data.text.replace(/\r\n/g,"<br/>")
         // _t = _t.replace(/\n/g,"<br/>");
         //  console.log(_t);
-        this.renderEditableContent(markdown, editData.links);
-        this.renderLinkLayer(editData.links);
+        this.renderEditableContent(markdown, editableLinks);
+        this.renderLinkLayer(editableLinks);
         this.contentEl.setAttribute('contentEditable', 'true');
         this.mindmap.editNode = this;
         this.data.isEdit = true;
@@ -2454,7 +3462,7 @@ class Node$1 {
         //selection.removeAllRanges();
     }
     cancelEdit() {
-        var _a, _b;
+        var _a, _b, _c;
         console.log("CancelEdit");
         (_a = this.imageReorderController) === null || _a === void 0 ? void 0 : _a.cancel();
         var text = this.getMarkdownFromEditedText();
@@ -2472,10 +3480,11 @@ class Node$1 {
         this._editLinks = [];
         this._editStructureChanged = false;
         this.clearSelectedEditImage();
+        (_b = this.codeController) === null || _b === void 0 ? void 0 : _b.clearEditSelection();
         if (this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.remove('mm-edit-node');
         }
-        (_b = this.mindmap.view) === null || _b === void 0 ? void 0 : _b.insertController.endEdit(this);
+        (_c = this.mindmap.view) === null || _c === void 0 ? void 0 : _c.insertController.endEdit(this);
         if (text != this._oldText) {
             this.mindmap.execute('changeNodeText', {
                 node: this,
@@ -2507,20 +3516,31 @@ class Node$1 {
         const width = getNodeAutoWrapWidth(this._oldText || this.data.text);
         return width ? setNodeAutoWrapWidth(markdown, width) : markdown;
     }
+    isRangeInsideCodeBlock(start, end, blocks) {
+        return blocks.some((block) => start >= block.start && end <= block.end);
+    }
     renderEditableContent(markdown, links) {
         this.contentEl.innerHTML = '';
-        const images = parseNodeImages(markdown);
+        const codeBlocks = parseNodeCodeBlocks(markdown);
+        const images = parseNodeImages(markdown).filter((image) => !this.isRangeInsideCodeBlock(image.start, image.end, codeBlocks));
         const items = [
             ...links.map((link) => ({ type: 'link', start: link.start, end: link.end })),
             ...images.map((image) => ({ type: 'image', start: image.start, end: image.end, image })),
+            ...codeBlocks.map((code) => ({ type: 'code', start: code.start, end: code.end, code })),
         ].sort((a, b) => a.start - b.start);
         let textStart = 0;
         items.forEach((item) => {
+            var _a;
             if (item.start < textStart)
                 return;
             this.appendEditableText(markdown.slice(textStart, item.start));
             if (item.type === 'image') {
                 this.contentEl.appendChild(this.createEditableImage(item.image));
+            }
+            else if (item.type === 'code') {
+                const codeEl = (_a = this.codeController) === null || _a === void 0 ? void 0 : _a.createEditable(item.code);
+                if (codeEl)
+                    this.contentEl.appendChild(codeEl);
             }
             textStart = item.end;
         });
@@ -2622,7 +3642,9 @@ class Node$1 {
         return image.target;
     }
     selectEditImage(imageEl) {
+        var _a;
         this.clearSelectedEditImage();
+        (_a = this.codeController) === null || _a === void 0 ? void 0 : _a.clearEditSelection();
         this._selectedEditImageEl = imageEl;
         imageEl.classList.add('is-selected');
         this.contentEl.classList.add('mm-node-image-selected');
@@ -2641,6 +3663,10 @@ class Node$1 {
         }
         this.deleteEditImageElement(imageEl);
         return true;
+    }
+    deleteEditAttachmentByKeyboard(key) {
+        var _a;
+        return Boolean((_a = this.codeController) === null || _a === void 0 ? void 0 : _a.deleteEditCodeByKeyboard()) || this.deleteEditImageByKeyboard(key);
     }
     getImageForKeyboardDelete(key) {
         var _a;
@@ -2677,7 +3703,7 @@ class Node$1 {
         this.clearSelectedEditImage();
         imageEl.remove();
         this._editStructureChanged = true;
-        this.normalizeEditContentAfterImageDelete();
+        this.normalizeEditContentAfterAttachmentDelete();
         this.refreshEditingLayout();
     }
     moveEditImageToBoundary(imageEl, boundary) {
@@ -2718,10 +3744,10 @@ class Node$1 {
         this.moveEditImageToPosition(imageEl, position);
         return true;
     }
-    normalizeEditContentAfterImageDelete() {
+    normalizeEditContentAfterAttachmentDelete() {
         const text = this.getEditedContentMarkdown().trim();
-        const hasImage = Boolean(this.contentEl.querySelector('.mm-node-image-attachment'));
-        if (!text && !hasImage) {
+        const hasAttachment = Boolean(this.contentEl.querySelector('.mm-node-image-attachment, .mm-node-code-attachment'));
+        if (!text && !hasAttachment) {
             this.contentEl.innerText = t('Sub title');
             this.selectText();
             return;
@@ -2805,7 +3831,7 @@ class Node$1 {
     getEditedContentMarkdown() {
         const parts = [];
         this.contentEl.childNodes.forEach((child) => {
-            var _a;
+            var _a, _b;
             if (child instanceof Text) {
                 parts.push(child.textContent || '');
                 return;
@@ -2820,6 +3846,12 @@ class Node$1 {
                 const image = this.readEditedImage(child);
                 if (image)
                     parts.push(createNodeImageMarkdown(image, getNodeImageWidthLimits((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.setting)));
+                return;
+            }
+            if (child.classList.contains('mm-node-code-attachment')) {
+                const markdown = (_b = this.codeController) === null || _b === void 0 ? void 0 : _b.serializeEditable(child);
+                if (markdown)
+                    parts.push(markdown);
                 return;
             }
             parts.push(child.innerText || '');
@@ -2880,9 +3912,10 @@ class Node$1 {
         });
     }
     destroy() {
-        var _a, _b;
-        (_a = this.imageReorderController) === null || _a === void 0 ? void 0 : _a.destroy();
-        (_b = this.autoWrapController) === null || _b === void 0 ? void 0 : _b.destroy();
+        var _a, _b, _c;
+        (_a = this.codeController) === null || _a === void 0 ? void 0 : _a.destroy();
+        (_b = this.imageReorderController) === null || _b === void 0 ? void 0 : _b.destroy();
+        (_c = this.autoWrapController) === null || _c === void 0 ? void 0 : _c.destroy();
     }
     renderLinkLayer(links) {
         this.linkLayerEl.innerHTML = '';
@@ -2976,9 +4009,11 @@ class Node$1 {
             return;
         const rawMarkdown = this.getEditedContentMarkdown().trim() || '';
         const editData = parseNodeMarkdown(rawMarkdown);
+        const codeBlocks = parseNodeCodeBlocks(rawMarkdown);
+        const links = editData.links.filter((link) => !this.isRangeInsideCodeBlock(link.start, link.end, codeBlocks));
         this._editText = editData.text;
-        this._editLinks = [...this._editLinks, ...editData.links];
-        this.renderEditableContent(rawMarkdown, editData.links);
+        this._editLinks = [...this._editLinks, ...links];
+        this.renderEditableContent(rawMarkdown, links);
         this.renderLinkLayer(this._editLinks);
         keepLastIndex(this.contentEl);
     }
@@ -37871,7 +38906,6 @@ const transformer$1 = new browser.Transformer();
 const headingPattern = /^\s{0,3}#{1,6}\s+\S/;
 const listItemPattern = /^\s*(?:[-+*]|\d+[.)])\s+\S/;
 const horizontalRulePattern = /^\s{0,3}(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$/;
-const fencePattern = /^\s{0,3}(`{3,}|~{3,})/;
 const blockquotePattern = /^\s{0,3}>\s?/;
 const blockIdPattern = /\s+\^([a-z0-9-]+)$/i;
 function parseMarkdownNodeForest(markdown) {
@@ -37953,7 +38987,7 @@ function isStructuredLine(line) {
 function isMarkdownBodySyntax(line) {
     const value = line.trim();
     return Boolean(horizontalRulePattern.test(line) ||
-        fencePattern.test(line) ||
+        isNodeCodeFenceOpening(line) ||
         blockquotePattern.test(line) ||
         isMindMapTableDivider(line) ||
         value === '\\[' ||
@@ -37981,13 +39015,8 @@ function skipFrontmatter(lines) {
         : 0;
 }
 function readBodyBlock(lines, start) {
-    var _a;
-    const fence = (_a = lines[start].match(fencePattern)) === null || _a === void 0 ? void 0 : _a[1];
-    if (fence) {
-        const end = findClosingFence(lines, start + 1, fence);
-        return end < 0
-            ? null
-            : { text: lines.slice(start, end + 1).join('\n'), end: end + 1 };
+    if (isNodeCodeFenceOpening(lines[start])) {
+        return readFencedCodeBlock(lines, start);
     }
     if (lines[start].trim() === '\\[') {
         const end = findExactLine(lines, start + 1, '\\]');
@@ -38009,7 +39038,7 @@ function readBodyBlock(lines, start) {
         lines[end].trim() &&
         !horizontalRulePattern.test(lines[end]) &&
         !isStructuredLine(lines[end]) &&
-        !fencePattern.test(lines[end]) &&
+        !isNodeCodeFenceOpening(lines[end]) &&
         lines[end].trim() !== '\\[' &&
         lines[end].trim() !== '$$') {
         end++;
@@ -38072,16 +39101,6 @@ function isEscaped(text, index) {
         slashCount++;
     }
     return slashCount % 2 === 1;
-}
-function findClosingFence(lines, start, opening) {
-    const character = opening[0];
-    const minimumLength = opening.length;
-    const closingPattern = new RegExp(`^\\s{0,3}${character}{${minimumLength},}\\s*$`);
-    for (let index = start; index < lines.length; index++) {
-        if (closingPattern.test(lines[index]))
-            return index;
-    }
-    return -1;
 }
 function findExactLine(lines, start, value) {
     for (let index = start; index < lines.length; index++) {
@@ -38454,7 +39473,7 @@ class NodeKeyboardController {
             return true;
         if (node.data.isEdit &&
             (event.key === 'Backspace' || event.key === 'Delete') &&
-            node.deleteEditImageByKeyboard(event.key)) {
+            node.deleteEditAttachmentByKeyboard(event.key)) {
             this.consume(event);
             return true;
         }
@@ -39711,7 +40730,7 @@ class MindMap {
         this.isComposing = false;
         this.setting = Object.assign(Object.assign({ 
             //canvasSize: 8000,
-            canvasSize: 36000, fontSize: 16, background: 'transparent', color: 'inherit', exportMdModel: 'default', headLevel: 2, layoutDirect: '', showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), setting || {});
+            canvasSize: 36000, fontSize: 16, codeFontSize: DEFAULT_NODE_CODE_FONT_SIZE, background: 'transparent', color: 'inherit', exportMdModel: 'default', headLevel: 2, layoutDirect: '', showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), setting || {});
         this.data = data;
         this.appEl = document.createElement('div');
         this.appEl.classList.add('mm-mindmap');
@@ -39777,6 +40796,7 @@ class MindMap {
         //  this.contentEL.style.color=`${this.setting.color};`;
         this.contentEL.style.background = `${this.setting.background}`;
         this.contentEL.style.fontSize = `${this.setting.fontSize}px`;
+        this.appEl.style.setProperty('--mm-code-font-size', `${normalizeNodeCodeFontSize(this.setting.codeFontSize)}px`);
         const textLimits = getTextNodeWidthLimits(this.setting);
         this.appEl.style.setProperty('--mm-text-node-min-width', `${textLimits.min}px`);
         this.appEl.style.setProperty('--mm-text-node-max-width', `${textLimits.max}px`);
@@ -41085,6 +42105,11 @@ class MindMap {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
                 }
+                const codeNode = serializeMindMapNodeWithCode(n.getData().text, hPrefix + ' ', '', ending);
+                if (codeNode) {
+                    md += codeNode;
+                    return;
+                }
                 md += (hPrefix + ' ');
                 if (table) {
                     md += table.title + ending + '\n\n';
@@ -41099,6 +42124,11 @@ class MindMap {
                     space += '\t';
                 }
                 var text = escapeLeadingOrderedNodeMarker(n.getData().text.trim());
+                const codeNode = serializeMindMapNodeWithCode(text, `${space}- `, `${space}  `, ending);
+                if (codeNode) {
+                    md += codeNode;
+                    return;
+                }
                 if (table) {
                     md += `${space}- ${table.title}${ending}\n`;
                     table.markdown.split('\n').forEach((line) => {
@@ -41113,28 +42143,16 @@ class MindMap {
                         md += `${space}- ${text}${ending}\n`;
                     }
                     else if (lineLength > 1) {
-                        //code
-                        if (text.startsWith('```')) {
-                            md += '\n';
-                            md += `${space}-\n`;
-                            textArr.forEach((t, i) => {
-                                md += `${space}  ${t.trim()}${i === textArr.length - 1 ? ending : ''}\n`;
-                            });
-                            md += '\n';
-                        }
-                        else {
-                            //text
-                            md += `${space}- `;
-                            textArr.forEach((t, i) => {
-                                var contentText = t.trim() || '<br>';
-                                if (i > 0) {
-                                    md += `${space}${contentText}${i === textArr.length - 1 ? ending : ''}\n`;
-                                }
-                                else {
-                                    md += `${contentText}\n`;
-                                }
-                            });
-                        }
+                        md += `${space}- `;
+                        textArr.forEach((t, i) => {
+                            var contentText = t.trim() || '<br>';
+                            if (i > 0) {
+                                md += `${space}${contentText}${i === textArr.length - 1 ? ending : ''}\n`;
+                            }
+                            else {
+                                md += `${contentText}\n`;
+                            }
+                        });
                     }
                 }
                 else {
@@ -41418,6 +42436,32 @@ class NodeMarkdownInsertion {
         this.range = range.cloneRange();
         this.restore();
     }
+    insertBlockNode(node) {
+        const range = this.getUsableRange();
+        range.deleteContents();
+        const hasContentBefore = this.hasMeaningfulContentBefore(range);
+        const fragment = this.editorEl.ownerDocument.createDocumentFragment();
+        if (hasContentBefore) {
+            fragment.appendChild(this.editorEl.ownerDocument.createTextNode('\n\n'));
+        }
+        fragment.appendChild(node);
+        const trailing = this.editorEl.ownerDocument.createTextNode('\n\n');
+        fragment.appendChild(trailing);
+        range.insertNode(fragment);
+        range.setStartAfter(trailing);
+        range.collapse(true);
+        this.range = range.cloneRange();
+        this.restore();
+    }
+    hasMeaningfulContentBefore(range) {
+        const before = this.editorEl.ownerDocument.createRange();
+        before.selectNodeContents(this.editorEl);
+        before.setEnd(range.startContainer, range.startOffset);
+        if (before.toString().trim())
+            return true;
+        const fragment = before.cloneContents();
+        return Boolean(fragment.querySelector('br, .mm-node-image-attachment, .mm-node-code-attachment'));
+    }
     append(markdown) {
         const range = this.createRangeAtEnd();
         const textNode = this.editorEl.ownerDocument.createTextNode(markdown);
@@ -41511,6 +42555,7 @@ class NodeInsertController {
         toolbar.appendChild(this.createButton(doc, 'link', t('Insert external link'), () => this.openExternalLink()));
         toolbar.appendChild(this.createButton(doc, 'file', t('Insert Vault file'), () => this.openVaultFile()));
         toolbar.appendChild(this.createButton(doc, 'image', t('Insert image'), (event) => this.openImageMenu(event), true));
+        toolbar.appendChild(this.createButton(doc, 'code-2', t('Insert code block'), () => this.openCodeBlock()));
         this.toolbarEl = toolbar;
         return toolbar;
     }
@@ -41546,6 +42591,25 @@ class NodeInsertController {
             return;
         const files = this.app.vault.getFiles().filter((file) => !isVaultImage(file));
         this.openFileModal(t('Choose Vault file'), files, session.node, session.insertion, false);
+    }
+    openCodeBlock() {
+        const session = this.getSession();
+        if (!session)
+            return;
+        const modal = new NodeCodeEditorModal(this.app, {
+            fontSize: session.node.mindmap.setting.codeFontSize,
+            sourcePath: session.node.mindmap.path || '',
+            onSubmit: (value) => {
+                this.activeCloseable = null;
+                this.insertCodeBlock(session.node, session.insertion, value.language, value.code);
+            },
+            onCancel: () => {
+                this.activeCloseable = null;
+                this.restoreSession(session.node, session.insertion);
+            },
+        });
+        this.activeCloseable = modal;
+        modal.open();
     }
     openImageMenu(event) {
         const session = this.getSession();
@@ -41727,6 +42791,19 @@ class NodeInsertController {
     }
     refreshNode(node) {
         node.refreshEditText();
+        this.refreshNodeLayout(node);
+    }
+    insertCodeBlock(node, insertion, language, code) {
+        var _a;
+        if (!this.isActiveSession(node, insertion))
+            return;
+        const markdown = createNodeCodeMarkdown(language, code);
+        const block = parseNodeCodeBlocks(markdown)[0];
+        const codeEl = block && ((_a = node.codeController) === null || _a === void 0 ? void 0 : _a.createEditable(block));
+        if (!codeEl)
+            return;
+        insertion.insertBlockNode(codeEl);
+        node._editStructureChanged = true;
         this.refreshNodeLayout(node);
     }
     insertImage(node, insertion, markdown, isSessionActive) {
@@ -44472,7 +45549,8 @@ class MindMapView extends obsidian.TextFileView {
     }
     mdToData(str) {
         var _a;
-        const protectedTables = protectMindMapTables(str);
+        const protectedCode = protectMindMapCodeBlocks(str);
+        const protectedTables = protectMindMapTables(protectedCode.markdown);
         function restoreLegacyFormulaBlankLines(text) {
             if (!text.includes('$$'))
                 return text;
@@ -44512,7 +45590,7 @@ class MindMapView extends obsidian.TextFileView {
             const text = restoreLeadingOrderedNodeMarker(restoreLegacyFormulaBlankLines(rawText));
             var map = {
                 id: id || uuid(),
-                text: restoreProtectedMindMapTables(text, protectedTables.tables),
+                text: restoreProtectedMindMapCodeBlocks(restoreProtectedMindMapTables(text, protectedTables.tables), protectedCode.blocks),
                 children: [],
                 expanded: id ? false : true
             };
@@ -44660,6 +45738,19 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                 });
             });
         });
+        new obsidian.Setting(containerEl)
+            .setName(t('Code font size'))
+            .setDesc(t('Code font size desc'))
+            .addText((text) => {
+            text.setValue(`${normalizeNodeCodeFontSize(this.plugin.settings.codeFontSize)}`);
+            text.inputEl.type = 'number';
+            text.inputEl.min = `${MIN_NODE_CODE_FONT_SIZE}`;
+            text.inputEl.max = `${MAX_NODE_CODE_FONT_SIZE}`;
+            text.inputEl.step = '1';
+            text.inputEl.addEventListener('change', () => {
+                void this.updateCodeFontSize(text.inputEl);
+            });
+        });
         this.renderWidthSetting(containerEl, 'Text node minimum width', 'Text node minimum width desc', 'textNodeMinWidth', 'textNodeMinWidth', 'textNodeMaxWidth');
         this.renderWidthSetting(containerEl, 'Text node maximum width', 'Text node maximum width desc', 'textNodeMaxWidth', 'textNodeMinWidth', 'textNodeMaxWidth');
         this.renderWidthSetting(containerEl, 'Node image minimum width', 'Node image minimum width desc', 'nodeImageMinWidth', 'nodeImageMinWidth', 'nodeImageMaxWidth');
@@ -44738,6 +45829,34 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             text.inputEl.step = '1';
             text.inputEl.addEventListener('change', () => {
                 void this.updateWidthSetting(text.inputEl, field, minField, maxField);
+            });
+        });
+    }
+    updateCodeFontSize(inputEl) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const value = Number(inputEl.value);
+            if (!Number.isSafeInteger(value)
+                || value < MIN_NODE_CODE_FONT_SIZE
+                || value > MAX_NODE_CODE_FONT_SIZE) {
+                inputEl.value = `${normalizeNodeCodeFontSize(this.plugin.settings.codeFontSize)}`;
+                new obsidian.Notice(t('Invalid code font size'));
+                return;
+            }
+            this.plugin.settings.codeFontSize = value;
+            yield this.plugin.saveSettings();
+            this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
+                const view = leaf.view;
+                if (!view.mindmap)
+                    return;
+                view.mindmap.setting.codeFontSize = value;
+                view.mindmap.setAppSetting();
+                view.mindmap.traverseBF((node) => {
+                    var _a;
+                    node.clearCacheData();
+                    node.refreshBox();
+                    (_a = node.codeController) === null || _a === void 0 ? void 0 : _a.refreshOverflowActions();
+                });
+                view.mindmap.refresh();
             });
         });
     }
@@ -45841,8 +46960,9 @@ class MindMapPlugin extends obsidian.Plugin {
     }
     loadSettings() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.settings = Object.assign(Object.assign(Object.assign({ canvasSize: 8000, headLevel: 2, fontSize: 16, background: 'transparent', layout: 'mindmap', layoutDirect: 'mindmap', defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), { nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts() }), yield this.loadData());
+            this.settings = Object.assign(Object.assign(Object.assign({ canvasSize: 8000, headLevel: 2, fontSize: 16, codeFontSize: DEFAULT_NODE_CODE_FONT_SIZE, background: 'transparent', layout: 'mindmap', layoutDirect: 'mindmap', defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), { nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts() }), yield this.loadData());
             Object.assign(this.settings, normalizeNodeWidthSettings(this.settings));
+            this.settings.codeFontSize = normalizeNodeCodeFontSize(this.settings.codeFontSize);
             this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(this.settings.nodeKeyboardShortcuts);
         });
     }
