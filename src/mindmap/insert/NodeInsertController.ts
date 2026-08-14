@@ -18,6 +18,11 @@ import { getNodeImageWidthLimits } from '../NodeWidthSettings';
 import { createExternalMarkdownLink } from '../link/NodeLinkMarkdown';
 import NodeMarkdownInsertion from './NodeMarkdownInsertion';
 import VaultFileSuggestModal from './VaultFileSuggestModal';
+import NodeCodeEditorModal from '../code/NodeCodeEditorModal';
+import {
+  createNodeCodeMarkdown,
+  parseNodeCodeBlocks,
+} from '../code/NodeCodeMarkdown';
 
 interface Closeable {
   close(): void;
@@ -97,6 +102,12 @@ export default class NodeInsertController {
       (event) => this.openImageMenu(event),
       true,
     ));
+    toolbar.appendChild(this.createButton(
+      doc,
+      'code-2',
+      t('Insert code block'),
+      () => this.openCodeBlock(),
+    ));
 
     this.toolbarEl = toolbar;
     return toolbar;
@@ -146,6 +157,25 @@ export default class NodeInsertController {
 
     const files = this.app.vault.getFiles().filter((file) => !isVaultImage(file));
     this.openFileModal(t('Choose Vault file'), files, session.node, session.insertion, false);
+  }
+
+  private openCodeBlock(): void {
+    const session = this.getSession();
+    if (!session) return;
+    const modal = new NodeCodeEditorModal(this.app, {
+      fontSize: session.node.mindmap.setting.codeFontSize,
+      sourcePath: session.node.mindmap.path || '',
+      onSubmit: (value) => {
+        this.activeCloseable = null;
+        this.insertCodeBlock(session.node, session.insertion, value.language, value.code);
+      },
+      onCancel: () => {
+        this.activeCloseable = null;
+        this.restoreSession(session.node, session.insertion);
+      },
+    });
+    this.activeCloseable = modal;
+    modal.open();
   }
 
   private openImageMenu(event: MouseEvent): void {
@@ -382,6 +412,22 @@ export default class NodeInsertController {
 
   private refreshNode(node: INode): void {
     node.refreshEditText();
+    this.refreshNodeLayout(node);
+  }
+
+  private insertCodeBlock(
+    node: INode,
+    insertion: NodeMarkdownInsertion,
+    language: string,
+    code: string,
+  ): void {
+    if (!this.isActiveSession(node, insertion)) return;
+    const markdown = createNodeCodeMarkdown(language, code);
+    const block = parseNodeCodeBlocks(markdown)[0];
+    const codeEl = block && node.codeController?.createEditable(block);
+    if (!codeEl) return;
+    insertion.insertBlockNode(codeEl);
+    node._editStructureChanged = true;
     this.refreshNodeLayout(node);
   }
 

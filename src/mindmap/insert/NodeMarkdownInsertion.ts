@@ -60,6 +60,36 @@ export default class NodeMarkdownInsertion {
     this.restore();
   }
 
+  insertBlockNode(node: globalThis.Node): void {
+    const range = this.getUsableRange();
+    range.deleteContents();
+    const hasContentBefore = this.hasMeaningfulContentBefore(range);
+    const fragment = this.editorEl.ownerDocument.createDocumentFragment();
+    if (hasContentBefore) {
+      fragment.appendChild(this.editorEl.ownerDocument.createTextNode('\n\n'));
+    }
+    fragment.appendChild(node);
+    const trailing = this.editorEl.ownerDocument.createTextNode('\n\n');
+    fragment.appendChild(trailing);
+    range.insertNode(fragment);
+    range.setStartAfter(trailing);
+    range.collapse(true);
+    this.range = range.cloneRange();
+    this.restore();
+  }
+
+  private hasMeaningfulContentBefore(range: Range): boolean {
+    const before = this.editorEl.ownerDocument.createRange();
+    before.selectNodeContents(this.editorEl);
+    before.setEnd(range.startContainer, range.startOffset);
+    if (before.toString().trim()) return true;
+
+    const fragment = before.cloneContents();
+    return Boolean(fragment.querySelector(
+      'br, .mm-node-image-attachment, .mm-node-code-attachment',
+    ));
+  }
+
   append(markdown: string): void {
     const range = this.createRangeAtEnd();
     const textNode = this.editorEl.ownerDocument.createTextNode(markdown);

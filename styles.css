@@ -383,6 +383,339 @@
   margin: 10px 0;
 }
 
+.mm-node-code-card {
+  position: relative;
+  display: block;
+  width: fit-content;
+  min-width: min(18em, 100%);
+  max-width: min(560px, 55vw);
+  margin: 7px 0 9px;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--code-background, var(--background-secondary));
+  color: var(--code-normal, var(--text-normal));
+  text-align: left;
+}
+
+.mm-node-code-card > pre {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 13em;
+  margin: 0;
+  padding: 28px 9px 9px;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--mm-code-font-size, 14px);
+  line-height: 1.5;
+  scrollbar-color: var(--scrollbar-thumb-bg) transparent;
+  scrollbar-width: thin;
+  white-space: pre;
+}
+
+.mm-node-code-card.has-custom-size {
+  width: var(--mm-code-card-width);
+  min-width: 0;
+  max-width: none;
+}
+
+.mm-node-code-card.has-custom-size > pre {
+  height: var(--mm-code-card-height);
+  max-height: none;
+}
+
+.mm-node-code-card > pre::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mm-node-code-card > pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mm-node-code-card > pre::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb-bg);
+  background-clip: padding-box;
+}
+
+.mm-node-code-card > pre > code {
+  display: block;
+  min-width: max-content;
+  padding: 0;
+  background: transparent;
+  font-family: var(--font-monospace);
+  font-size: inherit;
+  white-space: pre;
+}
+
+.mm-node-code-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+  padding: 2px 4px 2px 9px;
+  background: linear-gradient(to bottom, var(--code-background, var(--background-secondary)) 75%, transparent);
+  pointer-events: none;
+}
+
+.mm-node-code-language {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-node-code-controls {
+  display: flex;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  box-shadow: var(--shadow-s);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.mm-node-code-card:hover .mm-node-code-controls,
+.mm-node-code-card:focus-within .mm-node-code-controls {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.mm-node-code-header,
+.mm-node-code-controls,
+.mm-node-code-controls button {
+  pointer-events: auto;
+}
+
+.mm-node-code-controls button {
+  appearance: none;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  place-items: center;
+}
+
+.mm-node-code-controls button:hover,
+.mm-node-code-controls button:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.mm-node-code-attachment {
+  cursor: default;
+  user-select: none;
+}
+
+.mm-node.mm-edit-node .mm-node-code-attachment:not(.is-selected) {
+  border-color: transparent;
+}
+
+.mm-node-code-attachment.is-selected {
+  overflow: visible;
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.mm-node-content.mm-node-code-selected {
+  overflow: visible;
+}
+
+.mm-node-code-resize-handle {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  z-index: 3;
+  display: none;
+  width: 10px;
+  min-width: 10px;
+  height: 10px;
+  min-height: 10px;
+  padding: 0;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 50%;
+  background: var(--background-primary);
+  box-shadow: none;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.mm-node-code-attachment.is-selected .mm-node-code-resize-handle,
+.mm-node-code-attachment.is-resizing .mm-node-code-resize-handle {
+  display: block;
+}
+
+.mm-node-code-expanded-modal {
+  width: min(1200px, 90vw);
+  height: min(850px, 85vh);
+}
+
+.mm-node-code-expanded-modal .modal-content {
+  height: calc(100% - 3.5rem);
+  overflow: auto;
+}
+
+.mm-node-code-expanded-modal pre {
+  min-height: 100%;
+  margin: 0;
+  overflow: visible;
+  font-size: var(--mm-code-font-size, 14px);
+}
+
+.mm-node-code-expanded-modal pre code {
+  font-size: inherit;
+}
+
+.mm-node-code-editor-modal {
+  width: min(1200px, 92vw);
+}
+
+.mm-node-code-editor-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mm-node-code-editor-field label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.mm-node-code-editor-field input,
+.mm-node-code-editor-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mm-node-code-editor-workspace {
+  position: relative;
+  min-width: 0;
+  height: min(50vh, 420px);
+  min-height: 220px;
+  max-height: 70vh;
+  overflow: hidden;
+  resize: vertical;
+  border: var(--input-border-width) solid var(--background-modifier-border);
+  border-radius: var(--input-radius);
+  background: var(--code-background, var(--background-secondary));
+}
+
+.mm-node-code-editor-workspace textarea {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 10px 12px;
+  resize: none;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  color: transparent;
+  caret-color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--mm-code-font-size, 14px);
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre;
+  -webkit-text-fill-color: transparent;
+}
+
+.mm-node-code-editor-workspace textarea:focus {
+  border: 0;
+  box-shadow: inset 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.mm-node-code-editor-workspace textarea::selection {
+  background: var(--text-selection);
+}
+
+.mm-node-code-editor-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mm-node-code-editor-preview pre {
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--mm-code-font-size, 14px);
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.mm-node-code-editor-preview pre code {
+  display: block;
+  min-width: max-content;
+  padding: 0;
+  background: transparent;
+  font-family: var(--font-monospace);
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre;
+}
+
+.mm-node-code-editor-workspace.is-composing .mm-node-code-editor-preview,
+.mm-node-code-editor-workspace.has-render-error .mm-node-code-editor-preview {
+  visibility: hidden;
+}
+
+.mm-node-code-editor-workspace.is-composing textarea,
+.mm-node-code-editor-workspace.has-render-error textarea {
+  color: var(--text-normal);
+  -webkit-text-fill-color: var(--text-normal);
+}
+
+.mm-node-code-editor-actions {
+  align-items: center;
+}
+
+.mm-node-code-action-spacer {
+  flex: 1;
+}
+
+.mm-node-code-delete {
+  margin-right: auto;
+}
+
 .mm-node.mm-node-has-link .mm-node-content {
   padding-right: calc(4px + var(--mm-node-link-space, 1.45em));
 }

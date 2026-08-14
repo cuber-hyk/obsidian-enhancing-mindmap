@@ -26,6 +26,10 @@ import {
   DEFAULT_NODE_WIDTH_SETTINGS,
   normalizeNodeWidthSettings,
 } from './mindmap/NodeWidthSettings';
+import {
+  DEFAULT_NODE_CODE_FONT_SIZE,
+  normalizeNodeCodeFontSize,
+} from './mindmap/code/NodeCodeSettings';
 
 
 export default class MindMapPlugin extends Plugin {
@@ -1169,6 +1173,7 @@ export default class MindMapPlugin extends Plugin {
       canvasSize: 8000,
       headLevel: 2,
       fontSize: 16,
+      codeFontSize: DEFAULT_NODE_CODE_FONT_SIZE,
       background: 'transparent',
       layout: 'mindmap',
       layoutDirect: 'mindmap',
@@ -1178,6 +1183,7 @@ export default class MindMapPlugin extends Plugin {
       nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts(),
     }, await this.loadData());
     Object.assign(this.settings, normalizeNodeWidthSettings(this.settings));
+    this.settings.codeFontSize = normalizeNodeCodeFontSize(this.settings.codeFontSize);
     this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(
       this.settings.nodeKeyboardShortcuts,
     );

@@ -23,6 +23,9 @@ export default {
   "Max level of node to markdown head desc":"将小于该层级的节点文字转为markdown标题，最大层级为6，因为HTML标题支持最大为6级",
   "Font size":"文字大小",
   "Font size desc":"思维导图文字默认大小，单位px",
+  "Code font size":"代码字体大小",
+  "Code font size desc":"代码块和代码面板使用的字体大小，范围 10–24 px",
+  "Invalid code font size":"请输入 10–24 之间的整数",
   "Text node minimum width":"文本节点最小宽度",
   "Text node minimum width desc":"拖动普通文本节点时允许的最小宽度，单位 px",
   "Text node maximum width":"文本节点最大宽度",
@@ -153,6 +156,22 @@ export default {
   "Remove column":"删除列",
   "Edit source":"编辑源码",
   "Table header":"表头单元格",
-  "Table cell":"表格单元格"
+  "Table cell":"表格单元格",
+  "Insert code block":"插入代码块",
+  "Edit code block":"编辑代码块",
+  "Delete code block":"删除代码块",
+  "Code language":"代码语言",
+  "Code":"代码",
+  "Plain text":"纯文本",
+  "Code cannot be empty":"请输入代码后再保存",
+  "Node code block":"节点代码块",
+  "Code block controls":"代码块操作",
+  "Copy code":"复制代码",
+  "Code copied":"代码已复制",
+  "Failed to copy code":"复制代码失败",
+  "Expand code":"展开代码",
+  "Code preview":"代码预览",
+  "Resize code block":"调整代码块大小",
+  "Resize code block hint":"拖动调整大小；双击或按 Enter 恢复默认"
 
 };

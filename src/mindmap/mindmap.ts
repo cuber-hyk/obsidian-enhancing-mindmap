@@ -24,6 +24,11 @@ import {
     NodeWidthSettings,
 } from './NodeWidthSettings'
 import CanvasBoundsController from './CanvasBoundsController'
+import { serializeMindMapNodeWithCode } from './code/NodeCodeMarkdown'
+import {
+    DEFAULT_NODE_CODE_FONT_SIZE,
+    normalizeNodeCodeFontSize,
+} from './code/NodeCodeSettings'
 
 let tempDispLevel = 0;
 
@@ -31,6 +36,7 @@ interface Setting extends Partial<NodeWidthSettings> {
     canvasSize?: number;
     background?: string;
     fontSize?: number;
+    codeFontSize?: number;
     color?: string,
     exportMdModel?: string,
     headLevel: number,
@@ -94,6 +100,7 @@ export default class MindMap {
             //canvasSize: 8000,
             canvasSize: 36000,
             fontSize: 16,
+            codeFontSize: DEFAULT_NODE_CODE_FONT_SIZE,
             background: 'transparent',
             color: 'inherit',
             exportMdModel: 'default',
@@ -183,6 +190,10 @@ export default class MindMap {
         //  this.contentEL.style.color=`${this.setting.color};`;
         this.contentEL.style.background = `${this.setting.background}`;
         this.contentEL.style.fontSize = `${this.setting.fontSize}px`;
+        this.appEl.style.setProperty(
+            '--mm-code-font-size',
+            `${normalizeNodeCodeFontSize(this.setting.codeFontSize)}px`,
+        );
         const textLimits = getTextNodeWidthLimits(this.setting);
         this.appEl.style.setProperty('--mm-text-node-min-width', `${textLimits.min}px`);
         this.appEl.style.setProperty('--mm-text-node-max-width', `${textLimits.max}px`);
@@ -1674,6 +1685,16 @@ export default class MindMap {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
                 }
+                const codeNode = serializeMindMapNodeWithCode(
+                    n.getData().text,
+                    hPrefix + ' ',
+                    '',
+                    ending,
+                );
+                if (codeNode) {
+                    md += codeNode;
+                    return;
+                }
                 md += (hPrefix + ' ');
                 if (table) {
                     md += table.title + ending + '\n\n';
@@ -1687,6 +1708,16 @@ export default class MindMap {
                     space += '\t';
                 }
                 var text = escapeLeadingOrderedNodeMarker(n.getData().text.trim());
+                const codeNode = serializeMindMapNodeWithCode(
+                    text,
+                    `${space}- `,
+                    `${space}  `,
+                    ending,
+                );
+                if (codeNode) {
+                    md += codeNode;
+                    return;
+                }
                 if (table) {
                     md += `${space}- ${table.title}${ending}\n`;
                     table.markdown.split('\n').forEach((line: string) => {
@@ -1701,26 +1732,15 @@ export default class MindMap {
                     if (lineLength == 1) {
                         md += `${space}- ${text}${ending}\n`;
                     } else if (lineLength > 1) {
-                        //code
-                        if (text.startsWith('```')) {
-                            md+='\n'
-                            md += `${space}-\n`;
-                            textArr.forEach((t: string, i: number) => {
-                                md += `${space}  ${t.trim()}${i === textArr.length - 1 ? ending : '' }\n`
-                            });
-                            md+='\n'
-                        } else {
-                            //text
-                            md += `${space}- `;
-                            textArr.forEach((t: string, i: number) => {
-                                var contentText = t.trim() || '<br>';
-                                if (i > 0) {
-                                    md += `${space}${contentText}${i === textArr.length - 1 ? ending : '' }\n`
-                                } else {
-                                    md += `${contentText}\n`
-                                }
-                            });
-                        }
+                        md += `${space}- `;
+                        textArr.forEach((t: string, i: number) => {
+                            var contentText = t.trim() || '<br>';
+                            if (i > 0) {
+                                md += `${space}${contentText}${i === textArr.length - 1 ? ending : '' }\n`
+                            } else {
+                                md += `${contentText}\n`
+                            }
+                        });
 
                     }
                 } else {

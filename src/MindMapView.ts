@@ -34,6 +34,10 @@ import {
 } from './mindmap/table/NodeTableMarkdown';
 import { uuid } from './mindmap/NodeId';
 import { restoreLeadingOrderedNodeMarker } from './mindmap/interaction/OrderedSiblingNumbering';
+import {
+  protectMindMapCodeBlocks,
+  restoreProtectedMindMapCodeBlocks,
+} from './mindmap/code/NodeCodeMarkdown';
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
@@ -755,7 +759,8 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   mdToData(str: string) {
-    const protectedTables = protectMindMapTables(str);
+    const protectedCode = protectMindMapCodeBlocks(str);
+    const protectedTables = protectMindMapTables(protectedCode.markdown);
     function restoreLegacyFormulaBlankLines(text: string) {
       if (!text.includes('$$')) return text;
       const lines = text.split('\n');
@@ -799,7 +804,10 @@ export class MindMapView extends TextFileView implements HoverParent {
       );
       var map: INodeData = {
         id: id || uuid(),
-        text: restoreProtectedMindMapTables(text, protectedTables.tables),
+        text: restoreProtectedMindMapCodeBlocks(
+          restoreProtectedMindMapTables(text, protectedTables.tables),
+          protectedCode.blocks,
+        ),
         children: [],
         expanded: id ? false:true
       };

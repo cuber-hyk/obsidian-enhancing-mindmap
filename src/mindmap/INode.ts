@@ -33,6 +33,11 @@ import {
     getNodeImageWidthLimits,
     getTextNodeWidthLimits,
 } from './NodeWidthSettings'
+import NodeCodeController from './code/NodeCodeController'
+import {
+    NodeCodeBlock,
+    parseNodeCodeBlocks,
+} from './code/NodeCodeMarkdown'
 
 
 export function keepLastIndex(dom:HTMLElement) {
@@ -105,6 +110,7 @@ export default class Node {
     tablePreview?:NodeTablePreviewController;
     autoWrapController?:NodeAutoWrapController;
     imageReorderController?:NodeImageReorderController;
+    codeController?:NodeCodeController;
     parent?:Node;
     //isRoot?:boolean;
     children:Node[]=[];
@@ -144,6 +150,29 @@ export default class Node {
             containEl: this.containEl,
             contentEl: this.contentEl,
             onMove: (imageEl, boundary) => this.moveEditImageToBoundary(imageEl, boundary),
+        });
+        this.codeController = new NodeCodeController({
+            app: this.mindmap.view.app,
+            component: this.mindmap.view,
+            contentEl: this.contentEl,
+            getSourcePath: () => this.mindmap.path || '',
+            getFontSize: () => this.mindmap.setting.codeFontSize,
+            getScale: () => (this.mindmap.mindScale || 100) / 100,
+            onEditChange: () => {
+                this._editStructureChanged = true;
+                this.refreshEditingLayout();
+            },
+            onEditDelete: () => {
+                this._editStructureChanged = true;
+                this.normalizeEditContentAfterAttachmentDelete();
+                this.refreshEditingLayout();
+            },
+            onSelectEditCode: () => this.clearSelectedEditImage(),
+            onLayoutChange: () => {
+                this.clearCacheData();
+                this.refreshBox();
+                this.mindmap&&this.mindmap.emit('renderEditNode',{node:this});
+            },
         });
         //this.containEl.textContent = this.data.text;
         this.initNodeBar();
@@ -209,9 +238,11 @@ export default class Node {
         if (renderVersion !== this._renderVersion) return;
 
         this.tablePreview?.destroy();
+        this.codeController?.clearPreview();
         this.contentEl.replaceChildren(...Array.from(stagedContent.childNodes));
         this.data.mdText = this.contentEl.innerHTML;
         this.attachTablePreview();
+        this.codeController?.attachPreview(parseNodeCodeBlocks(text));
         this.autoWrapController?.refresh();
         this.refreshBox();
         this.mindmap&&this.mindmap.emit('initNode',{node:this});
@@ -456,14 +487,20 @@ export default class Node {
         this._oldText = this.data.text;
         const markdown = getNodeAutoWrapContent(this.data.text);
         var editData = parseNodeMarkdown(markdown);
+        const codeBlocks = parseNodeCodeBlocks(markdown);
+        const editableLinks = editData.links.filter((link) => !this.isRangeInsideCodeBlock(
+            link.start,
+            link.end,
+            codeBlocks,
+        ));
         this._editText = editData.text;
-        this._editLinks = editData.links;
+        this._editLinks = editableLinks;
         this._editStructureChanged = false;
         //var _t =  this.data.text.replace(/\r\n/g,"<br/>")
        // _t = _t.replace(/\n/g,"<br/>");
       //  console.log(_t);
-        this.renderEditableContent(markdown, editData.links);
-        this.renderLinkLayer(editData.links);
+        this.renderEditableContent(markdown, editableLinks);
+        this.renderLinkLayer(editableLinks);
         this.contentEl.setAttribute('contentEditable','true');
         this.mindmap.editNode = this;
         this.data.isEdit = true;
@@ -858,6 +895,7 @@ export default class Node {
         this._editLinks = [];
         this._editStructureChanged = false;
         this.clearSelectedEditImage();
+        this.codeController?.clearEditSelection();
 
         if(this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.remove('mm-edit-node')
@@ -902,12 +940,26 @@ export default class Node {
         return width ? setNodeAutoWrapWidth(markdown, width) : markdown;
     }
 
+    private isRangeInsideCodeBlock(
+        start: number,
+        end: number,
+        blocks: NodeCodeBlock[],
+    ): boolean {
+        return blocks.some((block) => start >= block.start && end <= block.end);
+    }
+
     renderEditableContent(markdown: string, links: NodeLinkData[]) {
         this.contentEl.innerHTML = '';
-        const images = parseNodeImages(markdown);
+        const codeBlocks = parseNodeCodeBlocks(markdown);
+        const images = parseNodeImages(markdown).filter((image) => !this.isRangeInsideCodeBlock(
+            image.start,
+            image.end,
+            codeBlocks,
+        ));
         const items = [
             ...links.map((link) => ({type: 'link' as const, start: link.start, end: link.end})),
             ...images.map((image) => ({type: 'image' as const, start: image.start, end: image.end, image})),
+            ...codeBlocks.map((code) => ({type: 'code' as const, start: code.start, end: code.end, code})),
         ].sort((a, b) => a.start - b.start);
 
         let textStart = 0;
@@ -916,6 +968,9 @@ export default class Node {
             this.appendEditableText(markdown.slice(textStart, item.start));
             if (item.type === 'image') {
                 this.contentEl.appendChild(this.createEditableImage(item.image));
+            } else if (item.type === 'code') {
+                const codeEl = this.codeController?.createEditable(item.code);
+                if (codeEl) this.contentEl.appendChild(codeEl);
             }
             textStart = item.end;
         });
@@ -1025,6 +1080,7 @@ export default class Node {
 
     selectEditImage(imageEl: HTMLElement) {
         this.clearSelectedEditImage();
+        this.codeController?.clearEditSelection();
         this._selectedEditImageEl = imageEl;
         imageEl.classList.add('is-selected');
         this.contentEl.classList.add('mm-node-image-selected');
@@ -1044,6 +1100,10 @@ export default class Node {
         }
         this.deleteEditImageElement(imageEl);
         return true;
+    }
+
+    deleteEditAttachmentByKeyboard(key: string): boolean {
+        return Boolean(this.codeController?.deleteEditCodeByKeyboard()) || this.deleteEditImageByKeyboard(key);
     }
 
     getImageForKeyboardDelete(key: string): HTMLElement | null {
@@ -1083,7 +1143,7 @@ export default class Node {
         this.clearSelectedEditImage();
         imageEl.remove();
         this._editStructureChanged = true;
-        this.normalizeEditContentAfterImageDelete();
+        this.normalizeEditContentAfterAttachmentDelete();
         this.refreshEditingLayout();
     }
 
@@ -1125,10 +1185,12 @@ export default class Node {
         return true;
     }
 
-    normalizeEditContentAfterImageDelete() {
+    normalizeEditContentAfterAttachmentDelete() {
         const text = this.getEditedContentMarkdown().trim();
-        const hasImage = Boolean(this.contentEl.querySelector('.mm-node-image-attachment'));
-        if (!text && !hasImage) {
+        const hasAttachment = Boolean(this.contentEl.querySelector(
+            '.mm-node-image-attachment, .mm-node-code-attachment',
+        ));
+        if (!text && !hasAttachment) {
             this.contentEl.innerText = t('Sub title');
             this.selectText();
             return;
@@ -1237,6 +1299,11 @@ export default class Node {
                 ));
                 return;
             }
+            if (child.classList.contains('mm-node-code-attachment')) {
+                const markdown = this.codeController?.serializeEditable(child);
+                if (markdown) parts.push(markdown);
+                return;
+            }
             parts.push(child.innerText || '');
         });
         return parts.join('');
@@ -1302,6 +1369,7 @@ export default class Node {
     }
 
     destroy() {
+        this.codeController?.destroy();
         this.imageReorderController?.destroy();
         this.autoWrapController?.destroy();
     }
@@ -1402,9 +1470,15 @@ export default class Node {
 
         const rawMarkdown = this.getEditedContentMarkdown().trim() || '';
         const editData = parseNodeMarkdown(rawMarkdown);
+        const codeBlocks = parseNodeCodeBlocks(rawMarkdown);
+        const links = editData.links.filter((link) => !this.isRangeInsideCodeBlock(
+            link.start,
+            link.end,
+            codeBlocks,
+        ));
         this._editText = editData.text;
-        this._editLinks = [...this._editLinks, ...editData.links];
-        this.renderEditableContent(rawMarkdown, editData.links);
+        this._editLinks = [...this._editLinks, ...links];
+        this.renderEditableContent(rawMarkdown, links);
         this.renderLinkLayer(this._editLinks);
         keepLastIndex(this.contentEl);
     }

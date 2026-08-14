@@ -14,6 +14,11 @@ import {
     NodeWidthSettings,
     normalizeNodeWidthSettings,
 } from './mindmap/NodeWidthSettings';
+import {
+    MAX_NODE_CODE_FONT_SIZE,
+    MIN_NODE_CODE_FONT_SIZE,
+    normalizeNodeCodeFontSize,
+} from './mindmap/code/NodeCodeSettings';
 
 type NodeWidthSettingKey = keyof NodeWidthSettings;
 
@@ -125,6 +130,20 @@ export class MindMapSettingsTab extends PluginSettingTab {
                             v.mindmap.refresh();
                         });
                     }));
+
+        new Setting(containerEl)
+            .setName(t('Code font size'))
+            .setDesc(t('Code font size desc'))
+            .addText((text) => {
+                text.setValue(`${normalizeNodeCodeFontSize(this.plugin.settings.codeFontSize)}`);
+                text.inputEl.type = 'number';
+                text.inputEl.min = `${MIN_NODE_CODE_FONT_SIZE}`;
+                text.inputEl.max = `${MAX_NODE_CODE_FONT_SIZE}`;
+                text.inputEl.step = '1';
+                text.inputEl.addEventListener('change', () => {
+                    void this.updateCodeFontSize(text.inputEl);
+                });
+            });
 
         this.renderWidthSetting(
             containerEl,
@@ -255,6 +274,34 @@ export class MindMapSettingsTab extends PluginSettingTab {
                     void this.updateWidthSetting(text.inputEl, field, minField, maxField);
                 });
             });
+    }
+
+    private async updateCodeFontSize(inputEl: HTMLInputElement): Promise<void> {
+        const value = Number(inputEl.value);
+        if (
+            !Number.isSafeInteger(value)
+            || value < MIN_NODE_CODE_FONT_SIZE
+            || value > MAX_NODE_CODE_FONT_SIZE
+        ) {
+            inputEl.value = `${normalizeNodeCodeFontSize(this.plugin.settings.codeFontSize)}`;
+            new Notice(t('Invalid code font size'));
+            return;
+        }
+
+        this.plugin.settings.codeFontSize = value;
+        await this.plugin.saveSettings();
+        this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
+            const view = leaf.view as MindMapView;
+            if (!view.mindmap) return;
+            view.mindmap.setting.codeFontSize = value;
+            view.mindmap.setAppSetting();
+            view.mindmap.traverseBF((node: MyNode) => {
+                node.clearCacheData();
+                node.refreshBox();
+                node.codeController?.refreshOverflowActions();
+            });
+            view.mindmap.refresh();
+        });
     }
 
     private async updateWidthSetting(
