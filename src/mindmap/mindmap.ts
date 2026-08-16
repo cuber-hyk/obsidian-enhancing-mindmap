@@ -15,7 +15,8 @@ import NodeKeyboardController from './interaction/NodeKeyboardController'
 import NodeSelectionController from './interaction/NodeSelectionController'
 import NodeLinkController from './link/NodeLinkController'
 import MindMapNavigatorController from './navigation/MindMapNavigatorController'
-import { NodeKeyboardShortcuts } from './interaction/NodeKeyboardShortcuts'
+import { MindMapShortcuts } from './interaction/MindMapShortcutCatalog'
+import MindMapShortcutRouter from './interaction/MindMapShortcutRouter'
 import { getNodeTableMarkdown } from './table/NodeTableMarkdown'
 import { escapeLeadingOrderedNodeMarker } from './interaction/OrderedSiblingNumbering'
 import {
@@ -43,7 +44,7 @@ interface Setting extends Partial<NodeWidthSettings> {
     layoutDirect: string,
     focusOnMove?: boolean,
     showLinkTitle?: boolean,
-    nodeKeyboardShortcuts?: NodeKeyboardShortcuts
+    mindMapShortcuts?: MindMapShortcuts
 }
 
 export default class MindMap {
@@ -84,6 +85,7 @@ export default class MindMap {
     nodeSelectionController: NodeSelectionController;
     nodeLinkController: NodeLinkController;
     navigatorController: MindMapNavigatorController;
+    shortcutRouter: MindMapShortcutRouter;
     canvasBoundsController?: CanvasBoundsController;
     scalePointer: number[] = [];
     mindScale = 100;
@@ -143,6 +145,7 @@ export default class MindMap {
         this.nodeClipboardController = new NodeClipboardController(this);
         this.nodeKeyboardController = new NodeKeyboardController(this);
         this.nodeSelectionController = new NodeSelectionController(this);
+        this.shortcutRouter = new MindMapShortcutRouter(this);
         this.nodeLinkController = new NodeLinkController(this);
         this.canvasBoundsController = new CanvasBoundsController(this, this.setting.canvasSize);
         this.navigatorController = new MindMapNavigatorController(this);
@@ -466,9 +469,7 @@ export default class MindMap {
         this.view?.mindMapChange();
     }
     appKeydown(e: KeyboardEvent) {
-        if (this.nodeSelectionController.handleKeydown(e)) return;
-        if (this.nodeClipboardController.handleKeydown(e)) return;
-        this.nodeKeyboardController.handleKeydown(e);
+        this.shortcutRouter.handleKeydown(e);
     }
 
      compositionStart(e: KeyboardEvent) {

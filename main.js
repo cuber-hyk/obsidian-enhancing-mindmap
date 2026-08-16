@@ -170,7 +170,7 @@ var en = {
     "Mindmap shortcuts": "Mindmap shortcuts",
     "Manage mindmap shortcuts": "Manage mindmap shortcuts",
     "Close mindmap shortcut inspector": "Close mindmap shortcut inspector",
-    "Mindmap shortcuts description": "Applies to all mindmaps",
+    "Mindmap shortcuts description": "Local to the active mindmap; does not replace Obsidian global hotkeys",
     "Custom shortcuts": "Custom shortcuts",
     "Other node shortcuts": "Other node shortcuts",
     "Clipboard and history": "Clipboard and history",
@@ -321,6 +321,26 @@ var en = {
     "Code preview": "Code preview",
     "Resize code block": "Resize code block",
     "Resize code block hint": "Drag to resize; double-click or press Enter to reset",
+    "Manage all shortcuts": "Manage all shortcuts",
+    "Search shortcuts": "Search shortcuts",
+    "Show modified shortcuts only": "Show modified only",
+    "Clear shortcut": "Clear shortcut",
+    "No matching shortcuts": "No matching shortcuts",
+    "Shortcut defaults restored": "Shortcut defaults restored",
+    "Node": "Node",
+    "Navigation": "Navigation",
+    "Image": "Image",
+    "Advanced": "Advanced",
+    "canvas": "Canvas",
+    "selected": "Node selected",
+    "editing": "Node editing",
+    "image": "Image focused",
+    "multiple": "Multiple selection",
+    "Select node above": "Select node above",
+    "Select node below": "Select node below",
+    "Select node left": "Select node left",
+    "Select node right": "Select node right",
+    "Select root node": "Select root node",
 };
 
 // British English
@@ -504,7 +524,7 @@ var zhCN = {
     "Mindmap shortcuts": "思维导图快捷键",
     "Manage mindmap shortcuts": "管理思维导图快捷键",
     "Close mindmap shortcut inspector": "关闭思维导图快捷键面板",
-    "Mindmap shortcuts description": "适用于全部思维导图",
+    "Mindmap shortcuts description": "仅在当前活动思维导图中生效，不替代 Obsidian 全局快捷键",
     "Custom shortcuts": "可自定义快捷键",
     "Other node shortcuts": "其他节点快捷键",
     "Clipboard and history": "剪贴板与撤销",
@@ -612,7 +632,27 @@ var zhCN = {
     "Expand code": "展开代码",
     "Code preview": "代码预览",
     "Resize code block": "调整代码块大小",
-    "Resize code block hint": "拖动调整大小；双击或按 Enter 恢复默认"
+    "Resize code block hint": "拖动调整大小；双击或按 Enter 恢复默认",
+    "Manage all shortcuts": "管理全部快捷键",
+    "Search shortcuts": "搜索快捷键",
+    "Show modified shortcuts only": "仅显示已修改项",
+    "Clear shortcut": "清除快捷键",
+    "No matching shortcuts": "没有匹配的快捷键",
+    "Shortcut defaults restored": "快捷键已恢复默认",
+    "Node": "节点",
+    "Navigation": "导航",
+    "Image": "图片",
+    "Advanced": "高级操作",
+    "canvas": "画布",
+    "selected": "已选中节点",
+    "editing": "节点编辑中",
+    "image": "图片已聚焦",
+    "multiple": "多选节点",
+    "Select node above": "选择上方节点",
+    "Select node below": "选择下方节点",
+    "Select node left": "选择左侧节点",
+    "Select node right": "选择右侧节点",
+    "Select root node": "选择根节点"
 };
 
 // 繁體中文
@@ -39156,6 +39196,155 @@ function createNodeData(text, children = []) {
     };
 }
 
+const key = (value, modifiers = {}) => (Object.assign({ key: normalizeShortcutKey(value), modKey: false, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, modifiers));
+const MINDMAP_SHORTCUT_DEFINITIONS = [
+    { id: 'addSiblingAfter', label: 'Add sibling below', category: 'Node', contexts: ['selected'], defaultShortcut: key('Enter'), highFrequency: true },
+    { id: 'addSiblingBefore', label: 'Add sibling above', category: 'Node', contexts: ['selected'], defaultShortcut: key('Enter', { shiftKey: true }), highFrequency: true },
+    { id: 'addChild', label: 'Add child node', category: 'Node', contexts: ['selected', 'editing'], defaultShortcut: key('Tab'), highFrequency: true },
+    { id: 'editNode', label: 'Enter edit mode', category: 'Node', contexts: ['selected'], defaultShortcut: key('Space'), highFrequency: true },
+    { id: 'deleteNode', label: 'Delete selected node', category: 'Node', contexts: ['selected', 'multiple'], defaultShortcut: key('Backspace'), highFrequency: true },
+    { id: 'finishEdit', label: 'Finish editing', category: 'Node', contexts: ['editing'], defaultShortcut: key('Enter'), highFrequency: true },
+    { id: 'insertLineBreak', label: 'Insert line break', category: 'Node', contexts: ['editing'], defaultShortcut: key('Enter', { shiftKey: true }) },
+    { id: 'copyNode', label: 'Copy selected node', category: 'Clipboard and history', contexts: ['selected'], defaultShortcut: key('c', { modKey: true }), highFrequency: true },
+    { id: 'cutNode', label: 'Cut selected node', category: 'Clipboard and history', contexts: ['selected'], defaultShortcut: key('x', { modKey: true }), highFrequency: true },
+    { id: 'pasteNode', label: 'Paste as child node', category: 'Clipboard and history', contexts: ['selected'], defaultShortcut: key('v', { modKey: true }), highFrequency: true },
+    { id: 'undo', label: 'Undo', category: 'Clipboard and history', contexts: ['canvas', 'selected'], defaultShortcut: key('z', { modKey: true }), highFrequency: true, commandId: 'Undo' },
+    { id: 'redo', label: 'Redo', category: 'Clipboard and history', contexts: ['canvas', 'selected'], defaultShortcut: obsidian.Platform.isMacOS ? key('z', { modKey: true, shiftKey: true }) : key('y', { modKey: true }), highFrequency: true, commandId: 'Redo' },
+    { id: 'toggleExpand', label: 'Toggle expand/collapse node', category: 'Node', contexts: ['selected'], defaultShortcut: key('Space', { modKey: true, shiftKey: true }), highFrequency: true, commandId: 'Toggle expand/collapse node' },
+    { id: 'numberChildNodes', label: 'Number child nodes', category: 'Node', contexts: ['selected'], defaultShortcut: null, highFrequency: true, commandId: 'Number child nodes' },
+    { id: 'boldText', label: 'Bold selected text', category: 'Markdown formatting', contexts: ['editing'], defaultShortcut: key('b', { modKey: true }), commandId: "Bold the node's text" },
+    { id: 'italicText', label: 'Italicize selected text', category: 'Markdown formatting', contexts: ['editing'], defaultShortcut: key('i', { modKey: true }), commandId: "Italicize the node's text" },
+    { id: 'strikeText', label: 'Strike through selected text', category: 'Markdown formatting', contexts: ['editing'], defaultShortcut: key('s', { modKey: true, shiftKey: true }) },
+    { id: 'highlightText', label: "Highlight the node's text", category: 'Markdown formatting', contexts: ['selected', 'editing'], defaultShortcut: key('h', { altKey: true, shiftKey: true }), commandId: "Highlight the node's text" },
+    { id: 'navigateUp', label: 'Select node above', category: 'Navigation', contexts: ['selected'], defaultShortcut: key('ArrowUp') },
+    { id: 'navigateDown', label: 'Select node below', category: 'Navigation', contexts: ['selected'], defaultShortcut: key('ArrowDown') },
+    { id: 'navigateLeft', label: 'Select node left', category: 'Navigation', contexts: ['selected'], defaultShortcut: key('ArrowLeft') },
+    { id: 'navigateRight', label: 'Select node right', category: 'Navigation', contexts: ['selected'], defaultShortcut: key('ArrowRight') },
+    { id: 'navigateRoot', label: 'Select root node', category: 'Navigation', contexts: ['selected'], defaultShortcut: key('Home') },
+    { id: 'moveImageUp', label: 'Move focused node image up', category: 'Image', contexts: ['image'], defaultShortcut: key('ArrowUp', { altKey: true }), commandId: 'Move focused node image up' },
+    { id: 'moveImageDown', label: 'Move focused node image down', category: 'Image', contexts: ['image'], defaultShortcut: key('ArrowDown', { altKey: true }), commandId: 'Move focused node image down' },
+    { id: 'moveImageLeft', label: 'Move focused node image left', category: 'Image', contexts: ['image'], defaultShortcut: key('ArrowLeft', { altKey: true }), commandId: 'Move focused node image left' },
+    { id: 'moveImageRight', label: 'Move focused node image right', category: 'Image', contexts: ['image'], defaultShortcut: key('ArrowRight', { altKey: true }), commandId: 'Move focused node image right' },
+    { id: 'expandMaxLevel', label: 'Expand one level from the max. displayed level', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('PageDown', { altKey: true }), commandId: 'Expand one level from the max. displayed level' },
+    { id: 'collapseMaxLevel', label: 'Collapse one level from the max. displayed level', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('PageUp', { altKey: true }), commandId: 'Collapse one level from the max. displayed level' },
+    { id: 'moveNodeUp', label: 'Move the current node above', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('ArrowUp', { altKey: true, shiftKey: true }), commandId: 'Move the current node above' },
+    { id: 'moveNodeDown', label: 'Move the current node below', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('ArrowDown', { altKey: true, shiftKey: true }), commandId: 'Move the current node below' },
+    { id: 'moveNodeLeft', label: 'Move the current node left', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('ArrowLeft', { altKey: true, shiftKey: true }), commandId: 'Move the current node left' },
+    { id: 'moveNodeRight', label: 'Move the current node right', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('ArrowRight', { altKey: true, shiftKey: true }), commandId: 'Move the current node right' },
+    { id: 'moveNextSiblings', label: 'Move next siblings as children', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('d', { altKey: true, shiftKey: true }), commandId: 'Move next siblings as children' },
+    { id: 'moveAllSiblings', label: 'Move all siblings as children', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('d', { altKey: true, modKey: true, shiftKey: true }), commandId: 'Move all siblings as children' },
+    { id: 'joinBelow', label: 'Join with the node below', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('j', { altKey: true, shiftKey: true }), commandId: 'Join with the node below' },
+    { id: 'joinCitation', label: 'Join as citation with the node below', category: 'Advanced', contexts: ['selected'], defaultShortcut: key('j', { altKey: true, modKey: true, shiftKey: true }), commandId: 'Join as citation with the node below' },
+    { id: 'centerNode', label: 'Center mindmap view on the current node', category: 'Navigation', contexts: ['selected'], defaultShortcut: key('e', { altKey: true }), commandId: 'Center mindmap view on the current node' },
+    { id: 'zoomIn', label: 'Zoom in', category: 'Navigation', contexts: ['canvas', 'selected'], defaultShortcut: key('=', { altKey: true }), commandId: 'Zoom in' },
+    { id: 'zoomOut', label: 'Zoom out', category: 'Navigation', contexts: ['canvas', 'selected'], defaultShortcut: key('-', { altKey: true }), commandId: 'Zoom out' },
+    { id: 'addTabulation', label: 'Add tabulation', category: 'Markdown formatting', contexts: ['editing'], defaultShortcut: key('t', { altKey: true, shiftKey: true }), commandId: 'Add tabulation' },
+    { id: 'removeLineBreaks', label: 'Remove line breaks (<br>)', category: 'Markdown formatting', contexts: ['selected', 'editing'], defaultShortcut: key('l', { altKey: true, shiftKey: true }), commandId: 'Remove line breaks (<br>)' },
+];
+const definitionById = new Map(MINDMAP_SHORTCUT_DEFINITIONS.map((definition) => [definition.id, definition]));
+const modifierKeys = new Set(['Alt', 'Control', 'Meta', 'Shift']);
+const invalidKeys = new Set(['Dead', 'Process', 'Unidentified']);
+function createDefaultMindMapShortcuts() {
+    return MINDMAP_SHORTCUT_DEFINITIONS.reduce((shortcuts, { id, defaultShortcut }) => {
+        shortcuts[id] = defaultShortcut ? Object.assign({}, defaultShortcut) : null;
+        return shortcuts;
+    }, {});
+}
+function normalizeMindMapShortcuts(value, legacy) {
+    const stored = isRecord(value) ? value : {};
+    const defaults = createDefaultMindMapShortcuts();
+    const normalized = Object.assign({}, defaults);
+    MINDMAP_SHORTCUT_DEFINITIONS.forEach(({ id }) => {
+        if (!(id in stored))
+            return;
+        normalized[id] = stored[id] === null ? null : normalizeShortcut(stored[id], defaults[id]);
+    });
+    if (!isRecord(value) && isRecord(legacy)) {
+        ['addSiblingAfter', 'addSiblingBefore'].forEach((id) => {
+            if (legacy[id])
+                normalized[id] = normalizeLegacyShortcut(legacy[id], defaults[id]);
+        });
+    }
+    return normalized;
+}
+function shortcutFromKeyboardEvent(event) {
+    const shortcutKey = normalizeShortcutKey(event.key);
+    if (!shortcutKey || modifierKeys.has(shortcutKey) || invalidKeys.has(shortcutKey) || event.isComposing)
+        return null;
+    return {
+        key: shortcutKey,
+        modKey: obsidian.Platform.isMacOS ? event.metaKey : event.ctrlKey,
+        shiftKey: event.shiftKey,
+        ctrlKey: obsidian.Platform.isMacOS ? event.ctrlKey : false,
+        metaKey: obsidian.Platform.isMacOS ? false : event.metaKey,
+        altKey: event.altKey,
+    };
+}
+function matchesMindMapShortcut(shortcut, event) {
+    if (!shortcut)
+        return false;
+    const actual = shortcutFromKeyboardEvent(event);
+    return Boolean(actual && shortcutsEqual(shortcut, actual));
+}
+function formatMindMapShortcut(shortcut) {
+    if (!shortcut)
+        return '';
+    const parts = [];
+    if (shortcut.modKey)
+        parts.push(obsidian.Platform.isMacOS ? 'Cmd' : 'Ctrl');
+    if (shortcut.ctrlKey)
+        parts.push('Ctrl');
+    if (shortcut.metaKey)
+        parts.push('Cmd');
+    if (shortcut.altKey)
+        parts.push('Alt');
+    if (shortcut.shiftKey)
+        parts.push('Shift');
+    const names = { ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑' };
+    parts.push(names[shortcut.key] || (shortcut.key.length === 1 ? shortcut.key.toUpperCase() : shortcut.key));
+    return parts.join(' + ');
+}
+function findShortcutConflict(id, shortcut, shortcuts) {
+    if (!shortcut)
+        return null;
+    const definition = definitionById.get(id);
+    return MINDMAP_SHORTCUT_DEFINITIONS.find((candidate) => candidate.id !== id
+        && Boolean(shortcuts[candidate.id])
+        && shortcutsEqual(shortcut, shortcuts[candidate.id])
+        && candidate.contexts.some((context) => definition.contexts.includes(context))) || null;
+}
+function getMindMapShortcutDefinition(id) {
+    return definitionById.get(id);
+}
+function normalizeShortcut(value, fallback) {
+    if (!isRecord(value) || typeof value.key !== 'string')
+        return fallback ? Object.assign({}, fallback) : null;
+    const shortcutKey = normalizeShortcutKey(value.key);
+    if (!shortcutKey || modifierKeys.has(shortcutKey) || invalidKeys.has(shortcutKey))
+        return fallback ? Object.assign({}, fallback) : null;
+    return key(shortcutKey, {
+        modKey: Boolean(value.modKey), shiftKey: Boolean(value.shiftKey), ctrlKey: Boolean(value.ctrlKey),
+        metaKey: Boolean(value.metaKey), altKey: Boolean(value.altKey),
+    });
+}
+function normalizeLegacyShortcut(value, fallback) {
+    if (!isRecord(value))
+        return fallback;
+    return normalizeShortcut(Object.assign(Object.assign({}, value), { modKey: false }), fallback);
+}
+function normalizeShortcutKey(value) {
+    if (value === ' ')
+        return 'Space';
+    return value.length === 1 ? value.toLowerCase() : value;
+}
+function shortcutsEqual(left, right) {
+    return left.key === right.key && left.modKey === right.modKey && left.shiftKey === right.shiftKey
+        && left.ctrlKey === right.ctrlKey && left.metaKey === right.metaKey && left.altKey === right.altKey;
+}
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object';
+}
+
 class NodeClipboardController {
     constructor(mindmap) {
         this.mindmap = mindmap;
@@ -39296,18 +39485,15 @@ class NodeClipboardController {
     getShortcutAction(event) {
         if (event.defaultPrevented ||
             event.isComposing ||
-            this.mindmap.isComposing ||
-            (!event.ctrlKey && !event.metaKey) ||
-            event.altKey ||
-            event.shiftKey) {
+            this.mindmap.isComposing) {
             return null;
         }
-        const key = event.key.toLowerCase();
-        if (key === 'c')
+        const shortcuts = normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts);
+        if (matchesMindMapShortcut(shortcuts.copyNode, event))
             return 'copy';
-        if (key === 'x')
+        if (matchesMindMapShortcut(shortcuts.cutNode, event))
             return 'cut';
-        if (key === 'v')
+        if (matchesMindMapShortcut(shortcuts.pasteNode, event))
             return 'paste';
         return null;
     }
@@ -39323,137 +39509,6 @@ class NodeClipboardController {
     }
 }
 
-const DEFAULT_NODE_KEYBOARD_SHORTCUTS = {
-    addSiblingAfter: {
-        key: 'Enter',
-        shiftKey: false,
-        ctrlKey: false,
-        metaKey: false,
-        altKey: false,
-    },
-    addSiblingBefore: {
-        key: 'Enter',
-        shiftKey: true,
-        ctrlKey: false,
-        metaKey: false,
-        altKey: false,
-    },
-};
-const modifierKeys = new Set(['Alt', 'Control', 'Meta', 'Shift']);
-const invalidKeys = new Set(['Dead', 'Process', 'Unidentified']);
-function normalizeKey(key) {
-    if (key === ' ')
-        return 'Space';
-    return key.length === 1 ? key.toLowerCase() : key;
-}
-function isRecord(value) {
-    return Boolean(value) && typeof value === 'object';
-}
-function isShortcut(value) {
-    return isRecord(value);
-}
-function normalizeShortcut(value, fallback) {
-    if (!isShortcut(value) || typeof value.key !== 'string')
-        return Object.assign({}, fallback);
-    const key = normalizeKey(value.key);
-    if (!key || modifierKeys.has(key) || invalidKeys.has(key))
-        return Object.assign({}, fallback);
-    return {
-        key,
-        shiftKey: Boolean(value.shiftKey),
-        ctrlKey: Boolean(value.ctrlKey),
-        metaKey: Boolean(value.metaKey),
-        altKey: Boolean(value.altKey),
-    };
-}
-function createDefaultNodeKeyboardShortcuts() {
-    return {
-        addSiblingAfter: Object.assign({}, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingAfter),
-        addSiblingBefore: Object.assign({}, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingBefore),
-    };
-}
-function normalizeNodeKeyboardShortcuts(value) {
-    const shortcuts = isRecord(value)
-        ? value
-        : {};
-    return {
-        addSiblingAfter: normalizeShortcut(shortcuts.addSiblingAfter, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingAfter),
-        addSiblingBefore: normalizeShortcut(shortcuts.addSiblingBefore, DEFAULT_NODE_KEYBOARD_SHORTCUTS.addSiblingBefore),
-    };
-}
-function shortcutFromKeyboardEvent(event) {
-    const key = normalizeKey(event.key);
-    if (!key || modifierKeys.has(key) || invalidKeys.has(key) || event.isComposing)
-        return null;
-    return {
-        key,
-        shiftKey: event.shiftKey,
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-        altKey: event.altKey,
-    };
-}
-function matchesNodeKeyboardShortcut(shortcut, event) {
-    return shortcut.key === normalizeKey(event.key)
-        && shortcut.shiftKey === event.shiftKey
-        && shortcut.ctrlKey === event.ctrlKey
-        && shortcut.metaKey === event.metaKey
-        && shortcut.altKey === event.altKey;
-}
-function formatNodeKeyboardShortcut(shortcut) {
-    const parts = [];
-    if (shortcut.ctrlKey)
-        parts.push('Ctrl');
-    if (shortcut.metaKey)
-        parts.push('Cmd');
-    if (shortcut.altKey)
-        parts.push('Alt');
-    if (shortcut.shiftKey)
-        parts.push('Shift');
-    const keyNames = {
-        Space: 'Space',
-        ArrowDown: '↓',
-        ArrowLeft: '←',
-        ArrowRight: '→',
-        ArrowUp: '↑',
-    };
-    parts.push(keyNames[shortcut.key] || (shortcut.key.length === 1
-        ? shortcut.key.toUpperCase()
-        : shortcut.key));
-    return parts.join(' + ');
-}
-function shortcutsEqual(left, right) {
-    return left.key === right.key
-        && left.shiftKey === right.shiftKey
-        && left.ctrlKey === right.ctrlKey
-        && left.metaKey === right.metaKey
-        && left.altKey === right.altKey;
-}
-function isFixedNodeKeyboardShortcut(shortcut) {
-    if ((shortcut.ctrlKey || shortcut.metaKey) && !shortcut.shiftKey && !shortcut.altKey && shortcut.key === 'z') {
-        return true;
-    }
-    if (shortcut.ctrlKey || shortcut.metaKey || shortcut.altKey)
-        return false;
-    if (!shortcut.shiftKey && ['Backspace', 'Space', 'Tab'].includes(shortcut.key)) {
-        return true;
-    }
-    return false;
-}
-function validateNodeKeyboardShortcut(id, shortcut, shortcuts) {
-    if (!shortcut)
-        return 'Shortcut must include a non-modifier key';
-    if (isFixedNodeKeyboardShortcut(shortcut)) {
-        return 'Shortcut conflicts with a fixed mindmap action';
-    }
-    const otherId = id === 'addSiblingAfter'
-        ? 'addSiblingBefore'
-        : 'addSiblingAfter';
-    if (shortcutsEqual(shortcut, shortcuts[otherId]))
-        return 'Shortcut is already assigned';
-    return null;
-}
-
 class NodeKeyboardController {
     constructor(mindmap) {
         this.mindmap = mindmap;
@@ -39467,9 +39522,10 @@ class NodeKeyboardController {
             this.mindmap.isComposing) {
             return false;
         }
-        if (!node.data.isEdit && this.handleNavigationShortcut(event, node))
+        const shortcuts = normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts);
+        if (!node.data.isEdit && this.handleNavigationShortcut(event, node, shortcuts))
             return true;
-        if (!node.data.isEdit && this.handleSiblingShortcut(event, node))
+        if (!node.data.isEdit && this.handleSiblingShortcut(event, node, shortcuts))
             return true;
         if (node.data.isEdit &&
             (event.key === 'Backspace' || event.key === 'Delete') &&
@@ -39477,46 +39533,36 @@ class NodeKeyboardController {
             this.consume(event);
             return true;
         }
-        if (event.key === 'Backspace' && !node.data.isEdit && !node.data.isRoot && this.hasNoModifiers(event)) {
+        if (matchesMindMapShortcut(shortcuts.deleteNode, event) && !node.data.isEdit && !node.data.isRoot) {
             this.consume(event);
             node.mindmap.execute('deleteNodeAndChild', { node });
             return true;
         }
-        if (event.key === ' ' && !node.data.isEdit && this.hasNoModifiers(event)) {
+        if (matchesMindMapShortcut(shortcuts.editNode, event) && !node.data.isEdit) {
             this.consume(event);
             node.edit();
             return true;
         }
-        if (event.key === 'Tab' && this.hasNoModifiers(event)) {
+        if (matchesMindMapShortcut(shortcuts.addChild, event)) {
             this.consume(event);
             if (node.data.isEdit)
                 this.finishEdit(node);
             this.addChild(node);
             return true;
         }
-        if (event.key !== 'Enter')
-            return false;
-        if (event.shiftKey) {
-            if (!node.data.isEdit || event.ctrlKey || event.metaKey || event.altKey)
+        if (matchesMindMapShortcut(shortcuts.insertLineBreak, event)) {
+            if (!node.data.isEdit)
                 return false;
             this.consume(event);
             node.insertLineBreak();
             return true;
         }
-        if (!this.hasNoModifiers(event))
-            return false;
-        this.consume(event);
-        if (node.data.isEdit) {
+        if (matchesMindMapShortcut(shortcuts.finishEdit, event) && node.data.isEdit) {
+            this.consume(event);
             this.finishEdit(node);
             return true;
         }
-        if (node.data.isRoot || !node.parent) {
-            this.addChild(node);
-        }
-        else {
-            this.addSiblingAfter(node);
-        }
-        return true;
+        return false;
     }
     isNodeKeyboardTarget(event, node) {
         const target = event.target;
@@ -39530,30 +39576,25 @@ class NodeKeyboardController {
         }
         return target === node.containEl || node.containEl.contains(target);
     }
-    handleNavigationShortcut(event, node) {
-        if (event.key === 'Home' && this.hasHomeModifiers(event)) {
+    handleNavigationShortcut(event, node, shortcuts) {
+        if (matchesMindMapShortcut(shortcuts.navigateRoot, event)) {
             this.consume(event);
             this.mindmap.clearSelectNode();
             this.mindmap.root.select();
             this.mindmap.center();
             return true;
         }
-        if (!this.hasNoModifiers(event))
-            return false;
-        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        if (matchesMindMapShortcut(shortcuts.navigateUp, event) || matchesMindMapShortcut(shortcuts.navigateDown, event)) {
             this.consume(event);
-            this.selectVerticalNode(node, event.key === 'ArrowUp' ? 'up' : 'down');
+            this.selectVerticalNode(node, matchesMindMapShortcut(shortcuts.navigateUp, event) ? 'up' : 'down');
             return true;
         }
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        if (matchesMindMapShortcut(shortcuts.navigateLeft, event) || matchesMindMapShortcut(shortcuts.navigateRight, event)) {
             this.consume(event);
-            this.selectHorizontalNode(node, event.key === 'ArrowLeft' ? 'left' : 'right');
+            this.selectHorizontalNode(node, matchesMindMapShortcut(shortcuts.navigateLeft, event) ? 'left' : 'right');
             return true;
         }
         return false;
-    }
-    hasHomeModifiers(event) {
-        return !event.shiftKey && !event.altKey && !(event.ctrlKey && event.metaKey);
     }
     selectVerticalNode(node, direct) {
         let candidate = node;
@@ -39602,9 +39643,8 @@ class NodeKeyboardController {
             direct: 'top',
         });
     }
-    handleSiblingShortcut(event, node) {
-        const shortcuts = normalizeNodeKeyboardShortcuts(this.mindmap.setting.nodeKeyboardShortcuts);
-        if (matchesNodeKeyboardShortcut(shortcuts.addSiblingAfter, event)) {
+    handleSiblingShortcut(event, node, shortcuts) {
+        if (matchesMindMapShortcut(shortcuts.addSiblingAfter, event)) {
             this.consume(event);
             if (node.data.isRoot || !node.parent) {
                 this.addChild(node);
@@ -39614,7 +39654,7 @@ class NodeKeyboardController {
             }
             return true;
         }
-        if (matchesNodeKeyboardShortcut(shortcuts.addSiblingBefore, event)) {
+        if (matchesMindMapShortcut(shortcuts.addSiblingBefore, event)) {
             this.consume(event);
             if (!node.data.isRoot && node.parent)
                 this.addSiblingBefore(node);
@@ -39622,27 +39662,16 @@ class NodeKeyboardController {
         }
         return false;
     }
-    hasNoModifiers(event) {
-        return !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
-    }
     consume(event) {
         event.preventDefault();
         event.stopPropagation();
     }
 }
 
-const BLOCKED_MULTI_SELECTION_KEYS = new Set([
-    'Backspace',
-    'Delete',
-    ' ',
-    'Enter',
-    'Tab',
-    'ArrowUp',
-    'ArrowDown',
-    'ArrowLeft',
-    'ArrowRight',
-    'Home',
-]);
+const SINGLE_NODE_SHORTCUTS = [
+    'addSiblingAfter', 'addSiblingBefore', 'addChild', 'editNode', 'deleteNode',
+    'navigateUp', 'navigateDown', 'navigateLeft', 'navigateRight', 'navigateRoot',
+];
 const BLANK_CLICK_MOVE_THRESHOLD = 4;
 class NodeSelectionController {
     constructor(mindmap) {
@@ -39925,7 +39954,7 @@ class NodeSelectionController {
     isBatchDeleteEvent(event) {
         var _a;
         if (!this.hasMultipleSelection() ||
-            (event.key !== 'Backspace' && event.key !== 'Delete') ||
+            !matchesMindMapShortcut(normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts).deleteNode, event) ||
             event.ctrlKey ||
             event.metaKey ||
             event.altKey ||
@@ -39949,7 +39978,10 @@ class NodeSelectionController {
         });
     }
     blockSingleNodeShortcut(event) {
-        if (!this.hasMultipleSelection() || !BLOCKED_MULTI_SELECTION_KEYS.has(event.key))
+        if (!this.hasMultipleSelection())
+            return false;
+        const shortcuts = normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts);
+        if (!SINGLE_NODE_SHORTCUTS.some((id) => matchesMindMapShortcut(shortcuts[id], event)))
             return false;
         event.preventDefault();
         event.stopPropagation();
@@ -40638,6 +40670,79 @@ class MindMapNavigatorController {
     }
 }
 
+const CONTROLLER_SHORTCUTS = new Set([
+    'addSiblingAfter', 'addSiblingBefore', 'addChild', 'editNode', 'deleteNode',
+    'finishEdit', 'insertLineBreak', 'copyNode', 'cutNode', 'pasteNode',
+    'navigateUp', 'navigateDown', 'navigateLeft', 'navigateRight', 'navigateRoot',
+]);
+class MindMapShortcutRouter {
+    constructor(mindmap) {
+        this.mindmap = mindmap;
+    }
+    handleKeydown(event) {
+        var _a, _b;
+        if (!this.isLocalEvent(event))
+            return false;
+        if (this.mindmap.nodeSelectionController.handleKeydown(event))
+            return true;
+        if (this.mindmap.nodeClipboardController.handleKeydown(event))
+            return true;
+        if (this.mindmap.nodeKeyboardController.handleKeydown(event))
+            return true;
+        const shortcuts = normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts);
+        const context = this.getContext();
+        const definition = MINDMAP_SHORTCUT_DEFINITIONS.find((candidate) => !CONTROLLER_SHORTCUTS.has(candidate.id)
+            && candidate.contexts.includes(context)
+            && matchesMindMapShortcut(shortcuts[candidate.id], event));
+        if (!definition)
+            return false;
+        if (definition.id === 'strikeText') {
+            const node = this.mindmap.editNode;
+            if (!(node === null || node === void 0 ? void 0 : node.data.isEdit) || !node.toggleMarkdownFormatting('~~'))
+                return false;
+            return this.consume(event);
+        }
+        if (!definition.commandId)
+            return false;
+        const commandId = `${this.mindmap.view.plugin.manifest.id}:${definition.commandId}`;
+        const executed = Boolean((_b = (_a = this.mindmap.view.app.commands) === null || _a === void 0 ? void 0 : _a.executeCommandById) === null || _b === void 0 ? void 0 : _b.call(_a, commandId));
+        return executed ? this.consume(event) : false;
+    }
+    getContext() {
+        var _a;
+        if (this.mindmap.nodeSelectionController.hasMultipleSelection())
+            return 'multiple';
+        if ((_a = this.mindmap.editNode) === null || _a === void 0 ? void 0 : _a.data.isEdit) {
+            const activeEl = this.mindmap.editNode.contentEl.ownerDocument.activeElement;
+            if (activeEl instanceof Element && activeEl.closest('.mm-node-image-attachment'))
+                return 'image';
+            return 'editing';
+        }
+        return this.mindmap.selectNode ? 'selected' : 'canvas';
+    }
+    isLocalEvent(event) {
+        var _a;
+        if (event.defaultPrevented || event.isComposing || this.mindmap.isComposing)
+            return false;
+        const view = this.mindmap.view;
+        if (!view || view.mindmap !== this.mindmap || view.app.workspace.activeLeaf !== view.leaf)
+            return false;
+        const target = event.target;
+        if (!(target instanceof Element) || !this.mindmap.appEl.contains(target))
+            return false;
+        if ((_a = this.mindmap.editNode) === null || _a === void 0 ? void 0 : _a.data.isEdit) {
+            return target === this.mindmap.editNode.contentEl
+                || this.mindmap.editNode.contentEl.contains(target);
+        }
+        return !target.closest('input, textarea, select, button, a, [contenteditable="true"]');
+    }
+    consume(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+    }
+}
+
 const CANVAS_SAFE_MARGIN = 60;
 function normalizeCanvasSize(size) {
     return Number.isFinite(size) && size > 0 ? Math.ceil(size) : 1;
@@ -40755,6 +40860,7 @@ class MindMap {
         this.nodeClipboardController = new NodeClipboardController(this);
         this.nodeKeyboardController = new NodeKeyboardController(this);
         this.nodeSelectionController = new NodeSelectionController(this);
+        this.shortcutRouter = new MindMapShortcutRouter(this);
         this.nodeLinkController = new NodeLinkController(this);
         this.canvasBoundsController = new CanvasBoundsController(this, this.setting.canvasSize);
         this.navigatorController = new MindMapNavigatorController(this);
@@ -41045,11 +41151,7 @@ class MindMap {
         (_a = this.view) === null || _a === void 0 ? void 0 : _a.mindMapChange();
     }
     appKeydown(e) {
-        if (this.nodeSelectionController.handleKeydown(e))
-            return;
-        if (this.nodeClipboardController.handleKeydown(e))
-            return;
-        this.nodeKeyboardController.handleKeydown(e);
+        this.shortcutRouter.handleKeydown(e);
     }
     compositionStart(e) {
         this.isComposing = true;
@@ -43112,287 +43214,240 @@ class MindMapStyleInspector {
     }
 }
 
-const fixedShortcuts = [
-    {
-        label: 'Enter edit mode',
-        shortcut: { key: 'Space', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Add child node',
-        shortcut: { key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Delete selected node',
-        shortcut: { key: 'Backspace', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Finish editing',
-        shortcut: { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Insert line break',
-        shortcut: { key: 'Enter', shiftKey: true, ctrlKey: false, metaKey: false, altKey: false },
-    },
-];
-const clipboardAndHistoryShortcuts = [
-    {
-        label: 'Copy selected node',
-        shortcut: { key: 'c', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Cut selected node',
-        shortcut: { key: 'x', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Paste as child node',
-        shortcut: { key: 'v', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-    },
-];
-const markdownFormattingShortcuts = [
-    {
-        label: 'Bold selected text',
-        shortcut: { key: 'b', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Italicize selected text',
-        shortcut: { key: 'i', shiftKey: false, ctrlKey: true, metaKey: false, altKey: false },
-    },
-    {
-        label: 'Strike through selected text',
-        shortcut: { key: 's', shiftKey: true, ctrlKey: true, metaKey: false, altKey: false },
-    },
-];
 class MindMapShortcutInspector {
     constructor(options) {
+        this.options = options;
         this.inspectorEl = null;
         this.contentEl = null;
-        this.recordingShortcutId = null;
-        this.validationError = null;
-        this.isSaving = false;
-        this.parentEl = options.parentEl;
-        this.shortcuts = normalizeNodeKeyboardShortcuts(options.shortcuts);
-        this.pluginShortcuts = options.pluginShortcuts;
-        this.onChange = options.onChange;
-        this.onClose = options.onClose;
+        this.recordingId = null;
+        this.error = null;
+        this.shortcuts = normalizeMindMapShortcuts(options.shortcuts);
     }
     open() {
         if (this.inspectorEl)
             return;
-        const inspectorEl = this.parentEl.createDiv({
-            cls: 'mm-mindmap-shortcut-inspector',
-            attr: {
-                role: 'complementary',
-                'aria-label': t('Mindmap shortcuts'),
-            },
-        });
-        this.inspectorEl = inspectorEl;
-        const header = inspectorEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-header' });
+        this.inspectorEl = this.options.parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector' });
+        const header = this.inspectorEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-header' });
         header.createEl('h3', { text: t('Mindmap shortcuts') });
-        const closeButton = header.createEl('button', {
-            cls: 'clickable-icon mm-mindmap-shortcut-inspector-close',
-            attr: {
-                type: 'button',
-                'aria-label': t('Close mindmap shortcut inspector'),
-            },
-        });
-        obsidian.setIcon(closeButton, 'x');
-        closeButton.addEventListener('click', () => this.onClose());
-        inspectorEl.createEl('p', {
-            text: t('Mindmap shortcuts description'),
-            cls: 'setting-item-description mm-mindmap-shortcut-inspector-description',
-        });
-        this.contentEl = inspectorEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-content' });
-        this.renderContent();
+        const close = header.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': t('Close mindmap shortcut inspector') } });
+        obsidian.setIcon(close, 'x');
+        close.addEventListener('click', this.options.onClose);
+        this.inspectorEl.createEl('p', { text: t('Mindmap shortcuts description'), cls: 'setting-item-description' });
+        const manage = this.inspectorEl.createEl('button', { text: t('Manage all shortcuts'), cls: 'mod-cta mm-shortcut-manage-all' });
+        manage.addEventListener('click', this.options.onManageAll);
+        this.contentEl = this.inspectorEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-content' });
+        this.render();
+    }
+    setShortcuts(shortcuts) {
+        this.shortcuts = normalizeMindMapShortcuts(shortcuts);
+        this.render();
     }
     destroy() {
         var _a;
         (_a = this.inspectorEl) === null || _a === void 0 ? void 0 : _a.remove();
         this.inspectorEl = null;
         this.contentEl = null;
-        this.recordingShortcutId = null;
     }
-    renderContent() {
-        const contentEl = this.contentEl;
-        if (!contentEl)
+    render() {
+        if (!this.contentEl)
             return;
-        contentEl.empty();
-        const customSection = contentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section' });
-        const customHeader = customSection.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section-header' });
-        customHeader.createEl('h4', { text: t('Custom shortcuts') });
-        const resetButton = customHeader.createEl('button', {
-            text: t('Reset shortcut defaults'),
-            cls: 'mm-mindmap-shortcut-inspector-reset',
-            attr: { type: 'button' },
-        });
-        resetButton.disabled = this.isSaving;
-        resetButton.addEventListener('click', () => {
-            void this.saveShortcuts(createDefaultNodeKeyboardShortcuts());
-        });
-        this.createEditableShortcutCard(customSection, 'addSiblingAfter', t('Add sibling below'));
-        this.createEditableShortcutCard(customSection, 'addSiblingBefore', t('Add sibling above'));
-        if (this.validationError) {
-            customSection.createDiv({
-                text: t(this.validationError),
-                cls: 'mm-mindmap-shortcut-inspector-error',
-                attr: { role: 'alert' },
-            });
-        }
-        this.createSection(contentEl, t('Other node shortcuts'), (section) => {
-            fixedShortcuts.forEach(({ label, shortcut }) => {
-                this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
-            });
-            const numberChildNodes = this.pluginShortcuts()
-                .find((shortcut) => shortcut.id === 'Number child nodes');
-            this.createFixedShortcutRow(section, t('Number child nodes'), (numberChildNodes === null || numberChildNodes === void 0 ? void 0 : numberChildNodes.shortcuts.length)
-                ? numberChildNodes.shortcuts.join(' / ')
-                : t('Shortcut not assigned'));
-        });
-        this.createSection(contentEl, t('Clipboard and history'), (section) => {
-            clipboardAndHistoryShortcuts.forEach(({ label, shortcut }) => {
-                this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
-            });
-            const historyShortcuts = this.pluginShortcuts();
-            ['Undo', 'Redo'].forEach((id) => {
-                const command = historyShortcuts.find((shortcut) => shortcut.id === id);
-                if (!command)
-                    return;
-                this.createFixedShortcutRow(section, t(id), command.shortcuts.length ? command.shortcuts.join(' / ') : t('Shortcut not assigned'));
+        this.contentEl.empty();
+        const definitions = MINDMAP_SHORTCUT_DEFINITIONS.filter((definition) => definition.highFrequency);
+        [...new Set(definitions.map((definition) => definition.category))].forEach((category) => {
+            const section = this.contentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section' });
+            section.createEl('h4', { text: t(category) });
+            definitions.filter((definition) => definition.category === category).forEach((definition) => {
+                const row = section.createDiv({ cls: 'mm-mindmap-shortcut-inspector-row' });
+                row.createSpan({ text: t(definition.label), cls: 'mm-mindmap-shortcut-inspector-label' });
+                const binding = row.createEl('button', {
+                    text: this.recordingId === definition.id ? t('Press a shortcut') : formatMindMapShortcut(this.shortcuts[definition.id]) || t('Shortcut not assigned'),
+                    cls: 'mm-mindmap-shortcut-inspector-binding',
+                    attr: { 'data-shortcut-id': definition.id },
+                });
+                binding.addEventListener('click', () => {
+                    var _a, _b;
+                    this.recordingId = definition.id;
+                    this.error = null;
+                    this.render();
+                    (_b = (_a = this.contentEl) === null || _a === void 0 ? void 0 : _a.querySelector(`[data-shortcut-id="${definition.id}"]`)) === null || _b === void 0 ? void 0 : _b.focus();
+                });
+                binding.addEventListener('keydown', (event) => void this.record(definition.id, event));
             });
         });
-        this.createSection(contentEl, t('Markdown formatting'), (section) => {
-            markdownFormattingShortcuts.forEach(({ label, shortcut }) => {
-                this.createFixedShortcutRow(section, t(label), formatPlatformShortcut(shortcut));
-            });
-        });
-        if (this.recordingShortcutId) {
-            const button = contentEl.querySelector(`[data-shortcut-id="${this.recordingShortcutId}"]`);
-            button === null || button === void 0 ? void 0 : button.focus();
-        }
+        if (this.error)
+            this.contentEl.createDiv({ text: this.error, cls: 'mm-mindmap-shortcut-inspector-error' });
     }
-    createSection(parentEl, title, content) {
-        const section = parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-section' });
-        section.createEl('h4', { text: title });
-        content(section);
-    }
-    createEditableShortcutCard(parentEl, id, label) {
-        const card = parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-card' });
-        card.createDiv({ text: label, cls: 'mm-mindmap-shortcut-inspector-card-label' });
-        const isRecording = this.recordingShortcutId === id;
-        const button = card.createEl('button', {
-            text: isRecording ? t('Press a shortcut') : formatNodeKeyboardShortcut(this.shortcuts[id]),
-            cls: 'mm-mindmap-shortcut-inspector-binding mm-mindmap-shortcut-inspector-card-binding',
-            attr: {
-                type: 'button',
-                'data-shortcut-id': id,
-                'aria-label': isRecording ? t('Press a shortcut') : `${label}: ${formatNodeKeyboardShortcut(this.shortcuts[id])}`,
-            },
-        });
-        button.classList.toggle('is-recording', isRecording);
-        button.disabled = this.isSaving;
-        button.addEventListener('click', () => this.startRecording(id));
-        button.addEventListener('keydown', (event) => {
-            if (this.recordingShortcutId !== id)
-                return;
-            void this.recordShortcut(id, event);
-        });
-    }
-    createFixedShortcutRow(parentEl, label, shortcut) {
-        const row = parentEl.createDiv({ cls: 'mm-mindmap-shortcut-inspector-row is-fixed' });
-        row.createSpan({ text: label, cls: 'mm-mindmap-shortcut-inspector-label' });
-        row.createSpan({ text: shortcut, cls: 'mm-mindmap-shortcut-inspector-fixed-binding' });
-    }
-    startRecording(id) {
-        if (this.isSaving)
-            return;
-        this.recordingShortcutId = id;
-        this.validationError = null;
-        this.renderContent();
-    }
-    recordShortcut(id, event) {
+    record(id, event) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.recordingId !== id)
+                return;
             event.preventDefault();
             event.stopPropagation();
             if (event.key === 'Escape') {
-                this.recordingShortcutId = null;
-                this.validationError = null;
-                this.renderContent();
+                this.recordingId = null;
+                this.render();
                 return;
             }
             const shortcut = shortcutFromKeyboardEvent(event);
-            const validationError = validateNodeKeyboardShortcut(id, shortcut, this.shortcuts);
-            if (validationError || !shortcut) {
-                this.validationError = validationError || 'Shortcut must include a non-modifier key';
-                this.renderContent();
+            if (!shortcut)
+                return;
+            const conflict = findShortcutConflict(id, shortcut, this.shortcuts);
+            if (conflict) {
+                this.error = `${t('Shortcut is already assigned')}: ${t(conflict.label)}`;
+                this.render();
                 return;
             }
-            yield this.saveShortcuts(Object.assign(Object.assign({}, this.shortcuts), { [id]: shortcut }));
+            this.shortcuts = Object.assign(Object.assign({}, this.shortcuts), { [id]: shortcut });
+            this.recordingId = null;
+            this.error = null;
+            yield this.options.onChange(this.shortcuts);
+            this.render();
         });
     }
-    saveShortcuts(shortcuts) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.isSaving)
-                return;
-            this.isSaving = true;
-            this.validationError = null;
-            this.renderContent();
-            try {
-                const normalizedShortcuts = normalizeNodeKeyboardShortcuts(shortcuts);
-                yield this.onChange(normalizedShortcuts);
-                this.shortcuts = normalizedShortcuts;
-                this.recordingShortcutId = null;
-            }
-            catch (error) {
-                console.error('Unable to save mindmap shortcuts', error);
-                this.validationError = 'Shortcut settings could not be saved';
-            }
-            finally {
-                this.isSaving = false;
-                this.renderContent();
-            }
-        });
-    }
-}
-function formatPlatformShortcut(shortcut) {
-    const platformShortcut = Object.assign(Object.assign({}, shortcut), { ctrlKey: obsidian.Platform.isMacOS ? false : shortcut.ctrlKey, metaKey: obsidian.Platform.isMacOS ? shortcut.ctrlKey : shortcut.metaKey });
-    return formatNodeKeyboardShortcut(platformShortcut);
 }
 
-function getPluginShortcutCatalog(app, pluginId) {
-    var _a;
-    const internalApp = app;
-    const commands = Object.values(((_a = internalApp.commands) === null || _a === void 0 ? void 0 : _a.commands) || {});
-    const hotkeyManager = internalApp.hotkeyManager;
-    if (!(hotkeyManager === null || hotkeyManager === void 0 ? void 0 : hotkeyManager.getHotkeys) || !hotkeyManager.getDefaultHotkeys)
-        return [];
-    const prefix = `${pluginId}:`;
-    return commands
-        .filter((command) => { var _a; return (_a = command.id) === null || _a === void 0 ? void 0 : _a.startsWith(prefix); })
-        .map((command) => {
-        const commandId = command.id;
-        const customHotkeys = hotkeyManager.getHotkeys(commandId);
-        const customized = customHotkeys !== null && customHotkeys !== undefined;
-        const hotkeys = customized
-            ? customHotkeys
-            : hotkeyManager.getDefaultHotkeys(commandId) || [];
-        return {
-            id: commandId.slice(prefix.length),
-            label: command.name || commandId.slice(prefix.length),
-            shortcuts: hotkeys.map(formatPluginHotkey),
-        };
-    })
-        .sort((left, right) => left.label.localeCompare(right.label));
-}
-function formatPluginHotkey(shortcut) {
-    const modifiers = (shortcut.modifiers || []).map((modifier) => {
-        if (modifier === 'Mod')
-            return obsidian.Platform.isMacOS ? 'Cmd' : 'Ctrl';
-        if (modifier === 'Meta')
-            return 'Cmd';
-        return modifier;
-    });
-    const key = shortcut.key || '';
-    const parts = [...modifiers, key.length === 1 ? key.toUpperCase() : key];
-    return parts.filter(Boolean).join(' + ');
+class MindMapShortcutManagerModal extends obsidian.Modal {
+    constructor(app, shortcuts, onChange) {
+        super(app);
+        this.onChange = onChange;
+        this.query = '';
+        this.modifiedOnly = false;
+        this.recordingId = null;
+        this.shortcuts = normalizeMindMapShortcuts(shortcuts);
+    }
+    onOpen() {
+        this.modalEl.addClass('mm-shortcut-manager-modal');
+        this.render();
+    }
+    setShortcuts(shortcuts) {
+        this.shortcuts = normalizeMindMapShortcuts(shortcuts);
+        if (this.contentEl.isConnected)
+            this.render();
+    }
+    render() {
+        this.contentEl.empty();
+        const header = this.contentEl.createDiv({ cls: 'mm-shortcut-manager-header' });
+        header.createEl('h2', { text: t('Manage mindmap shortcuts') });
+        header.createEl('p', {
+            text: t('Mindmap shortcuts description'),
+            cls: 'setting-item-description',
+        });
+        const toolbar = this.contentEl.createDiv({ cls: 'mm-shortcut-manager-toolbar' });
+        const search = toolbar.createEl('input', {
+            type: 'search',
+            placeholder: t('Search shortcuts'),
+            value: this.query,
+        });
+        search.addEventListener('input', () => {
+            this.query = search.value;
+            this.renderList();
+        });
+        const modifiedLabel = toolbar.createEl('label');
+        const modifiedToggle = modifiedLabel.createEl('input', { type: 'checkbox' });
+        modifiedToggle.checked = this.modifiedOnly;
+        modifiedToggle.addEventListener('change', () => {
+            this.modifiedOnly = modifiedToggle.checked;
+            this.renderList();
+        });
+        modifiedLabel.appendText(t('Show modified shortcuts only'));
+        const resetAll = toolbar.createEl('button', { text: t('Reset shortcut defaults') });
+        resetAll.addEventListener('click', () => void this.save(createDefaultMindMapShortcuts()));
+        this.contentEl.createDiv({ cls: 'mm-shortcut-manager-list' });
+        this.renderList();
+    }
+    renderList() {
+        const list = this.contentEl.querySelector('.mm-shortcut-manager-list');
+        if (!list)
+            return;
+        list.empty();
+        const defaults = createDefaultMindMapShortcuts();
+        const query = this.query.trim().toLocaleLowerCase();
+        const definitions = MINDMAP_SHORTCUT_DEFINITIONS.filter((definition) => {
+            const isModified = formatMindMapShortcut(this.shortcuts[definition.id])
+                !== formatMindMapShortcut(defaults[definition.id]);
+            if (this.modifiedOnly && !isModified)
+                return false;
+            return !query || `${t(definition.label)} ${t(definition.category)}`.toLocaleLowerCase().includes(query);
+        });
+        const categories = [...new Set(definitions.map((definition) => definition.category))];
+        categories.forEach((category) => {
+            const section = list.createDiv({ cls: 'mm-shortcut-manager-section' });
+            const sectionHeader = section.createDiv({ cls: 'mm-shortcut-manager-section-header' });
+            sectionHeader.createEl('h3', { text: t(category) });
+            const reset = sectionHeader.createEl('button', { text: t('Reset shortcut defaults') });
+            reset.addEventListener('click', () => {
+                const next = Object.assign({}, this.shortcuts);
+                MINDMAP_SHORTCUT_DEFINITIONS.filter((definition) => definition.category === category)
+                    .forEach((definition) => next[definition.id] = defaults[definition.id]);
+                void this.save(next);
+            });
+            definitions.filter((definition) => definition.category === category).forEach((definition) => {
+                const row = section.createDiv({ cls: 'mm-shortcut-manager-row' });
+                const text = row.createDiv();
+                text.createDiv({ text: t(definition.label), cls: 'mm-shortcut-manager-label' });
+                text.createDiv({ text: definition.contexts.map((context) => t(context)).join(' · '), cls: 'setting-item-description' });
+                const controls = row.createDiv({ cls: 'mm-shortcut-manager-controls' });
+                const binding = controls.createEl('button', {
+                    text: this.recordingId === definition.id
+                        ? t('Press a shortcut')
+                        : formatMindMapShortcut(this.shortcuts[definition.id]) || t('Shortcut not assigned'),
+                    attr: { 'data-shortcut-id': definition.id },
+                });
+                binding.toggleClass('is-recording', this.recordingId === definition.id);
+                binding.addEventListener('click', () => {
+                    var _a;
+                    this.recordingId = definition.id;
+                    this.renderList();
+                    (_a = list.querySelector(`[data-shortcut-id="${definition.id}"]`)) === null || _a === void 0 ? void 0 : _a.focus();
+                });
+                binding.addEventListener('keydown', (event) => void this.record(definition.id, event));
+                const clear = controls.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': t('Clear shortcut') } });
+                obsidian.setIcon(clear, 'x');
+                clear.addEventListener('click', () => void this.save(Object.assign(Object.assign({}, this.shortcuts), { [definition.id]: null })));
+                const resetOne = controls.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': t('Reset shortcut defaults') } });
+                obsidian.setIcon(resetOne, 'rotate-ccw');
+                resetOne.addEventListener('click', () => void this.save(Object.assign(Object.assign({}, this.shortcuts), { [definition.id]: defaults[definition.id] })));
+            });
+        });
+        if (!definitions.length)
+            list.createDiv({ text: t('No matching shortcuts'), cls: 'setting-item-description' });
+    }
+    record(id, event) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.recordingId !== id)
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === 'Escape') {
+                this.recordingId = null;
+                this.renderList();
+                return;
+            }
+            const shortcut = shortcutFromKeyboardEvent(event);
+            if (!shortcut)
+                return;
+            const conflict = findShortcutConflict(id, shortcut, this.shortcuts);
+            if (conflict) {
+                const row = (_a = this.contentEl.querySelector(`[data-shortcut-id="${id}"]`)) === null || _a === void 0 ? void 0 : _a.closest('.mm-shortcut-manager-row');
+                row === null || row === void 0 ? void 0 : row.createDiv({
+                    text: `${t('Shortcut is already assigned')}: ${t(getMindMapShortcutDefinition(conflict.id).label)}`,
+                    cls: 'mm-shortcut-manager-error',
+                    attr: { role: 'alert' },
+                });
+                return;
+            }
+            yield this.save(Object.assign(Object.assign({}, this.shortcuts), { [id]: shortcut }));
+        });
+    }
+    save(shortcuts) {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.shortcuts = normalizeMindMapShortcuts(shortcuts);
+            this.recordingId = null;
+            yield this.onChange(this.shortcuts);
+            this.renderList();
+        });
+    }
 }
 
 var domToImageMore = createCommonjsModule(function (module, exports) {
@@ -45126,6 +45181,7 @@ class MindMapView extends obsidian.TextFileView {
         this.styleInspector = null;
         this.isStyleInspectorOpen = false;
         this.shortcutInspector = null;
+        this.shortcutManager = null;
         this.isShortcutInspectorOpen = false;
         this.isApplyingStyleTemplate = false;
         this.timeOut = null;
@@ -45139,6 +45195,7 @@ class MindMapView extends obsidian.TextFileView {
         };
     }
     onClose() {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             // Remove draggables from render, as the DOM has already detached
             //this.plugin.removeView(this);
@@ -45147,6 +45204,8 @@ class MindMapView extends obsidian.TextFileView {
             this.destroyStyleInspector();
             this.isShortcutInspectorOpen = false;
             this.destroyShortcutInspector();
+            (_a = this.shortcutManager) === null || _a === void 0 ? void 0 : _a.close();
+            this.shortcutManager = null;
             this.clearStagingMindmap();
             if (this.mindmap) {
                 this.mindmap.clear();
@@ -45289,10 +45348,6 @@ class MindMapView extends obsidian.TextFileView {
     }
     onload() {
         super.onload();
-        this.scope = new obsidian.Scope(this.app.scope);
-        this.scope.register(['Mod'], 'b', () => this.formatEditingNode('**', '__'));
-        this.scope.register(['Mod'], 'i', () => this.formatEditingNode('_', '*'));
-        this.scope.register(['Mod', 'Shift'], 's', () => this.formatEditingNode('~~'));
         this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
         this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
         this.registerEvent(this.app.workspace.on("quick-preview", (file, data) => this.onQuickPreview(file, data), this));
@@ -45376,9 +45431,9 @@ class MindMapView extends obsidian.TextFileView {
             return;
         this.shortcutInspector = new MindMapShortcutInspector({
             parentEl: this.contentEl,
-            shortcuts: this.plugin.settings.nodeKeyboardShortcuts,
-            pluginShortcuts: () => this.getPluginShortcuts(),
-            onChange: (shortcuts) => this.updateNodeKeyboardShortcuts(shortcuts),
+            shortcuts: this.plugin.settings.mindMapShortcuts,
+            onChange: (shortcuts) => this.updateMindMapShortcuts(shortcuts),
+            onManageAll: () => this.openShortcutManager(),
             onClose: () => {
                 this.isShortcutInspectorOpen = false;
                 this.destroyShortcutInspector();
@@ -45391,10 +45446,21 @@ class MindMapView extends obsidian.TextFileView {
         (_a = this.shortcutInspector) === null || _a === void 0 ? void 0 : _a.destroy();
         this.shortcutInspector = null;
     }
-    updateNodeKeyboardShortcuts(shortcuts) {
+    updateMindMapShortcuts(shortcuts) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.plugin.updateNodeKeyboardShortcuts(shortcuts);
+            yield this.plugin.updateMindMapShortcuts(shortcuts);
         });
+    }
+    refreshShortcutInspector() {
+        var _a, _b;
+        (_a = this.shortcutInspector) === null || _a === void 0 ? void 0 : _a.setShortcuts(this.plugin.settings.mindMapShortcuts);
+        (_b = this.shortcutManager) === null || _b === void 0 ? void 0 : _b.setShortcuts(this.plugin.settings.mindMapShortcuts);
+    }
+    openShortcutManager() {
+        var _a;
+        (_a = this.shortcutManager) === null || _a === void 0 ? void 0 : _a.close();
+        this.shortcutManager = new MindMapShortcutManagerModal(this.app, this.plugin.settings.mindMapShortcuts, (shortcuts) => this.updateMindMapShortcuts(shortcuts));
+        this.shortcutManager.open();
     }
     formatEditingNode(primaryMarker, alternateMarker) {
         var _a;
@@ -45402,9 +45468,6 @@ class MindMapView extends obsidian.TextFileView {
         if (!(node === null || node === void 0 ? void 0 : node.data.isEdit))
             return;
         return node.toggleMarkdownFormatting(primaryMarker, alternateMarker) ? false : undefined;
-    }
-    getPluginShortcuts() {
-        return getPluginShortcutCatalog(this.app, this.plugin.manifest.id);
     }
     previewStyleTemplate(styleTemplateId) {
         if (!this.mindmap)
@@ -45894,31 +45957,20 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
         });
     }
     renderShortcutCatalog(containerEl) {
-        const detailsEl = containerEl.createEl('details', {
-            cls: 'mm-settings-shortcut-catalog',
-        });
-        detailsEl.createEl('summary', { text: t('All plugin shortcuts') });
-        new obsidian.Setting(detailsEl)
-            .setDesc(t('All plugin shortcuts desc'))
+        new obsidian.Setting(containerEl)
+            .setName(t('Mindmap shortcuts'))
+            .setDesc(t('Mindmap shortcuts description'))
             .addButton((button) => button
-            .setButtonText(t('Manage shortcuts'))
+            .setButtonText(t('Manage all shortcuts'))
             .onClick(() => {
-            var _a, _b;
-            const setting = this.app.setting;
-            setting === null || setting === void 0 ? void 0 : setting.open();
-            const hotkeyTab = (_a = setting === null || setting === void 0 ? void 0 : setting.openTabById) === null || _a === void 0 ? void 0 : _a.call(setting, 'hotkeys');
-            (_b = hotkeyTab === null || hotkeyTab === void 0 ? void 0 : hotkeyTab.setQuery) === null || _b === void 0 ? void 0 : _b.call(hotkeyTab, this.plugin.manifest.id);
-        }));
-        const listEl = detailsEl.createDiv({ cls: 'mm-settings-shortcut-list' });
-        getPluginShortcutCatalog(this.app, this.plugin.manifest.id).forEach((command) => {
-            const setting = new obsidian.Setting(listEl).setName(command.label);
-            setting.controlEl.createSpan({
-                text: command.shortcuts.length
-                    ? command.shortcuts.join(' / ')
-                    : t('Shortcut not assigned'),
-                cls: 'mm-settings-shortcut-binding',
-            });
-        });
+            new MindMapShortcutManagerModal(this.app, this.plugin.settings.mindMapShortcuts, (shortcuts) => this.plugin.updateMindMapShortcuts(shortcuts)).open();
+        }))
+            .addButton((button) => button
+            .setButtonText(t('Reset shortcut defaults'))
+            .onClick(() => __awaiter(this, void 0, void 0, function* () {
+            yield this.plugin.updateMindMapShortcuts(createDefaultMindMapShortcuts());
+            new obsidian.Notice(t('Shortcut defaults restored'));
+        })));
     }
 }
 
@@ -46055,12 +46107,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Undo',
                 name: `${t('Undo')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Mod'],
-                        key: 'Z',
-                    },
-                ],
                 checkCallback: (checking) => {
                     const mindmap = this.getActiveMindMapForHistory();
                     if (!mindmap)
@@ -46073,9 +46119,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Redo',
                 name: `${t('Redo')}`,
-                hotkeys: obsidian.Platform.isMacOS
-                    ? [{ modifiers: ['Mod', 'Shift'], key: 'Z' }]
-                    : [{ modifiers: ['Mod'], key: 'Y' }],
                 checkCallback: (checking) => {
                     const mindmap = this.getActiveMindMapForHistory();
                     if (!mindmap)
@@ -46089,12 +46132,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Edit node',
                 name: `${t('Edit node')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Shift'],
-                        key: 'F2',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46110,12 +46147,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Delete node & child',
                 name: `${t('Delete node & child')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Shift'],
-                        key: 'Delete',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46149,12 +46180,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Bold the node\'s text',
                 name: `${t('Bold the node\'s text')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'B',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46182,12 +46207,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Italicize the node\'s text',
                 name: `${t('Italicize the node\'s text')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'I',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46243,12 +46262,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Highlight the node\'s text',
                 name: `${t('Highlight the node\'s text')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'H',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46299,12 +46312,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Add tabulation',
                 name: `${t('Add tabulation')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 't',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46322,12 +46329,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Add line break (<br>)',
                 name: `${t('Add line break (<br>)')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Ctrl', 'Shift'],
-                        key: 'l',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46346,12 +46347,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Remove line breaks (<br>)',
                 name: `${t('Remove line breaks (<br>)')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'l',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46394,12 +46389,6 @@ class MindMapPlugin extends obsidian.Plugin {
                 this.addCommand({
                     id: command.id,
                     name: command.name,
-                    hotkeys: [
-                        {
-                            modifiers: ['Alt'],
-                            key: command.key,
-                        },
-                    ],
                     callback: () => {
                         var _a;
                         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
@@ -46428,12 +46417,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Expand one level from the max. displayed level',
                 name: `${t('Expand one level from the max. displayed level')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: 'PageDown',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46477,12 +46460,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Collapse one level from the max. displayed level',
                 name: `${t('Collapse one level from the max. displayed level')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: 'PageUp',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46504,12 +46481,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Toggle expand/collapse node',
                 name: `${t('Toggle expand/collapse node')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Mod', 'Shift'],
-                        key: 'Space',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46527,12 +46498,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Move the current node above',
                 name: `${t('Move the current node above')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'ArrowUp',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46561,12 +46526,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Move the current node below',
                 name: `${t('Move the current node below')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'ArrowDown',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46595,12 +46554,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Move the current node left',
                 name: `${t('Move the current node left')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'ArrowLeft',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46630,12 +46583,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Move the current node right',
                 name: `${t('Move the current node right')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'ArrowRight',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46668,12 +46615,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Move next siblings as children',
                 name: `${t('Move next siblings as children')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'D',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46689,12 +46630,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Move all siblings as children',
                 name: `${t('Move all siblings as children')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Ctrl', 'Shift'],
-                        key: 'D',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46711,12 +46646,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Join with the node below',
                 name: `${t('Join with the node below')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'J',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46733,12 +46662,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Join as citation with the node below',
                 name: `${t('Join as citation with the node below')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift', 'Ctrl'],
-                        key: 'J',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46755,12 +46678,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Center mindmap view on the current node',
                 name: `${t('Center mindmap view on the current node')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: 'E',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46785,12 +46702,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Zoom in',
                 name: `${t('Zoom in')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: '=',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46803,12 +46714,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Zoom out',
                 name: `${t('Zoom out')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt'],
-                        key: '-',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -46960,10 +46865,14 @@ class MindMapPlugin extends obsidian.Plugin {
     }
     loadSettings() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.settings = Object.assign(Object.assign(Object.assign({ canvasSize: 8000, headLevel: 2, fontSize: 16, codeFontSize: DEFAULT_NODE_CODE_FONT_SIZE, background: 'transparent', layout: 'mindmap', layoutDirect: 'mindmap', defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), { nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts() }), yield this.loadData());
+            const storedSettings = (yield this.loadData()) || {};
+            this.settings = Object.assign(Object.assign(Object.assign({ canvasSize: 8000, headLevel: 2, fontSize: 16, codeFontSize: DEFAULT_NODE_CODE_FONT_SIZE, background: 'transparent', layout: 'mindmap', layoutDirect: 'mindmap', defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, showLinkTitle: false }, DEFAULT_NODE_WIDTH_SETTINGS), { mindMapShortcuts: createDefaultMindMapShortcuts() }), storedSettings);
             Object.assign(this.settings, normalizeNodeWidthSettings(this.settings));
             this.settings.codeFontSize = normalizeNodeCodeFontSize(this.settings.codeFontSize);
-            this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(this.settings.nodeKeyboardShortcuts);
+            this.settings.mindMapShortcuts = normalizeMindMapShortcuts(Object.prototype.hasOwnProperty.call(storedSettings, 'mindMapShortcuts')
+                ? this.settings.mindMapShortcuts
+                : undefined, storedSettings.nodeKeyboardShortcuts);
+            delete this.settings.nodeKeyboardShortcuts;
         });
     }
     saveSettings() {
@@ -46971,15 +46880,16 @@ class MindMapPlugin extends obsidian.Plugin {
             yield this.saveData(this.settings);
         });
     }
-    updateNodeKeyboardShortcuts(shortcuts) {
+    updateMindMapShortcuts(shortcuts) {
         return __awaiter(this, void 0, void 0, function* () {
-            const normalizedShortcuts = normalizeNodeKeyboardShortcuts(shortcuts);
-            this.settings.nodeKeyboardShortcuts = normalizedShortcuts;
+            const normalizedShortcuts = normalizeMindMapShortcuts(shortcuts);
+            this.settings.mindMapShortcuts = normalizedShortcuts;
             yield this.saveSettings();
             this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
                 const view = leaf.view;
                 if (view.mindmap)
-                    view.mindmap.setting.nodeKeyboardShortcuts = normalizedShortcuts;
+                    view.mindmap.setting.mindMapShortcuts = normalizedShortcuts;
+                view.refreshShortcutInspector();
             });
         });
     }

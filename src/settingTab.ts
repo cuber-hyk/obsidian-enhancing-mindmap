@@ -9,7 +9,8 @@ import { t } from './lang/helpers'
 import { MindMapView, mindmapViewType } from './MindMapView';
 import MyNode from './mindmap/INode';
 import { MINDMAP_STYLE_TEMPLATES, resolveMindMapStyleTemplate } from './mindmap/style/MindMapStyle';
-import { getPluginShortcutCatalog } from './mindmap/interaction/PluginShortcutCatalog';
+import MindMapShortcutManagerModal from './mindmap/interaction/MindMapShortcutManagerModal';
+import { createDefaultMindMapShortcuts } from './mindmap/interaction/MindMapShortcutCatalog';
 import {
     NodeWidthSettings,
     normalizeNodeWidthSettings,
@@ -342,31 +343,23 @@ export class MindMapSettingsTab extends PluginSettingTab {
     }
 
     private renderShortcutCatalog(containerEl: HTMLElement): void {
-        const detailsEl = containerEl.createEl('details', {
-            cls: 'mm-settings-shortcut-catalog',
-        });
-        detailsEl.createEl('summary', { text: t('All plugin shortcuts') });
-
-        new Setting(detailsEl)
-            .setDesc(t('All plugin shortcuts desc'))
+        new Setting(containerEl)
+            .setName(t('Mindmap shortcuts'))
+            .setDesc(t('Mindmap shortcuts description'))
             .addButton((button) => button
-                .setButtonText(t('Manage shortcuts'))
+                .setButtonText(t('Manage all shortcuts'))
                 .onClick(() => {
-                    const setting = (this.app as any).setting;
-                    setting?.open();
-                    const hotkeyTab = setting?.openTabById?.('hotkeys');
-                    hotkeyTab?.setQuery?.(this.plugin.manifest.id);
+                    new MindMapShortcutManagerModal(
+                        this.app,
+                        this.plugin.settings.mindMapShortcuts,
+                        (shortcuts) => this.plugin.updateMindMapShortcuts(shortcuts),
+                    ).open();
+                }))
+            .addButton((button) => button
+                .setButtonText(t('Reset shortcut defaults'))
+                .onClick(async () => {
+                    await this.plugin.updateMindMapShortcuts(createDefaultMindMapShortcuts());
+                    new Notice(t('Shortcut defaults restored'));
                 }));
-
-        const listEl = detailsEl.createDiv({ cls: 'mm-settings-shortcut-list' });
-        getPluginShortcutCatalog(this.app, this.plugin.manifest.id).forEach((command) => {
-            const setting = new Setting(listEl).setName(command.label);
-            setting.controlEl.createSpan({
-                text: command.shortcuts.length
-                    ? command.shortcuts.join(' / ')
-                    : t('Shortcut not assigned'),
-                cls: 'mm-settings-shortcut-binding',
-            });
-        });
     }
 }
