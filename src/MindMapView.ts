@@ -6,8 +6,7 @@ import {
   WorkspaceLeaf,
   TFile,
   Notice,
-  Platform,
-  Scope
+  Platform
 } from "obsidian";
 
 import MindMapPlugin from './main'
@@ -26,8 +25,8 @@ import {
 } from './mindmap/style/MindMapStyle';
 import MindMapStyleInspector from './mindmap/style/MindMapStyleInspector';
 import MindMapShortcutInspector from './mindmap/interaction/MindMapShortcutInspector';
-import { NodeKeyboardShortcuts } from './mindmap/interaction/NodeKeyboardShortcuts';
-import { getPluginShortcutCatalog } from './mindmap/interaction/PluginShortcutCatalog';
+import { MindMapShortcuts } from './mindmap/interaction/MindMapShortcutCatalog';
+import MindMapShortcutManagerModal from './mindmap/interaction/MindMapShortcutManagerModal';
 import {
   protectMindMapTables,
   restoreProtectedMindMapTables,
@@ -71,6 +70,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   styleInspector: MindMapStyleInspector | null = null;
   isStyleInspectorOpen: boolean = false;
   shortcutInspector: MindMapShortcutInspector | null = null;
+  shortcutManager: MindMapShortcutManagerModal | null = null;
   isShortcutInspectorOpen: boolean = false;
   isApplyingStyleTemplate: boolean = false;
   pendingViewState?: MindMapViewState;
@@ -325,6 +325,8 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.destroyStyleInspector();
     this.isShortcutInspectorOpen = false;
     this.destroyShortcutInspector();
+    this.shortcutManager?.close();
+    this.shortcutManager = null;
     this.clearStagingMindmap();
     if (this.mindmap) {
       this.mindmap.clear();
@@ -492,10 +494,6 @@ export class MindMapView extends TextFileView implements HoverParent {
 
   onload() {
     super.onload();
-    this.scope = new Scope(this.app.scope);
-    this.scope.register(['Mod'], 'b', () => this.formatEditingNode('**', '__'));
-    this.scope.register(['Mod'], 'i', () => this.formatEditingNode('_', '*'));
-    this.scope.register(['Mod', 'Shift'], 's', () => this.formatEditingNode('~~'));
     this.addAction('palette', t('Choose mindmap style'), () => this.toggleStyleInspector());
     this.addAction('keyboard', t('Manage mindmap shortcuts'), () => this.toggleShortcutInspector());
     this.registerEvent(
@@ -585,9 +583,9 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     this.shortcutInspector = new MindMapShortcutInspector({
       parentEl: this.contentEl,
-      shortcuts: this.plugin.settings.nodeKeyboardShortcuts,
-      pluginShortcuts: () => this.getPluginShortcuts(),
-      onChange: (shortcuts) => this.updateNodeKeyboardShortcuts(shortcuts),
+      shortcuts: this.plugin.settings.mindMapShortcuts,
+      onChange: (shortcuts) => this.updateMindMapShortcuts(shortcuts),
+      onManageAll: () => this.openShortcutManager(),
       onClose: () => {
         this.isShortcutInspectorOpen = false;
         this.destroyShortcutInspector();
@@ -601,8 +599,23 @@ export class MindMapView extends TextFileView implements HoverParent {
     this.shortcutInspector = null;
   }
 
-  private async updateNodeKeyboardShortcuts(shortcuts: NodeKeyboardShortcuts) {
-    await this.plugin.updateNodeKeyboardShortcuts(shortcuts);
+  private async updateMindMapShortcuts(shortcuts: MindMapShortcuts) {
+    await this.plugin.updateMindMapShortcuts(shortcuts);
+  }
+
+  refreshShortcutInspector(): void {
+    this.shortcutInspector?.setShortcuts(this.plugin.settings.mindMapShortcuts);
+    this.shortcutManager?.setShortcuts(this.plugin.settings.mindMapShortcuts);
+  }
+
+  openShortcutManager(): void {
+    this.shortcutManager?.close();
+    this.shortcutManager = new MindMapShortcutManagerModal(
+      this.app,
+      this.plugin.settings.mindMapShortcuts,
+      (shortcuts) => this.updateMindMapShortcuts(shortcuts),
+    );
+    this.shortcutManager.open();
   }
 
   private formatEditingNode(primaryMarker: string, alternateMarker?: string): false | void {
@@ -611,9 +624,6 @@ export class MindMapView extends TextFileView implements HoverParent {
     return node.toggleMarkdownFormatting(primaryMarker, alternateMarker) ? false : undefined;
   }
 
-  private getPluginShortcuts() {
-    return getPluginShortcutCatalog(this.app, this.plugin.manifest.id);
-  }
 
   private previewStyleTemplate(styleTemplateId: string) {
     if (!this.mindmap) return;

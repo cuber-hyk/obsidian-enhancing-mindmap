@@ -32,7 +32,7 @@ token_source: design-tokens.json
 - 节点代码块：`src/mindmap/code/NodeCodeMarkdown.ts`、`src/mindmap/code/NodeCodeController.ts`、`src/mindmap/code/NodeCodeEditorModal.ts`、`src/mindmap/code/NodeCodeRenderer.ts`、`src/mindmap/code/NodeCodeSettings.ts`、`styles.css`
 - 画布边界与导航：`src/mindmap/CanvasBoundsController.ts`、`src/mindmap/navigation/MindMapNavigatorController.ts`
 - 画布节点多选：`src/mindmap/interaction/NodeSelectionController.ts`、`styles.css`
-- 脑图样式与快捷键检查器：`src/mindmap/style/`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/mindmap/interaction/PluginShortcutCatalog.ts`、`src/MindMapView.ts`、`src/settingTab.ts`、`styles.css`
+- 脑图样式与快捷键：`src/mindmap/style/`、`src/mindmap/interaction/MindMapShortcutCatalog.ts`、`src/mindmap/interaction/MindMapShortcutRouter.ts`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/mindmap/interaction/MindMapShortcutManagerModal.ts`、`src/MindMapView.ts`、`src/settingTab.ts`、`styles.css`
 - 已确认视觉示例：`docs/assets/node-insert-toolbar-concept.png`
 
 ## 设计原则
@@ -68,7 +68,7 @@ token_source: design-tokens.json
 - 右下角导航控件提供小视图、视口框、缩放滑动条、加减按钮、百分比显示、可见/总节点数、隐藏/恢复按钮和 hover 四角拖拽缩放点；控件属于画布级 UI，不属于节点编辑工具栏。
 - 脑图视图的样式模板入口使用标题栏调色板操作；该操作切换当前脑图视图内的右侧样式检查器，不创建 Obsidian 全局侧栏。
 - 样式检查器使用单列模板卡片，卡片以自然内容高度完整展示可换行的模板名称、根节点、分支线和调色板缩略效果；模板的具体色值由集中模板目录维护，不散落在 CSS 规则中。
-- 脑图标题栏的键盘操作打开当前视图内的右侧快捷键检查器；快捷键与样式检查器共用同一右侧空间，显式切换入口时只保留目标检查器。常规桌面宽度下快捷键检查器为约 280px 的稳定侧栏，避免动作名称和键帽在画布可用时被压缩截断；面板仅作为高频速查入口，分组展示可配置节点新建操作、固定节点/剪贴板/编辑格式操作，并从 Obsidian 当前热键注册表读取“批量编号子节点”、`Undo`、`Redo` 的有效组合键。完整插件命令目录放在插件设置页的默认折叠区块中。
+- 脑图标题栏的键盘操作打开当前视图内的右侧快捷键检查器；快捷键与样式检查器共用同一右侧空间，显式切换入口时只保留目标检查器。常规桌面宽度下快捷键检查器为约 280px 的稳定侧栏，避免动作名称和键帽在画布可用时被压缩截断；面板仅作为高频速查入口，分组展示约 10–15 项常用局部快捷键，并提供“管理全部快捷键”入口。全集使用独立 Obsidian `Modal`，支持搜索、分类、录制、清除、恢复默认和仅看已修改；插件设置页只提供全集入口、恢复默认和局部生效说明，不展开长列表。
 - 优先使用 Obsidian 提供的图标、弹窗和搜索选择器。
 
 ## 交互模式
@@ -83,8 +83,8 @@ token_source: design-tokens.json
 - 编辑或删除链接只影响目标链接，并通过节点文本命令历史支持撤销和重做。
 - 链接图标不参与节点正文宽度计算，避免改变分支线位置。
 - 节点新增和删除只使用画布键盘状态机：选中态 `Space` 进入编辑，`Backspace` 删除当前非根节点及子节点，`Enter` 默认在下方新增同级，`Shift+Enter` 默认在上方新增同级；根节点的下方新增快捷键仍新增一级子节点，上方新增不执行操作。新节点创建后立即进入编辑态；普通新节点全选默认文案，从 `数字.` 或 `数字)` 节点新增同级节点时保留自动生成的编号前缀并只选中默认正文。编辑态 `Enter` 结束编辑，`Shift+Enter` 插入 Markdown `<br>` 节点内换行，`Tab` 新增子节点；`Ctrl`/`Cmd+B`、`Ctrl`/`Cmd+I` 与 `Ctrl`/`Cmd+Shift+S` 分别切换选区的加粗、斜体与删除线 Markdown 标记，空选区插入标记对并将光标置中。
-- 快捷键检查器仅允许修改新增上方/下方同级节点的全局绑定；这两项以纵向录制卡展示完整动作名和全宽键帽，恢复默认作为区块级低强调操作。固定节点、剪贴板、撤销重做与编辑格式操作使用轻量只读列表；“批量编号子节点”、`Undo`、`Redo` 只显示简洁动作名及宿主当前有效绑定，不重复插件前缀。插件设置页的完整快捷键目录默认折叠，提供跳转 Obsidian 快捷键设置并按插件筛选的入口；两处展示复用同一宿主热键目录，不建立第二套绑定配置。录制须拒绝固定节点操作或两个可配置操作之间的冲突，保存后立即作用于所有已打开脑图。
-- 脑图键盘操作只在当前活动脑图画布内生效；输入框、按钮、链接、可编辑元素及其他交互控件保留宿主行为。静止空白画布单击在清空选择后将焦点留在画布，使无节点选中时仍可执行脑图撤销或重做。方向导航只为真实展开状态变化写入 History，叶节点或已展开节点不得产生无效历史项。
+- 右侧常用面板和全集管理器读写同一份插件级局部快捷键配置；录制须拒绝适用上下文存在交集的重复绑定，互斥上下文允许复用同一按键。保存、清除和恢复默认后立即同步所有已打开脑图。插件命令仍保留在 Obsidian 命令面板，但插件不声明全局默认热键，也不改写用户主动设置的 Obsidian 全局绑定。
+- 脑图键盘操作只在当前活动脑图画布内且操作上下文匹配时生效；输入框、按钮、链接、弹窗、非节点可编辑元素及其他交互控件保留宿主行为。静止空白画布单击在清空选择后将焦点留在画布，使无节点选中时仍可执行脑图撤销或重做。方向导航只为真实展开状态变化写入 History，叶节点或已展开节点不得产生无效历史项。
 - 编辑态图片显示为可选中的图片控件，不显示原始图片 Markdown；点击图片选中，拖拽手柄调整宽度，`Backspace` 或 `Delete` 删除选中图片。选中描边和缩放手柄必须完整可见，不得触发节点正文滚动条或改变节点布局尺寸。
 - 编辑态已选中的图片可拖到节点正文上方或下方，拖动时使用强调色横线提示唯一落点；图片手势不得触发节点整体拖动。聚焦图片后可使用 `Alt+↑/↓/←/→` 将图片放到文字对应方向，四项均注册为可重新绑定的 Obsidian 命令。多图节点只移动当前图片，其余内容保持相对顺序。
 - 编辑态双击图片打开只读大图预览；双击不得冒泡为节点编辑手势，关闭预览后仅在原编辑会话仍有效时恢复图片焦点。预览不修改节点 Markdown、图片宽度或撤销历史。
@@ -121,7 +121,7 @@ token_source: design-tokens.json
 ## 可访问性
 
 - 每个工具栏操作必须提供可访问名称和可见提示。
-- 快捷键检查器的打开、关闭、录制和恢复默认控件必须可键盘聚焦；录制状态和冲突提示必须被辅助技术识别。
+- 快捷键检查器与全集管理器的打开、关闭、搜索、筛选、录制、清除和恢复默认控件必须可键盘聚焦；录制状态和冲突提示必须被辅助技术识别。
 - 链接图标必须可聚焦并提供链接标题作为可访问名称；上下文菜单使用宿主键盘导航。
 - 图片预览 Modal 必须提供可访问标题和图片替代文本，关闭后将焦点恢复到仍有效的原编辑图片。
 - 编辑态图片必须提供可访问的换位说明和键盘等价操作；拖动时同步 `aria-grabbed`，完成换位后焦点回到移动后的图片。

@@ -4,8 +4,7 @@ import {
   TFile,
   TFolder,
   ViewState,
-  MarkdownView,
-  Platform
+  MarkdownView
 } from 'obsidian';
 // import DEFAULT_SETTINGS from './setting'
 import { around } from 'monkey-around'
@@ -17,10 +16,10 @@ import { frontMatterKey, createMindmapFrontmatter } from './constants';
 import { t } from './lang/helpers'
 import { DEFAULT_MINDMAP_STYLE_TEMPLATE_ID, resolveMindMapStyleTemplate } from './mindmap/style/MindMapStyle';
 import {
-  createDefaultNodeKeyboardShortcuts,
-  NodeKeyboardShortcuts,
-  normalizeNodeKeyboardShortcuts,
-} from './mindmap/interaction/NodeKeyboardShortcuts';
+  createDefaultMindMapShortcuts,
+  MindMapShortcuts,
+  normalizeMindMapShortcuts,
+} from './mindmap/interaction/MindMapShortcutCatalog';
 import { NodeImagePosition } from './mindmap/image/NodeImageMarkdown';
 import {
   DEFAULT_NODE_WIDTH_SETTINGS,
@@ -170,12 +169,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Undo',
       name: `${t('Undo')}`,
-      hotkeys: [
-        {
-          modifiers: ['Mod'],
-          key: 'Z',
-        },
-      ],
       checkCallback: (checking: boolean) => {
         const mindmap = this.getActiveMindMapForHistory();
         if (!mindmap) return false;
@@ -187,9 +180,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Redo',
       name: `${t('Redo')}`,
-      hotkeys: Platform.isMacOS
-        ? [{ modifiers: ['Mod', 'Shift'], key: 'Z' }]
-        : [{ modifiers: ['Mod'], key: 'Y' }],
       checkCallback: (checking: boolean) => {
         const mindmap = this.getActiveMindMapForHistory();
         if (!mindmap) return false;
@@ -202,12 +192,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Edit node',
       name: `${t('Edit node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Shift'],
-          key: 'F2',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -224,12 +208,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Delete node & child',
       name: `${t('Delete node & child')}`,
-      hotkeys: [
-        {
-          modifiers: ['Shift'],
-          key: 'Delete',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -265,12 +243,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Bold the node\'s text',
       name: `${t('Bold the node\'s text')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'B',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -304,12 +276,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Italicize the node\'s text',
       name: `${t('Italicize the node\'s text')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'I',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -374,12 +340,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Highlight the node\'s text',
       name: `${t('Highlight the node\'s text')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'H',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -440,12 +400,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Add tabulation',
       name: `${t('Add tabulation')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 't',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -467,12 +421,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Add line break (<br>)',
       name: `${t('Add line break (<br>)')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt','Ctrl', 'Shift'],
-          key: 'l',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -492,12 +440,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Remove line breaks (<br>)',
       name: `${t('Remove line breaks (<br>)')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt','Shift'],
-          key: 'l',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -546,12 +488,6 @@ export default class MindMapPlugin extends Plugin {
       this.addCommand({
         id: command.id,
         name: command.name,
-        hotkeys: [
-          {
-            modifiers: ['Alt'],
-            key: command.key,
-          },
-        ],
         callback: () => {
           const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
           mindmapView?.mindmap.editNode?.moveFocusedEditImageToPosition(command.position);
@@ -580,12 +516,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Expand one level from the max. displayed level',
       name: `${t('Expand one level from the max. displayed level')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt'],
-          key: 'PageDown',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -633,12 +563,6 @@ export default class MindMapPlugin extends Plugin {
       this.addCommand({
         id: 'Collapse one level from the max. displayed level',
         name: `${t('Collapse one level from the max. displayed level')}`,
-        hotkeys: [
-          {
-            modifiers: ['Alt'],
-            key: 'PageUp',
-          },
-        ],
           callback: () => {
           const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
           if(mindmapView){
@@ -661,12 +585,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Toggle expand/collapse node',
       name: `${t('Toggle expand/collapse node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Mod', 'Shift'],
-          key: 'Space',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -683,12 +601,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Move the current node above',
       name: `${t('Move the current node above')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'ArrowUp',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -722,12 +634,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Move the current node below',
       name: `${t('Move the current node below')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'ArrowDown',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -761,12 +667,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Move the current node left',
       name: `${t('Move the current node left')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'ArrowLeft',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -801,12 +701,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Move the current node right',
       name: `${t('Move the current node right')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'ArrowRight',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -845,12 +739,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Move next siblings as children',
       name: `${t('Move next siblings as children')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'D',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -867,12 +755,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Move all siblings as children',
       name: `${t('Move all siblings as children')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Ctrl', 'Shift'],
-          key: 'D',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -890,12 +772,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Join with the node below',
       name: `${t('Join with the node below')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'J',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -912,12 +788,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Join as citation with the node below',
       name: `${t('Join as citation with the node below')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift', 'Ctrl'],
-          key: 'J',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -934,12 +804,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Center mindmap view on the current node',
       name: `${t('Center mindmap view on the current node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt'],
-          key: 'E',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -966,12 +830,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Zoom in',
       name: `${t('Zoom in')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt'],
-          key: '=',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -985,12 +843,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Zoom out',
       name: `${t('Zoom out')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt'],
-          key: '-',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -1169,6 +1021,7 @@ export default class MindMapPlugin extends Plugin {
   }
 
   async loadSettings() {
+    const storedSettings = await this.loadData() || {};
     this.settings = Object.assign({
       canvasSize: 8000,
       headLevel: 2,
@@ -1180,27 +1033,32 @@ export default class MindMapPlugin extends Plugin {
       defaultStyleTemplate: DEFAULT_MINDMAP_STYLE_TEMPLATE_ID,
       showLinkTitle: false,
       ...DEFAULT_NODE_WIDTH_SETTINGS,
-      nodeKeyboardShortcuts: createDefaultNodeKeyboardShortcuts(),
-    }, await this.loadData());
+      mindMapShortcuts: createDefaultMindMapShortcuts(),
+    }, storedSettings);
     Object.assign(this.settings, normalizeNodeWidthSettings(this.settings));
     this.settings.codeFontSize = normalizeNodeCodeFontSize(this.settings.codeFontSize);
-    this.settings.nodeKeyboardShortcuts = normalizeNodeKeyboardShortcuts(
-      this.settings.nodeKeyboardShortcuts,
+    this.settings.mindMapShortcuts = normalizeMindMapShortcuts(
+      Object.prototype.hasOwnProperty.call(storedSettings, 'mindMapShortcuts')
+        ? this.settings.mindMapShortcuts
+        : undefined,
+      storedSettings.nodeKeyboardShortcuts,
     );
+    delete (this.settings as any).nodeKeyboardShortcuts;
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
   }
 
-  async updateNodeKeyboardShortcuts(shortcuts: NodeKeyboardShortcuts) {
-    const normalizedShortcuts = normalizeNodeKeyboardShortcuts(shortcuts);
-    this.settings.nodeKeyboardShortcuts = normalizedShortcuts;
+  async updateMindMapShortcuts(shortcuts: MindMapShortcuts) {
+    const normalizedShortcuts = normalizeMindMapShortcuts(shortcuts);
+    this.settings.mindMapShortcuts = normalizedShortcuts;
     await this.saveSettings();
 
     this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
       const view = leaf.view as MindMapView;
-      if (view.mindmap) view.mindmap.setting.nodeKeyboardShortcuts = normalizedShortcuts;
+      if (view.mindmap) view.mindmap.setting.mindMapShortcuts = normalizedShortcuts;
+      view.refreshShortcutInspector();
     });
   }
 

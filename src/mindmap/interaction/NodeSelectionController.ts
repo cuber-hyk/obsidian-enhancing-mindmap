@@ -1,18 +1,15 @@
 import type Node from '../INode';
 import type MindMap from '../mindmap';
+import {
+  matchesMindMapShortcut,
+  MindMapShortcutId,
+  normalizeMindMapShortcuts,
+} from './MindMapShortcutCatalog';
 
-const BLOCKED_MULTI_SELECTION_KEYS = new Set([
-  'Backspace',
-  'Delete',
-  ' ',
-  'Enter',
-  'Tab',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'Home',
-]);
+const SINGLE_NODE_SHORTCUTS: MindMapShortcutId[] = [
+  'addSiblingAfter', 'addSiblingBefore', 'addChild', 'editNode', 'deleteNode',
+  'navigateUp', 'navigateDown', 'navigateLeft', 'navigateRight', 'navigateRoot',
+];
 const BLANK_CLICK_MOVE_THRESHOLD = 4;
 
 export default class NodeSelectionController {
@@ -333,7 +330,10 @@ export default class NodeSelectionController {
   private isBatchDeleteEvent(event: KeyboardEvent): boolean {
     if (
       !this.hasMultipleSelection() ||
-      (event.key !== 'Backspace' && event.key !== 'Delete') ||
+      !matchesMindMapShortcut(
+        normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts).deleteNode,
+        event,
+      ) ||
       event.ctrlKey ||
       event.metaKey ||
       event.altKey ||
@@ -362,7 +362,9 @@ export default class NodeSelectionController {
   }
 
   private blockSingleNodeShortcut(event: KeyboardEvent): boolean {
-    if (!this.hasMultipleSelection() || !BLOCKED_MULTI_SELECTION_KEYS.has(event.key)) return false;
+    if (!this.hasMultipleSelection()) return false;
+    const shortcuts = normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts);
+    if (!SINGLE_NODE_SHORTCUTS.some((id) => matchesMindMapShortcut(shortcuts[id], event))) return false;
     event.preventDefault();
     event.stopPropagation();
     return true;

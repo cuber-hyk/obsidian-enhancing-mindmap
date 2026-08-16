@@ -3,6 +3,7 @@ import type Node from '../INode';
 import type MindMap from '../mindmap';
 import {parseMarkdownNodeForest} from '../clipboard/NodeMarkdownPaste';
 import {t} from '../../lang/helpers';
+import { matchesMindMapShortcut, normalizeMindMapShortcuts } from './MindMapShortcutCatalog';
 
 type ClipboardAction = 'copy' | 'cut' | 'paste';
 
@@ -159,18 +160,15 @@ export default class NodeClipboardController {
     if (
       event.defaultPrevented ||
       event.isComposing ||
-      this.mindmap.isComposing ||
-      (!event.ctrlKey && !event.metaKey) ||
-      event.altKey ||
-      event.shiftKey
+      this.mindmap.isComposing
     ) {
       return null;
     }
 
-    const key = event.key.toLowerCase();
-    if (key === 'c') return 'copy';
-    if (key === 'x') return 'cut';
-    if (key === 'v') return 'paste';
+    const shortcuts = normalizeMindMapShortcuts(this.mindmap.setting.mindMapShortcuts);
+    if (matchesMindMapShortcut(shortcuts.copyNode, event)) return 'copy';
+    if (matchesMindMapShortcut(shortcuts.cutNode, event)) return 'cut';
+    if (matchesMindMapShortcut(shortcuts.pasteNode, event)) return 'paste';
     return null;
   }
 

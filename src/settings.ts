@@ -1,7 +1,7 @@
 import {
-    createDefaultNodeKeyboardShortcuts,
-    NodeKeyboardShortcuts,
-} from './mindmap/interaction/NodeKeyboardShortcuts';
+    createDefaultMindMapShortcuts,
+    MindMapShortcuts,
+} from './mindmap/interaction/MindMapShortcutCatalog';
 import {
     DEFAULT_NODE_WIDTH_SETTINGS,
     NodeWidthSettings,
@@ -25,5 +25,5 @@ export class MindMapSettings implements NodeWidthSettings {
     textNodeMaxWidth:number = DEFAULT_NODE_WIDTH_SETTINGS.textNodeMaxWidth;
     nodeImageMinWidth:number = DEFAULT_NODE_WIDTH_SETTINGS.nodeImageMinWidth;
     nodeImageMaxWidth:number = DEFAULT_NODE_WIDTH_SETTINGS.nodeImageMaxWidth;
-    nodeKeyboardShortcuts: NodeKeyboardShortcuts = createDefaultNodeKeyboardShortcuts();
+    mindMapShortcuts: MindMapShortcuts = createDefaultMindMapShortcuts();
 }

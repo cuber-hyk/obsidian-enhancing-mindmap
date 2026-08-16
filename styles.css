@@ -1431,6 +1431,105 @@
   white-space: nowrap;
 }
 
+.mm-shortcut-manage-all {
+  width: calc(100% - 24px);
+  margin: 0 12px 10px;
+}
+
+.mm-shortcut-manager-modal {
+  width: min(860px, calc(100vw - 48px));
+  max-height: min(760px, calc(100vh - 48px));
+}
+
+.mm-shortcut-manager-header h2 {
+  margin-bottom: 4px;
+}
+
+.mm-shortcut-manager-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 12px 0;
+  background: var(--background-primary);
+}
+
+.mm-shortcut-manager-toolbar label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.mm-shortcut-manager-list {
+  max-height: min(600px, calc(100vh - 230px));
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.mm-shortcut-manager-section {
+  margin-bottom: 18px;
+}
+
+.mm-shortcut-manager-section-header,
+.mm-shortcut-manager-row,
+.mm-shortcut-manager-controls {
+  display: flex;
+  align-items: center;
+}
+
+.mm-shortcut-manager-section-header,
+.mm-shortcut-manager-row {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mm-shortcut-manager-section-header h3 {
+  margin: 8px 0;
+  font-size: var(--font-ui-medium);
+}
+
+.mm-shortcut-manager-section-header button {
+  font-size: var(--font-ui-smaller);
+}
+
+.mm-shortcut-manager-row {
+  min-height: 52px;
+  padding: 7px 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.mm-shortcut-manager-row > :first-child {
+  min-width: 0;
+}
+
+.mm-shortcut-manager-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-shortcut-manager-controls {
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.mm-shortcut-manager-controls > button:first-child {
+  min-width: 126px;
+  font-family: var(--font-monospace);
+}
+
+.mm-shortcut-manager-controls .is-recording {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.mm-shortcut-manager-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
 @media (max-width: 480px) {
   .mm-mindmap-style-inspector,
   .mm-mindmap-shortcut-inspector {

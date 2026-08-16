@@ -32,7 +32,7 @@
 | 审计 | `CONTEXT.md`、相关能力文档 | 相关 `src/` 入口及 `package.json` 脚本 | 使用 `dev-audit`，报告写入 `docs/audits/`。 |
 | 发布说明 | `CHANGELOG.md` | `manifest.json`、`versions.json`、Git 历史 | 使用 `dev-changelog`。 |
 | 架构决策 | `CONTEXT.md`、相关能力文档与 ADR | 公开视图、命令及节点入口 | 仅在 ADR 门禁通过后创建 ADR。 |
-| UI、页面或组件 | `DESIGN.md`、相关能力文档 | `styles.css`、`src/mindmap/INode.ts`、`src/mindmap/insert/NodeInsertController.ts`、`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/code/NodeCodeController.ts`、`src/mindmap/code/NodeCodeEditorModal.ts`、`src/mindmap/code/NodeCodeRenderer.ts`、`src/mindmap/navigation/MindMapNavigatorController.ts` | 复用 Obsidian UI 语义；可复用规则变化时使用 `dev-design-system`。 |
+| UI、页面或组件 | `DESIGN.md`、相关能力文档 | `styles.css`、`src/mindmap/INode.ts`、`src/mindmap/insert/NodeInsertController.ts`、`src/mindmap/link/NodeLinkController.ts`、`src/mindmap/code/NodeCodeController.ts`、`src/mindmap/code/NodeCodeEditorModal.ts`、`src/mindmap/code/NodeCodeRenderer.ts`、`src/mindmap/navigation/MindMapNavigatorController.ts`、`src/mindmap/interaction/MindMapShortcutInspector.ts`、`src/mindmap/interaction/MindMapShortcutManagerModal.ts` | 复用 Obsidian UI 语义；可复用规则变化时使用 `dev-design-system`。 |
 
 ## 计划就绪规则
 
@@ -75,3 +75,4 @@
 - 2026-07-31：增加剪贴板 Markdown 节点森林解析 owner 模块路由。
 - 2026-08-08：增加运行时画布边界 owner 模块路由。
 - 2026-08-11：增加节点代码块解析、卡片交互、独立编辑与显示设置 owner 模块路由。
+- 2026-08-16：增加脑图局部快捷键目录、路由、常用面板和全集管理器 owner 模块路由。
