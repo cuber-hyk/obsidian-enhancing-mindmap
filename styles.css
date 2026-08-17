@@ -1627,6 +1627,10 @@
   display: none;
 }
 
+.nav-file-title.mm-mindmap-file-title > .iconic-icon:not(.mm-mindmap-file-icon) {
+  visibility: hidden;
+}
+
 .mm-mindmap-file-icon {
   display: inline-flex;
   flex: 0 0 auto;
@@ -1634,6 +1638,12 @@
   justify-content: center;
   margin-inline-end: var(--size-2-1);
   color: var(--text-muted);
+}
+
+.nav-file-title.mm-mindmap-file-title:has(> .iconic-icon) > .mm-mindmap-file-icon {
+  position: absolute;
+  inset-inline-start: var(--mm-mindmap-file-icon-inline-start, var(--size-4-1));
+  margin-inline-end: 0;
 }
 
 .mm-mindmap-file-icon svg {
