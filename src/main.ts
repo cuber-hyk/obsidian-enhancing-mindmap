@@ -29,6 +29,9 @@ import {
   DEFAULT_NODE_CODE_FONT_SIZE,
   normalizeNodeCodeFontSize,
 } from './mindmap/code/NodeCodeSettings';
+import MindMapFileIconController, {
+  MINDMAP_FILE_ICON,
+} from './mindmap/file/MindMapFileIconController';
 
 
 export default class MindMapPlugin extends Plugin {
@@ -959,6 +962,7 @@ export default class MindMapPlugin extends Plugin {
 
 
     this.registerView(mindmapViewType, (leaf) => new MindMapView(leaf, this));
+    this.addChild(new MindMapFileIconController(this.app));
     this.registerEvents();
     this.registerMonkeyAround();
 
@@ -1089,7 +1093,7 @@ export default class MindMapPlugin extends Plugin {
           menu.addItem((item) => {
             item
               .setTitle(`${t('New mindmap board')}`)
-              .setIcon('document')
+              .setIcon(MINDMAP_FILE_ICON)
               .onClick(() => this.newMindMap(file));
           });
         }
@@ -1102,7 +1106,7 @@ export default class MindMapPlugin extends Plugin {
                   menu.addItem((item) => {
                    item
                    .setTitle(`${t('Open as mindmap board')}`)
-                   .setIcon("document")
+                   .setIcon(MINDMAP_FILE_ICON)
                    .onClick(() => {
                      this.mindmapFileModes[leaf.id || file.path] = mindmapViewType;
                      this.setMindMapView(leaf);

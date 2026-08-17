@@ -33,6 +33,7 @@ import {
 } from './mindmap/table/NodeTableMarkdown';
 import { uuid } from './mindmap/NodeId';
 import { restoreLeadingOrderedNodeMarker } from './mindmap/interaction/OrderedSiblingNumbering';
+import { MINDMAP_FILE_ICON } from './mindmap/file/MindMapFileIconController';
 import {
   protectMindMapCodeBlocks,
   restoreProtectedMindMapCodeBlocks,
@@ -56,7 +57,7 @@ interface MindMapViewState {
 
 
 export const mindmapViewType = "mindmapView";
-export const mindmapIcon = "blocks";
+export const mindmapIcon = MINDMAP_FILE_ICON;
 
 export class MindMapView extends TextFileView implements HoverParent {
   plugin: MindMapPlugin;

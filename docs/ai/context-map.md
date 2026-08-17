@@ -29,6 +29,7 @@
 |---|---|---|---|
 | 模糊想法 | `CONTEXT.md`、`docs/capabilities/mindmap-editing.md` | `src/mindmap/INode.ts`、`src/mindmap/mindmap.ts` | 使用 `dev-brainstorm`，确认后转入 `dev-plan`。 |
 | 功能或缺陷 | `CONTEXT.md`、相关能力文档 | `src/main.ts`、`src/MindMapView.ts`、相关 `src/mindmap/*.ts` | 先使用 `dev-orient`。节点插入、键盘状态机与节点多选、剪贴板 Markdown 解析、链接操作、图片附件、代码块、画布边界、画布导航和样式模板分别由 `src/mindmap/insert/`、`src/mindmap/interaction/`、`src/mindmap/clipboard/`、`src/mindmap/link/`、`src/mindmap/image/`、`src/mindmap/code/`、`src/mindmap/CanvasBoundsController.ts`、`src/mindmap/navigation/`、`src/mindmap/style/` 负责。 |
+| 脑图文件身份与图标 | `CONTEXT.md`、`docs/capabilities/mindmap-file-identity.md`、`DESIGN.md` | `src/mindmap/file/MindMapFileIconController.ts`、`src/main.ts`、`src/MindMapView.ts`、`styles.css` | 文件身份严格来自 `mindmap-plugin: basic`；文件树 DOM 适配、刷新和清理由 controller 集中负责。 |
 | 审计 | `CONTEXT.md`、相关能力文档 | 相关 `src/` 入口及 `package.json` 脚本 | 使用 `dev-audit`，报告写入 `docs/audits/`。 |
 | 发布说明 | `CHANGELOG.md` | `manifest.json`、`versions.json`、Git 历史 | 使用 `dev-changelog`。 |
 | 架构决策 | `CONTEXT.md`、相关能力文档与 ADR | 公开视图、命令及节点入口 | 仅在 ADR 门禁通过后创建 ADR。 |
@@ -76,3 +77,4 @@
 - 2026-08-08：增加运行时画布边界 owner 模块路由。
 - 2026-08-11：增加节点代码块解析、卡片交互、独立编辑与显示设置 owner 模块路由。
 - 2026-08-16：增加脑图局部快捷键目录、路由、常用面板和全集管理器 owner 模块路由。
+- 2026-08-17：增加脑图文件身份、专属图标和文件资源管理器 controller 路由。
