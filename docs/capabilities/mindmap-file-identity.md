@@ -18,6 +18,7 @@ adr_reviewed: not_required
 - `enhancing-mindmap-file` 是脑图文档专属图标的唯一 ID；脑图视图、标签页、新建脑图和“以脑图打开”等入口复用该图标。
 - 图标使用 `0 0 100 100` 视区内的文档轮廓与导图分支组合，颜色继承 `currentColor`，文件资源管理器中的实例仅作装饰并设置 `aria-hidden`。
 - `MindMapFileIconController` 只通过 `MetadataCache` 判断文件身份，不为图标显示读取或写入 Markdown 正文。
+- 脑图文件行只显示插件拥有的专属图标；Obsidian 原生 `.nav-file-icon` 与 Iconic 直接插入的 `.iconic-icon` 仅在该行被隐藏，专属图标按 Iconic 当前槽位的实际位置对齐，身份移除或插件卸载后由宿主样式自然恢复。
 - controller 在工作区布局就绪后观察当前桌面文件资源管理器的 `.nav-files-container`；只扫描其中可见且带 `data-path` 的文件行，并按动画帧合并元数据、Vault、布局和 DOM 变化触发的刷新。
 - 文件资源管理器 DOM 是非公开宿主契约。预期的容器、文件行或标题内容不存在时，controller 安全跳过，不改变文件树交互或创建替代文件类型。
 - 重复刷新不会重复插入插件图标；frontmatter 不再匹配、文件行被复用或插件卸载时，controller 移除专属 class、SVG 和自定义图标注册，取消待执行刷新并断开 MutationObserver。

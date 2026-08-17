@@ -43464,6 +43464,7 @@ const FILE_TITLE_SELECTOR = '.nav-file-title[data-path]';
 const FILE_TITLE_CONTENT_SELECTOR = ':scope > .nav-file-title-content';
 const FILE_TITLE_CLASS = 'mm-mindmap-file-title';
 const FILE_ICON_CLASS = 'mm-mindmap-file-icon';
+const FILE_ICON_INLINE_START_PROPERTY = '--mm-mindmap-file-icon-inline-start';
 class MindMapFileIconController extends obsidian.Component {
     constructor(app) {
         super();
@@ -43559,18 +43560,37 @@ class MindMapFileIconController extends obsidian.Component {
             return;
         }
         titleEl.classList.add(FILE_TITLE_CLASS);
-        if (titleEl.querySelector(`:scope > .${FILE_ICON_CLASS}`))
-            return;
-        const contentEl = titleEl.querySelector(FILE_TITLE_CONTENT_SELECTOR);
-        if (!contentEl) {
-            titleEl.classList.remove(FILE_TITLE_CLASS);
+        let iconEl = titleEl.querySelector(`:scope > .${FILE_ICON_CLASS}`);
+        if (!iconEl) {
+            const contentEl = titleEl.querySelector(FILE_TITLE_CONTENT_SELECTOR);
+            if (!contentEl) {
+                titleEl.classList.remove(FILE_TITLE_CLASS);
+                return;
+            }
+            iconEl = document.createElement('span');
+            iconEl.classList.add(FILE_ICON_CLASS);
+            iconEl.setAttribute('aria-hidden', 'true');
+            obsidian.setIcon(iconEl, MINDMAP_FILE_ICON);
+            titleEl.insertBefore(iconEl, contentEl);
+        }
+        this.alignIconWithIconicSlot(titleEl, iconEl);
+    }
+    alignIconWithIconicSlot(titleEl, iconEl) {
+        const iconicEl = titleEl.querySelector(`:scope > .iconic-icon:not(.${FILE_ICON_CLASS})`);
+        if (!iconicEl) {
+            iconEl.style.removeProperty(FILE_ICON_INLINE_START_PROPERTY);
             return;
         }
-        const iconEl = document.createElement('span');
-        iconEl.classList.add('nav-file-icon', FILE_ICON_CLASS);
-        iconEl.setAttribute('aria-hidden', 'true');
-        obsidian.setIcon(iconEl, MINDMAP_FILE_ICON);
-        titleEl.insertBefore(iconEl, contentEl);
+        const titleRect = titleEl.getBoundingClientRect();
+        const iconicRect = iconicEl.getBoundingClientRect();
+        if (iconicRect.width === 0 && iconicRect.height === 0) {
+            iconEl.style.removeProperty(FILE_ICON_INLINE_START_PROPERTY);
+            return;
+        }
+        const inlineStart = getComputedStyle(titleEl).direction === 'rtl'
+            ? titleRect.right - iconicRect.right
+            : iconicRect.left - titleRect.left;
+        iconEl.style.setProperty(FILE_ICON_INLINE_START_PROPERTY, `${inlineStart}px`);
     }
     cleanupDecorations(scope) {
         scope.querySelectorAll(`.${FILE_TITLE_CLASS}`).forEach((titleEl) => {
