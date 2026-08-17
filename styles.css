@@ -1623,3 +1623,21 @@
   gap: 8px;
 }
 
+.nav-file-title.mm-mindmap-file-title > .nav-file-icon:not(.mm-mindmap-file-icon) {
+  display: none;
+}
+
+.mm-mindmap-file-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-inline-end: var(--size-2-1);
+  color: var(--text-muted);
+}
+
+.mm-mindmap-file-icon svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+

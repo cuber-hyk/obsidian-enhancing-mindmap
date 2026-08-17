@@ -69,6 +69,7 @@ token_source: design-tokens.json
 - 脑图视图的样式模板入口使用标题栏调色板操作；该操作切换当前脑图视图内的右侧样式检查器，不创建 Obsidian 全局侧栏。
 - 样式检查器使用单列模板卡片，卡片以自然内容高度完整展示可换行的模板名称、根节点、分支线和调色板缩略效果；模板的具体色值由集中模板目录维护，不散落在 CSS 规则中。
 - 脑图标题栏的键盘操作打开当前视图内的右侧快捷键检查器；快捷键与样式检查器共用同一右侧空间，显式切换入口时只保留目标检查器。常规桌面宽度下快捷键检查器为约 280px 的稳定侧栏，避免动作名称和键帽在画布可用时被压缩截断；面板仅作为高频速查入口，分组展示约 10–15 项常用局部快捷键，并提供“管理全部快捷键”入口。全集使用独立 Obsidian `Modal`，支持搜索、分类、录制、清除、恢复默认和仅看已修改；插件设置页只提供全集入口、恢复默认和局部生效说明，不展开长列表。
+- 带有 `mindmap-plugin: basic` frontmatter 的脑图文档在文件资源管理器、脑图标签页和脑图相关菜单中复用同一个专属图标；图标使用文档轮廓与导图分支组合、`currentColor` 单色描边和 Obsidian/Lucide 的圆角语义，不以固定颜色表达文件身份。
 - 优先使用 Obsidian 提供的图标、弹窗和搜索选择器。
 
 ## 交互模式
@@ -116,11 +117,13 @@ token_source: design-tokens.json
 - `src/mindmap/mindmap.ts` 和 `src/mindmap/INode.ts` 仅保留生命周期与编辑接线。
 - 节点表格的识别、保护和 Markdown 序列化放入 `src/mindmap/table/NodeTableMarkdown.ts`；预览交互和编辑 Modal 分别由 `src/mindmap/table/NodeTablePreviewController.ts` 和 `src/mindmap/table/NodeTableEditorModal.ts` 负责，视图、节点和脑图模块不得重复实现表格语法解析或表格 UI。
 - 节点代码围栏、尺寸元数据和文档保护放入 `src/mindmap/code/NodeCodeMarkdown.ts`；Obsidian 高亮渲染由 `src/mindmap/code/NodeCodeRenderer.ts` 统一提供；卡片交互、独立编辑 Modal 和显示设置分别由同目录的 Controller、Modal 和 Settings 模块负责，`INode` 与 `MindMapView` 只保留生命周期和保护恢复接线。
+- 脑图文件身份判断、专属图标注册、文件资源管理器 DOM 装饰、刷新调度和卸载清理由 `src/mindmap/file/MindMapFileIconController.ts` 统一负责；宿主 DOM 不满足预期时安全跳过，不得读取或改写 Markdown 正文，也不得把选择器和观察器逻辑散落到插件或视图入口。
 - 验证 Obsidian 深色、浅色主题以及活动节点的焦点和选区行为。
 
 ## 可访问性
 
 - 每个工具栏操作必须提供可访问名称和可见提示。
+- 文件资源管理器中的专属图标仅作装饰并设置 `aria-hidden`；文件名继续承担可访问名称，脑图身份必须依靠图形轮廓而不是颜色区分。
 - 快捷键检查器与全集管理器的打开、关闭、搜索、筛选、录制、清除和恢复默认控件必须可键盘聚焦；录制状态和冲突提示必须被辅助技术识别。
 - 链接图标必须可聚焦并提供链接标题作为可访问名称；上下文菜单使用宿主键盘导航。
 - 图片预览 Modal 必须提供可访问标题和图片替代文本，关闭后将焦点恢复到仍有效的原编辑图片。
